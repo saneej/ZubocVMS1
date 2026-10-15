@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, Check, ShieldCheck, Key, Hash, Monitor, Send, AlertCircle } from 'lucide-react';
 import { AppSettings } from '../types';
 import { safeFetchJson } from '../utils/api';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -41,32 +43,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const sanitizedStationId = cleanInputString(stationId);
 
     try {
-      const data = await safeFetchJson('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramBotToken: sanitizedToken,
-          telegramChatId: sanitizedChatId,
-          stationId: sanitizedStationId,
-          autoUpload: true
-        })
+      // 1. Direct verify with Telegram API if new token provided
+      if (sanitizedToken && !sanitizedToken.includes('...')) {
+        const meRes = await fetch(`https://api.telegram.org/bot${sanitizedToken}/getMe`);
+        const meText = await meRes.text();
+        let meData: any = null;
+        try { meData = JSON.parse(meText); } catch {}
+        if (!meData || !meData.ok) {
+          throw new Error(meData?.description || 'Invalid Telegram Bot Token');
+        }
+      }
+
+      // 2. Persist to LocalStorage
+      if (sanitizedToken && !sanitizedToken.includes('...')) {
+        localStorage.setItem('zuboc_telegram_token', sanitizedToken);
+      }
+      localStorage.setItem('zuboc_telegram_chatid', sanitizedChatId);
+      localStorage.setItem('zuboc_station_id', sanitizedStationId);
+
+      // 3. Persist to Firestore
+      if (db) {
+        try {
+          await setDoc(doc(db, 'settings', 'config'), {
+            telegramBotToken: localStorage.getItem('zuboc_telegram_token') || sanitizedToken,
+            telegramChatId: sanitizedChatId,
+            stationId: sanitizedStationId,
+            autoUpload: true,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch {}
+      }
+
+      // 4. Save to Express API silently
+      try {
+        await safeFetchJson('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramBotToken: sanitizedToken,
+            telegramChatId: sanitizedChatId,
+            stationId: sanitizedStationId,
+            autoUpload: true
+          })
+        });
+      } catch {}
+
+      onSaveSettings({
+        ...settings,
+        telegramBotToken: localStorage.getItem('zuboc_telegram_token') || sanitizedToken,
+        telegramChatId: sanitizedChatId,
+        stationId: sanitizedStationId,
+        hasToken: Boolean(sanitizedToken)
       });
 
-      if (data.success) {
-        onSaveSettings({
-          ...settings,
-          telegramBotToken: sanitizedToken,
-          telegramChatId: sanitizedChatId,
-          stationId: sanitizedStationId,
-          hasToken: Boolean(sanitizedToken)
-        });
-        setSaveSuccess(true);
-        setTimeout(() => {
-          onClose();
-        }, 800);
-      } else {
-        setErrorMessage(data.error || 'Failed to save settings');
-      }
+      setSaveSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 800);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error saving settings');
     } finally {

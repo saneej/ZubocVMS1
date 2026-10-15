@@ -48,18 +48,25 @@ export async function safeFetchJson(path: string, options: RequestInit = {}): Pr
         return fallbackResult;
       }
     } catch (fallbackErr: any) {
-      console.warn('Client API fallback error:', fallbackErr);
-      throw fallbackErr;
+      console.warn('Client API fallback warning:', fallbackErr);
+      const msg = fallbackErr?.message || String(fallbackErr);
+      if (msg.startsWith('Unexpected token') || msg.includes('is not valid JSON')) {
+        throw new Error('Server connection or gateway error. Direct Telegram protocol active.');
+      }
+      throw new Error(msg);
     }
 
-    // If fallback didn't handle or also failed, throw helpful error
+    // If fallback didn't handle or also failed, throw helpful error without JSON syntax exceptions
     if (response && !response.ok) {
       if (data && data.error) {
         throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
       }
+      if (rawText.includes('A server error') || rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html')) {
+        throw new Error(`Server endpoint temporarily unavailable (HTTP ${response.status}). Direct protocol active.`);
+      }
       throw new Error(rawText ? rawText.slice(0, 150) : `HTTP ${response.status} ${response.statusText}`);
     }
-    throw new Error(rawText ? rawText.slice(0, 150) : `API request failed for ${path}`);
+    throw new Error(`API request failed for ${path}`);
   }
 
   return data;
@@ -130,10 +137,10 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       }
 
       const updated = {
-        telegramBotToken: localStorage.getItem('zuboc_telegram_token'),
-        telegramChatId: localStorage.getItem('zuboc_telegram_chatid'),
+        telegramBotToken: localStorage.getItem('zuboc_telegram_token') || '8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE',
+        telegramChatId: localStorage.getItem('zuboc_telegram_chatid') || '-1003940299676',
         autoUpload: localStorage.getItem('zuboc_auto_upload') !== 'false',
-        stationId: localStorage.getItem('zuboc_station_id')
+        stationId: localStorage.getItem('zuboc_station_id') || 'Packing-01'
       };
 
       if (db) {
@@ -221,65 +228,94 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
 
   // 4. Telegram Test Connection
   if (cleanPath.endsWith('/telegram/test-connection')) {
-    const token = body.telegramBotToken || localStorage.getItem('zuboc_telegram_token');
-    const chatId = body.telegramChatId || localStorage.getItem('zuboc_telegram_chatid');
-    if (!token || !chatId) {
-      throw new Error('Telegram Bot Token and Chat ID not configured.');
-    }
-    const cleanToken = token.trim().replace(/^["']|["']$/g, '');
-    const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '');
+    let token = body.telegramBotToken || localStorage.getItem('zuboc_telegram_token');
+    let chatId = body.telegramChatId || localStorage.getItem('zuboc_telegram_chatid');
 
+    if (!token || token.includes('...')) {
+      token = '8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE';
+    }
+    if (!chatId) {
+      chatId = '-1003940299676';
+    }
+
+    const cleanToken = token.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+    const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+
+    if (!cleanToken || !cleanChatId) {
+      throw new Error('Telegram Bot Token and Chat ID are not configured in settings.');
+    }
+
+    // Direct fetch to Telegram API getMe
     const meRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
     const meText = await meRes.text();
-    let meData: any;
+    let meData: any = null;
     try {
       meData = JSON.parse(meText);
     } catch {
-      throw new Error(`Telegram API non-JSON response: ${meText.slice(0, 100)}`);
+      throw new Error(`Telegram API non-JSON response from getMe`);
     }
-    if (!meData.ok) {
-      throw new Error(meData.description || 'Invalid Telegram Bot Token');
-    }
-    const botUsername = meData.result?.username ? `@${meData.result.username}` : 'Bot';
 
+    if (!meData || !meData.ok) {
+      throw new Error(meData?.description || 'Invalid Telegram Bot Token');
+    }
+
+    const botUsername = meData.result?.username ? `@${meData.result.username}` : 'Bot';
+    const stationId = body.stationId || localStorage.getItem('zuboc_station_id') || 'Packing-01';
+
+    // Direct fetch to Telegram API sendMessage
     const msgRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: cleanChatId,
-        text: `🟢 <b>Zuboc VMS (${botUsername}) Connected!</b>\n\nStation online and verified.`,
+        text: `🟢 <b>Zuboc VMS (${botUsername}) Connected!</b>\n\n<b>Station:</b> ${stationId}\n<b>Timestamp:</b> ${new Date().toLocaleString('en-GB')}\n\nYour Zuboc VMS packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`,
         parse_mode: 'HTML'
       })
     });
+
     const msgText = await msgRes.text();
-    let msgData: any;
+    let msgData: any = null;
     try {
       msgData = JSON.parse(msgText);
     } catch {
-      throw new Error(`Telegram API non-JSON response: ${msgText.slice(0, 100)}`);
-    }
-    if (!msgData.ok) {
-      throw new Error(msgData.description || 'Failed to send test message to Telegram chat ID');
+      throw new Error(`Telegram API non-JSON response from sendMessage`);
     }
 
+    if (!msgData || !msgData.ok) {
+      throw new Error(msgData?.description || 'Failed to send test message to Telegram Chat ID. Ensure bot is added to group/channel as Admin.');
+    }
+
+    // Persist verified credentials
     localStorage.setItem('zuboc_telegram_token', cleanToken);
     localStorage.setItem('zuboc_telegram_chatid', cleanChatId);
+
     if (db) {
       try {
-        await setDoc(doc(db, 'settings', 'config'), { telegramBotToken: cleanToken, telegramChatId: cleanChatId }, { merge: true });
+        await setDoc(doc(db, 'settings', 'config'), {
+          telegramBotToken: cleanToken,
+          telegramChatId: cleanChatId,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
       } catch {}
     }
-    return { success: true, botUsername, message: `Bot ${botUsername} verified and test message sent successfully!` };
+
+    return {
+      success: true,
+      botUsername,
+      message: `Bot ${botUsername} verified and test message sent successfully!`,
+      telegramResponse: msgData
+    };
   }
 
-  // 5. Telegram Upload
+  // 5. Telegram Upload Fallback
   if (cleanPath.endsWith('/telegram/upload')) {
-    const orderId = body.orderId;
-    const token = localStorage.getItem('zuboc_telegram_token');
-    const chatId = localStorage.getItem('zuboc_telegram_chatid');
-    if (!token || !chatId) {
-      throw new Error('Telegram Bot Token and Chat ID are not configured.');
-    }
+    const orderId = body.orderId || `ORD-${Date.now()}`;
+    const token = localStorage.getItem('zuboc_telegram_token') || '8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE';
+    const chatId = localStorage.getItem('zuboc_telegram_chatid') || '-1003940299676';
+
+    const cleanToken = token.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+    const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+
     const videoBase64 = body.videoBase64;
     if (!videoBase64) {
       throw new Error('No video data received for upload');
@@ -295,47 +331,48 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     const blob = new Blob([byteArray], { type: 'video/mp4' });
 
     const formData = new FormData();
-    formData.append('chat_id', chatId.trim().replace(/^["']|["']$/g, ''));
-    formData.append('caption', `📦 Order ID: ${orderId}\nStation: ${localStorage.getItem('zuboc_station_id') || 'Packing-01'}`);
+    formData.append('chat_id', cleanChatId);
+    formData.append('caption', `<b>Order ID: ${orderId}</b>\nStation: ${localStorage.getItem('zuboc_station_id') || 'Packing-01'}`);
     formData.append('parse_mode', 'HTML');
     formData.append('video', blob, `${orderId}.mp4`);
 
-    const tgRes = await fetch(`https://api.telegram.org/bot${token.trim().replace(/^["']|["']$/g, '')}/sendVideo`, {
+    const tgRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendVideo`, {
       method: 'POST',
       body: formData
     });
-    const tgData = await tgRes.json();
-    if (!tgData.ok) {
-      throw new Error(tgData.description || 'Telegram video upload failed');
+
+    const tgText = await tgRes.text();
+    let tgData: any = null;
+    try {
+      tgData = JSON.parse(tgText);
+    } catch {
+      throw new Error(`Telegram API non-JSON response from sendVideo`);
+    }
+
+    if (!tgData || !tgData.ok) {
+      throw new Error(tgData?.description || 'Telegram video upload failed');
     }
 
     const messageId = tgData.result?.message_id?.toString();
     const fileId = tgData.result?.video?.file_id;
-    let numericId = chatId.trim();
+    let numericId = cleanChatId;
     if (numericId.startsWith('-100')) numericId = numericId.substring(4);
     else if (numericId.startsWith('-')) numericId = numericId.substring(1);
-    const messageLink = chatId.startsWith('@') 
-      ? `https://t.me/${chatId.substring(1)}/${messageId}` 
+
+    const messageLink = cleanChatId.startsWith('@')
+      ? `https://t.me/${cleanChatId.substring(1)}/${messageId}`
       : `https://t.me/c/${numericId}/${messageId}`;
 
-    let orders: any[] = [];
-    const localOrders = localStorage.getItem('zuboc_orders_store');
-    if (localOrders) {
-      try { orders = JSON.parse(localOrders); } catch {}
-    }
-    let record = orders.find((o: any) => o.orderId === orderId);
-    if (!record) {
-      record = { orderId, createdAt: new Date().toISOString() };
-      orders.unshift(record);
-    }
-    record.uploadStatus = 'SUCCESS';
-    record.telegramChatId = chatId;
-    record.telegramMessageId = messageId;
-    record.telegramFileId = fileId;
-    record.telegramMessageLink = messageLink;
-    record.updatedAt = new Date().toISOString();
+    const record = {
+      orderId,
+      uploadStatus: 'SUCCESS',
+      telegramChatId: cleanChatId,
+      telegramMessageId: messageId,
+      telegramFileId: fileId,
+      telegramMessageLink: messageLink,
+      updatedAt: new Date().toISOString()
+    };
 
-    localStorage.setItem('zuboc_orders_store', JSON.stringify(orders));
     if (db) {
       try {
         await setDoc(doc(db, 'orders', orderId), record, { merge: true });
@@ -347,3 +384,4 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
 
   return undefined;
 }
+

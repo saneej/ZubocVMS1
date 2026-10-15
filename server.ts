@@ -654,9 +654,16 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
   try {
     // First verify bot info via getMe
     const meRes = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
-    const meData = await meRes.json() as any;
-    if (!meData.ok) {
-      throw new Error(meData.description || 'Invalid Telegram Bot Token');
+    const meText = await meRes.text();
+    let meData: any = null;
+    try {
+      meData = JSON.parse(meText);
+    } catch {
+      throw new Error('Telegram API unreachable or returned non-JSON response');
+    }
+
+    if (!meData || !meData.ok) {
+      throw new Error(meData?.description || 'Invalid Telegram Bot Token');
     }
     const botUsername = meData.result?.username ? `@${meData.result.username}` : 'Bot';
 
@@ -672,10 +679,16 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
       })
     });
 
-    const data = await response.json() as any;
+    const responseText = await response.text();
+    let data: any = null;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error('Telegram API sendMessage returned non-JSON response');
+    }
 
-    if (!data.ok) {
-      throw new Error(data.description || 'Failed to send message to Telegram chat ID');
+    if (!data || !data.ok) {
+      throw new Error(data?.description || 'Failed to send message to Telegram chat ID');
     }
 
     // Save if valid

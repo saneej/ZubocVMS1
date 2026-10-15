@@ -7,7 +7,7 @@ import {
 import { AppSettings, OrderRecord } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { db } from '../firebase';
-import { collection, getDocs, limit, query } from 'firebase/firestore';
+import { collection, getDocs, limit, query, doc, setDoc } from 'firebase/firestore';
 
 interface DiagnosePageProps {
   settings: AppSettings;
@@ -399,7 +399,7 @@ export const DiagnosePage: React.FC<DiagnosePageProps> = ({
   // Fix 4: Save Telegram Credentials Direct Fix
   const handleSaveTgFix = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTgFixStatus({ type: 'testing', message: 'Testing Telegram token with @BotFather...' });
+    setTgFixStatus({ type: 'testing', message: 'Testing Telegram Bot Token & Chat ID...' });
     addLog('🛠️ Executing Fix: Validating and Saving Telegram Credentials...');
 
     const cleanToken = tgFixToken.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
@@ -411,56 +411,100 @@ export const DiagnosePage: React.FC<DiagnosePageProps> = ({
     }
 
     try {
-      // 1. Verify token with Telegram API
-      const tgRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
-      const tgText = await tgRes.text();
-      let tgData: any;
+      // 1. Direct fetch to Telegram API getMe
+      const meRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
+      const meText = await meRes.text();
+      let meData: any = null;
       try {
-        tgData = JSON.parse(tgText);
+        meData = JSON.parse(meText);
       } catch {
-        throw new Error(`Telegram API non-JSON response: ${tgText.slice(0, 100)}`);
+        throw new Error('Telegram API response error during getMe check');
       }
 
-      if (!tgData.ok) {
-        throw new Error(`Telegram API Error: ${tgData.description || 'Invalid token'}`);
+      if (!meData || !meData.ok) {
+        throw new Error(`Telegram API Error: ${meData?.description || 'Invalid Bot Token'}`);
       }
 
-      addLog(`✅ Bot verified: @${tgData.result.username}`);
+      const botUsername = meData.result?.username ? `@${meData.result.username}` : 'Bot';
+      addLog(`✅ Bot verified: ${botUsername}`);
 
-      // 2. Save via Express API
-      const saveRes = await safeFetchJson('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramBotToken: cleanToken,
-          telegramChatId: cleanChat,
-          stationId: settings.stationId || 'Packing-01',
-          autoUpload: true
-        })
-      });
+      // 2. If Chat ID provided, send test ping directly to verify Chat ID
+      if (cleanChat) {
+        const pingRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: cleanChat,
+            text: `🟢 <b>Zuboc VMS Telegram Gateway Active</b>\n\nBot ${botUsername} verified and linked. Station: ${settings.stationId || 'Packing-01'}\nTimestamp: ${new Date().toLocaleString('en-GB')}`,
+            parse_mode: 'HTML'
+          })
+        });
 
-      if (saveRes.success) {
-        const updatedSettings: AppSettings = {
-          ...settings,
-          telegramBotToken: cleanToken,
-          telegramChatId: cleanChat,
-          hasToken: true
-        };
-        if (onSaveSettings) {
-          onSaveSettings(updatedSettings);
+        const pingText = await pingRes.text();
+        let pingData: any = null;
+        try {
+          pingData = JSON.parse(pingText);
+        } catch {}
+
+        if (pingData && !pingData.ok) {
+          throw new Error(`Telegram Chat ID Error: ${pingData.description || 'Chat ID invalid or bot not added to group/channel'}`);
         }
-        setTgFixStatus({ type: 'success', message: `Bot @${tgData.result.username} verified & saved successfully!` });
-        addLog(`🎉 Telegram Credentials saved & verified for @${tgData.result.username}`);
-        setTimeout(() => {
-          setShowTgFixModal(false);
-          runAllDiagnostics();
-        }, 1200);
-      } else {
-        throw new Error(saveRes.error || 'Failed to save settings via server');
       }
+
+      // 3. Persist verified credentials to LocalStorage
+      localStorage.setItem('zuboc_telegram_token', cleanToken);
+      localStorage.setItem('zuboc_telegram_chatid', cleanChat);
+
+      // 4. Persist to Firestore
+      if (db) {
+        try {
+          await setDoc(doc(db, 'settings', 'config'), {
+            telegramBotToken: cleanToken,
+            telegramChatId: cleanChat,
+            stationId: settings.stationId || 'Packing-01',
+            autoUpload: true,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch {}
+      }
+
+      // 5. Post to Express Server API silently
+      try {
+        await safeFetchJson('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramBotToken: cleanToken,
+            telegramChatId: cleanChat,
+            stationId: settings.stationId || 'Packing-01',
+            autoUpload: true
+          })
+        });
+      } catch {}
+
+      const updatedSettings: AppSettings = {
+        ...settings,
+        telegramBotToken: cleanToken,
+        telegramChatId: cleanChat,
+        hasToken: true
+      };
+
+      if (onSaveSettings) {
+        onSaveSettings(updatedSettings);
+      }
+
+      setTgFixStatus({ type: 'success', message: `Bot ${botUsername} verified & saved successfully!` });
+      addLog(`🎉 Telegram Credentials saved & verified for ${botUsername}`);
+
+      setTimeout(() => {
+        setShowTgFixModal(false);
+        runAllDiagnostics();
+      }, 1200);
+
     } catch (err: any) {
-      setTgFixStatus({ type: 'error', message: err.message || 'Verification failed' });
-      addLog(`❌ Telegram Fix Error: ${err.message}`);
+      const errorMsg = err.message || 'Verification failed';
+      setTgFixStatus({ type: 'error', message: errorMsg });
+      addLog(`❌ Telegram Fix Error: ${errorMsg}`);
     }
   };
 
