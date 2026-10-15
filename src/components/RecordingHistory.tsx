@@ -1,13 +1,16 @@
-import React from 'react';
-import { Download, RefreshCw, ExternalLink, History, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, RefreshCw, ExternalLink, History, FileText, Trash2 } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface RecordingHistoryProps {
   orders: OrderRecord[];
   onRefresh: () => void;
+  onDeleteOrder: (orderId: string) => void;
 }
 
-export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRefresh }) => {
+export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRefresh, onDeleteOrder }) => {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const exportCSV = () => {
     const headers = ['Order ID', 'Staff ID', 'Station ID', 'Duration (s)', 'Upload Status', 'Timestamp'];
     const rows = orders.map(o => [
@@ -27,6 +30,17 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDelete = async (orderId: string) => {
+    if (window.confirm(`Are you sure you want to delete audit entry for order ${orderId}?`)) {
+      setDeletingId(orderId);
+      try {
+        await onDeleteOrder(orderId);
+      } finally {
+        setDeletingId(null);
+      }
+    }
   };
 
   return (
@@ -76,7 +90,7 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
             <FileText className="w-4 h-4 text-cyan-400" />
             <span>FULL LEDGER ENTRIES ({orders.length})</span>
           </div>
-          <span className="text-[11px] text-slate-500">Encrypted Storage</span>
+          <span className="text-[11px] text-slate-500">Secure Management Console</span>
         </div>
 
         {orders.length === 0 ? (
@@ -94,7 +108,7 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
                   <th className="px-6 py-4">Duration</th>
                   <th className="px-6 py-4">Telegram Dispatch</th>
                   <th className="px-6 py-4">Timestamp</th>
-                  <th className="px-6 py-4 text-right">Evidence Link</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -114,19 +128,27 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-[11px]">{new Date(order.createdAt).toLocaleString()}</td>
                     <td className="px-6 py-4 text-right font-sans">
-                      {order.telegramMessageLink ? (
-                        <a
-                          href={order.telegramMessageLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all group-hover:scale-105"
+                      <div className="flex items-center justify-end gap-2">
+                        {order.telegramMessageLink && (
+                          <a
+                            href={order.telegramMessageLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleDelete(order.orderId)}
+                          disabled={deletingId === order.orderId}
+                          title="Delete Record"
+                          className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl transition-all cursor-pointer disabled:opacity-50"
                         >
-                          <span>Open</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-600">-</span>
-                      )}
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

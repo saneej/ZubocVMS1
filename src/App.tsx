@@ -123,17 +123,28 @@ export default function App() {
     setOrders(prev => [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)]);
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setOrders(prev => prev.filter(o => o.orderId !== orderId));
+      }
+    } catch (err) {
+      console.error('Error deleting order:', err);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
-        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-medium">Connecting to PackVision VMS...</p>
+        <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-400 font-medium font-mono text-xs">Initializing Zuboc VMS Vault...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-slate-950">
       
       <Navbar
         activeTab={activeTab}
@@ -158,6 +169,7 @@ export default function App() {
           <SearchRetrieval
             orders={orders}
             onRefreshOrders={fetchOrdersAPI}
+            onDeleteOrder={handleDeleteOrder}
           />
         )}
 
@@ -165,6 +177,7 @@ export default function App() {
           <RecordingHistory
             orders={orders}
             onRefresh={fetchOrdersAPI}
+            onDeleteOrder={handleDeleteOrder}
           />
         )}
 

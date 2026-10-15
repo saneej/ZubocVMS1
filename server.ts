@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 dotenv.config();
 
@@ -54,12 +54,25 @@ try {
     firebaseApp = initializeApp(firebaseConfig, 'SERVER_APP');
     firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
     console.log('Server initialized Firebase Firestore:', firebaseConfig.projectId);
+  } else if (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID) {
+    const firebaseConfig = {
+      projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+      appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID,
+      apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID
+    };
+    firebaseApp = initializeApp(firebaseConfig, 'SERVER_APP');
+    firestoreDb = getFirestore(firebaseApp, process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)');
+    console.log('Server initialized Firebase Firestore from environment variables');
   }
 } catch (e) {
   console.error('Error initializing Firebase in server.ts:', e);
 }
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
+const TMP_DATA_FILE = '/tmp/vms_data.json';
 
 interface OrderRecord {
   orderId: string;
@@ -97,8 +110,12 @@ let settings: AppSettings = {
 let ordersStore: Record<string, OrderRecord> = {};
 
 try {
-  if (fs.existsSync(DATA_FILE)) {
-    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+  let activeDataPath = DATA_FILE;
+  if (!fs.existsSync(activeDataPath)) {
+    activeDataPath = TMP_DATA_FILE;
+  }
+  if (fs.existsSync(activeDataPath)) {
+    const raw = fs.readFileSync(activeDataPath, 'utf-8');
     const parsed = JSON.parse(raw);
     if (parsed.orders) ordersStore = parsed.orders;
     if (parsed.settings) {
@@ -115,10 +132,15 @@ try {
 }
 
 function saveLocalBackup() {
+  const payload = JSON.stringify({ orders: ordersStore, settings }, null, 2);
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ orders: ordersStore, settings }, null, 2));
-  } catch (e) {
-    console.error('Error saving vms_data.json:', e);
+    fs.writeFileSync(DATA_FILE, payload);
+  } catch (e: any) {
+    try {
+      fs.writeFileSync(TMP_DATA_FILE, payload);
+    } catch (tmpErr) {
+      console.error('Error saving local backup to /tmp:', tmpErr);
+    }
   }
 }
 
@@ -296,6 +318,27 @@ app.post('/api/orders', async (req, res) => {
   }
 
   res.json({ success: true, record });
+});
+
+// Delete order record
+app.delete('/api/orders/:orderId', async (req, res) => {
+  const orderId = sanitizeString(req.params.orderId);
+  if (!orderId) {
+    return res.status(400).json({ error: 'orderId is required' });
+  }
+
+  delete ordersStore[orderId];
+  saveLocalBackup();
+
+  if (firestoreDb) {
+    try {
+      await deleteDoc(doc(firestoreDb, 'orders', orderId));
+    } catch (e) {
+      console.error('Error deleting order from Firestore:', e);
+    }
+  }
+
+  res.json({ success: true, message: `Order ${orderId} deleted successfully` });
 });
 
 // Helper to safely escape strings for Telegram HTML parse_mode

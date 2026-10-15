@@ -1,20 +1,33 @@
 import React, { useState } from 'react';
-import { Search, ExternalLink, RefreshCw, Video, ShieldCheck, Database, Filter } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Video, ShieldCheck, Database, Trash2 } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
   onRefreshOrders: () => void;
+  onDeleteOrder: (orderId: string) => void;
 }
 
-export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefreshOrders }) => {
+export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefreshOrders, onDeleteOrder }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filteredOrders = orders.filter(order => {
     return order.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
            order.staffId.toLowerCase().includes(searchTerm.toLowerCase()) ||
            order.stationId.toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  const handleDelete = async (orderId: string) => {
+    if (window.confirm(`Are you sure you want to delete recording evidence for order ${orderId}?`)) {
+      setDeletingId(orderId);
+      try {
+        await onDeleteOrder(orderId);
+      } finally {
+        setDeletingId(null);
+      }
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
@@ -34,7 +47,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
               <span>Zuboc Evidence Retrieval</span>
             </h1>
             <p className="text-sm text-slate-400 max-w-2xl">
-              Instantly retrieve immutable packing video evidence, verify Telegram dispatch logs, and audit end-to-end fulfillment compliance across all active stations.
+              Instantly retrieve immutable packing video evidence, verify Telegram delivery status, and audit or prune fulfillment records.
             </p>
           </div>
 
@@ -48,7 +61,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
         </div>
       </div>
 
-      {/* Search Bar & Filters */}
+      {/* Search Bar */}
       <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-5 shadow-xl">
         <div className="relative">
           <Search className="w-5 h-5 text-cyan-400 absolute left-4 top-4" />
@@ -70,7 +83,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
             <span>ARCHIVED EVIDENCE RECORDS ({filteredOrders.length})</span>
           </div>
           <div className="text-[11px] text-slate-500">
-            Immutable Storage Mode Active
+            Secure Management Console
           </div>
         </div>
 
@@ -91,9 +104,9 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                   <th className="px-6 py-4">Station</th>
                   <th className="px-6 py-4">Operator</th>
                   <th className="px-6 py-4">Duration</th>
-                  <th className="px-6 py-4">Recorded Timestamp</th>
+                  <th className="px-6 py-4">Timestamp</th>
                   <th className="px-6 py-4">Telegram Dispatch</th>
-                  <th className="px-6 py-4 text-right">Evidence Stream</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -120,7 +133,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider inline-flex items-center gap-1.5 ${
                         order.uploadStatus === 'SUCCESS' 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm shadow-emerald-500/10' 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                           : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${order.uploadStatus === 'SUCCESS' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
@@ -128,19 +141,27 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right font-sans">
-                      {order.telegramMessageLink ? (
-                        <a
-                          href={order.telegramMessageLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 hover:from-cyan-500/20 hover:to-emerald-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow-cyan-500/20 group-hover:scale-105"
+                      <div className="flex items-center justify-end gap-2">
+                        {order.telegramMessageLink && (
+                          <a
+                            href={order.telegramMessageLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all"
+                          >
+                            <span>Play</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleDelete(order.orderId)}
+                          disabled={deletingId === order.orderId}
+                          title="Delete Record"
+                          className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl transition-all cursor-pointer disabled:opacity-50"
                         >
-                          <span>Play Video</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-600 font-mono text-[11px]">Pending Upload</span>
-                      )}
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
