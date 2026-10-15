@@ -40,12 +40,14 @@ function getSupportedMimeType(): string {
 
 async function getCameraStream(): Promise<MediaStream> {
   const constraintsToTry = [
-    // Prioritize Full HD 1080p (1920x1080) for maximum label/barcode clarity
-    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, facingMode: { ideal: 'environment' } } },
-    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } },
-    { video: { width: { ideal: 1920 }, height: { ideal: 1080 } } },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: 'environment' } } },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
+    // Prioritize Full HD 1080p (1920x1080) with explicit 16:9 widescreen aspect ratio for maximum clarity
+    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 }, frameRate: { ideal: 30 }, facingMode: { ideal: 'environment' } } },
+    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 }, frameRate: { ideal: 30 } } },
+    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 }, facingMode: { ideal: 'environment' } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 } } },
+    { video: { aspectRatio: { ideal: 1.7777777778 }, facingMode: 'environment' } },
+    { video: { aspectRatio: { ideal: 1.7777777778 } } },
     { video: { facingMode: 'environment' } },
     { video: true }
   ];
@@ -643,14 +645,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Recorded Video Review Player */}
-                <div className="bg-black rounded-xl overflow-hidden border border-[#1a2233] aspect-video flex items-center justify-center relative">
+                <div className="bg-black rounded-xl overflow-hidden border border-[#1a2233] aspect-video w-full flex items-center justify-center relative">
                   {recordedVideoUrl ? (
                     <video
                       ref={reviewVideoRef}
                       src={recordedVideoUrl}
                       controls
                       autoPlay
-                      className="w-full h-full object-cover"
+                      playsInline
+                      className="w-full h-full object-contain bg-black rounded-xl"
                     />
                   ) : (
                     <span className="text-xs text-slate-500 font-mono">Video recording preview unavailable</span>
