@@ -4,6 +4,7 @@ import { PackingStation } from './components/PackingStation';
 import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
+import { DiagnosePage } from './components/DiagnosePage';
 import { SettingsModal } from './components/SettingsModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { OrderRecord, StaffMember, AppSettings } from './types';
@@ -49,7 +50,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin'>('station');
+  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'diagnose'>('station');
   const [currentStaff, setCurrentStaff] = useState<StaffMember>({
     id: 'Staff-01',
     name: 'Alex Packer',
@@ -186,6 +187,14 @@ export default function App() {
             orders={orders}
             settings={settings}
             onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+        )}
+
+        {activeTab === 'diagnose' && (
+          <DiagnosePage
+            settings={settings}
+            orders={orders}
+            onRefreshOrders={fetchOrdersAPI}
           />
         )}
       </main>

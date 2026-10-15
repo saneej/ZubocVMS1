@@ -16,15 +16,18 @@ type StationStep = 'READY' | 'SCAN' | 'RECORDING' | 'CONFIRM';
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
   const types = [
-    'video/mp4;codecs=avc1,mp4a.40.2',
     'video/mp4',
-    'video/webm;codecs=vp8,opus',
-    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
     'video/webm'
   ];
   for (const type of types) {
-    if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
-      return type;
+    try {
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    } catch {
+      // ignore invalid mime pattern exceptions
     }
   }
   return '';
@@ -156,11 +159,25 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
     try {
       const selectedMime = getSupportedMimeType();
-      const options = selectedMime ? { mimeType: selectedMime } : undefined;
-      let recorder: MediaRecorder;
-      try {
-        recorder = options ? new MediaRecorder(mediaStreamRef.current!, options) : new MediaRecorder(mediaStreamRef.current!);
-      } catch {
+      const candidateMimes = [
+        selectedMime,
+        'video/mp4',
+        'video/webm',
+        ''
+      ].filter((m, idx, arr) => m !== undefined && arr.indexOf(m) === idx);
+
+      let recorder: MediaRecorder | null = null;
+      for (const mime of candidateMimes) {
+        try {
+          const options = mime ? { mimeType: mime } : undefined;
+          recorder = options ? new MediaRecorder(mediaStreamRef.current!, options) : new MediaRecorder(mediaStreamRef.current!);
+          if (recorder) break;
+        } catch (mErr) {
+          console.warn(`MediaRecorder init attempt failed with mimeType="${mime}":`, mErr);
+        }
+      }
+
+      if (!recorder) {
         recorder = new MediaRecorder(mediaStreamRef.current!);
       }
 

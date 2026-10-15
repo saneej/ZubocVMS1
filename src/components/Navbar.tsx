@@ -3,8 +3,8 @@ import { Video, Settings as SettingsIcon, User, ShieldCheck } from 'lucide-react
 import { StaffMember, AppSettings } from '../types';
 
 interface NavbarProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin';
-  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin') => void;
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'diagnose';
+  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'diagnose') => void;
   currentStaff: StaffMember;
   setCurrentStaff: (staff: StaffMember) => void;
   settings: AppSettings;
@@ -88,6 +88,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Telemetry
             </button>
+
+            <button
+              onClick={() => setActiveTab('diagnose')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'diagnose'
+                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 shadow-md font-extrabold'
+                  : 'text-cyan-400 hover:text-cyan-300'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+              <span>Diagnostics</span>
+            </button>
           </nav>
 
           {/* Zone 3: Actions, Telegram Indicator & Staff Switcher */}
@@ -132,6 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button onClick={() => setActiveTab('search')} className={activeTab === 'search' ? 'text-cyan-400 font-bold' : ''}>Search</button>
           <button onClick={() => setActiveTab('history')} className={activeTab === 'history' ? 'text-cyan-400 font-bold' : ''}>Logs</button>
           <button onClick={() => setActiveTab('admin')} className={activeTab === 'admin' ? 'text-cyan-400 font-bold' : ''}>Telemetry</button>
+          <button onClick={() => setActiveTab('diagnose')} className={activeTab === 'diagnose' ? 'text-cyan-400 font-bold' : ''}>Diagnose</button>
         </div>
 
       </div>
