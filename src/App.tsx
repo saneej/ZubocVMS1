@@ -195,6 +195,7 @@ export default function App() {
             settings={settings}
             orders={orders}
             onRefreshOrders={fetchOrdersAPI}
+            onSaveSettings={(newSet) => setSettings(newSet)}
           />
         )}
       </main>
