@@ -228,6 +228,8 @@ class UploadQueueManager {
           }
         };
         xhr.onerror = () => reject(new Error('Network error during Telegram video upload'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out (exceeded 5 minutes for 10+ minute video).'));
+        xhr.timeout = 900000;
         xhr.open('POST', `https://api.telegram.org/bot${cleanToken}/sendVideo`, true);
         xhr.send(formData);
       });

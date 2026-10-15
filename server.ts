@@ -24,9 +24,9 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
     fs.writeFileSync(inputPath, inputBuffer);
 
     const bin = ffmpegPath || 'ffmpeg';
-    // Fast transcode to baseline H.264 MP4 with yuv420p, even dimensions, aac audio, and faststart moov atom
-    const ffmpegCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:a aac -b:a 128k -movflags +faststart "${outputPath}" -y`;
-    await execPromise(ffmpegCmd, { timeout: 30000 });
+    // Optimized for 10+ minute packing videos: H.264 compression to fit under Telegram 50MB bot limit, with 300s timeout
+    const ffmpegCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -maxrate 800k -bufsize 1600k -pix_fmt yuv420p -vf "scale='min(1280,iw)':-2:flags=lanczos" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+    await execPromise(ffmpegCmd, { timeout: 300000 });
 
     if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
       const mp4Buffer = fs.readFileSync(outputPath);

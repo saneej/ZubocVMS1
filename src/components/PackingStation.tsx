@@ -808,11 +808,25 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                     className="w-full h-full object-cover block"
                   />
 
-                  {/* Recording Badge Overlay */}
+                  {/* Recording Badge Overlay with Persistent Timer, Progress Bar & Uploaded Chunks */}
                   {isRecording && (
-                    <div className="absolute top-3 left-3 bg-rose-600/90 text-white px-3 py-1 rounded-md text-xs font-mono font-bold flex items-center gap-2 shadow-lg backdrop-blur">
-                      <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-                      <span>REC {formatTime(timerSeconds)}</span>
+                    <div className="absolute top-3 left-3 right-3 flex flex-col gap-1.5 z-20 pointer-events-none">
+                      <div className="bg-rose-600/90 text-white px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center justify-between shadow-lg backdrop-blur">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
+                          <span>REC SESSION: {formatTime(timerSeconds)} (10m+ Min Packing)</span>
+                        </div>
+                        <div className="text-[11px] text-rose-100">
+                          Chunks Recorded: {chunksRef.current.length} • Uploaded: {queueTasks.filter(t => t.orderId === activeOrderId && t.status === 'SUCCESS').length}
+                        </div>
+                      </div>
+                      {/* Persistent Progress Bar */}
+                      <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden border border-slate-700">
+                        <div 
+                          className="bg-emerald-500 h-full transition-all duration-300"
+                          style={{ width: `${Math.min(100, (timerSeconds / 600) * 100)}%` }}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -1207,37 +1221,56 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
               {/* RECORDING ACTIVE CONTROLS */}
               {step === 'RECORDING' && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 font-mono">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 font-mono">
                   
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-slate-800">
-                      ORDER: <strong className="text-emerald-700">{activeOrderId}</strong>
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Recording: <strong className="text-rose-600">{formatTime(timerSeconds)}</strong>
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-slate-800">
+                        ORDER: <strong className="text-emerald-700">{activeOrderId}</strong>
+                      </span>
+                      <span className="text-xs text-slate-600 font-bold">
+                        Session: <strong className="text-rose-600 text-sm">{formatTime(timerSeconds)}</strong> / 10:00+ Min
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-[11px]">
+                        Chunks: {chunksRef.current.length} (Uploaded: {queueTasks.filter(t => t.orderId === activeOrderId && t.status === 'SUCCESS').length})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* Snap Photo During Recording button */}
+                      <button
+                        type="button"
+                        onClick={handleTakeSnapshot}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>SNAP PHOTO ({capturedPhotos.length})</span>
+                      </button>
+
+                      {/* Stop Recording */}
+                      <button
+                        type="button"
+                        onClick={handleStopRecording}
+                        className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-sm transition-all uppercase tracking-wider"
+                      >
+                        <StopCircle className="w-4 h-4" />
+                        <span>STOP & REVIEW</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Snap Photo During Recording button */}
-                    <button
-                      type="button"
-                      onClick={handleTakeSnapshot}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>SNAP PHOTO ({capturedPhotos.length})</span>
-                    </button>
-
-                    {/* Stop Recording */}
-                    <button
-                      type="button"
-                      onClick={handleStopRecording}
-                      className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-sm transition-all uppercase tracking-wider"
-                    >
-                      <StopCircle className="w-4 h-4" />
-                      <span>STOP & REVIEW</span>
-                    </button>
+                  {/* Persistent Session Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] text-slate-500 font-bold">
+                      <span>PACKING SESSION DURATION PROGRESS</span>
+                      <span>{Math.min(100, Math.round((timerSeconds / 600) * 100))}% (Min 10m Recommended)</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden border border-slate-300">
+                      <div 
+                        className="bg-emerald-600 h-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (timerSeconds / 600) * 100)}%` }}
+                      />
+                    </div>
                   </div>
 
                 </div>
