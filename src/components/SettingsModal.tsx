@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings as SettingsIcon, ShieldCheck, Check, Send } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { AppSettings } from '../types';
 
 interface SettingsModalProps {
@@ -51,7 +51,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setSaveSuccess(true);
         setTimeout(() => {
           onClose();
-        }, 1200);
+        }, 1000);
       }
     } catch (err: any) {
       alert('Failed to save settings: ' + err.message);
@@ -61,87 +61,78 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md overflow-hidden shadow-xl">
         
-        <div className="bg-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <SettingsIcon className="w-5 h-5 text-cyan-400" />
-            <h3 className="font-bold text-white text-base">System & Telegram Settings</h3>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            <X className="w-5 h-5" />
+        <div className="bg-zinc-950 px-5 py-3 border-b border-zinc-800 flex items-center justify-between">
+          <h3 className="font-bold text-white text-sm">Telegram & Station Settings</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white cursor-pointer">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-5">
+        <form onSubmit={handleSave} className="p-5 space-y-4 text-xs">
           
           <div>
-            <label className="block text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">
+            <label className="block font-semibold text-zinc-300 mb-1.5">
               Telegram Bot Token
             </label>
             <input
               type="password"
               value={botToken}
               onChange={(e) => setBotToken(e.target.value)}
-              placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm font-mono focus:outline-none focus:border-cyan-500 shadow-inner"
+              placeholder="e.g. 8372063656:AAG..."
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
             />
-            <p className="text-xs text-slate-500 mt-1.5">
-              Obtain your bot token from @BotFather on Telegram and add it to the designated private group.
-            </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">
-              Telegram Group / Chat ID
+            <label className="block font-semibold text-zinc-300 mb-1.5">
+              Telegram Channel / Group ID
             </label>
             <input
               type="text"
               value={chatId}
               onChange={(e) => setChatId(e.target.value)}
-              placeholder="e.g. -100123456789 or @packing_group"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm font-mono focus:outline-none focus:border-cyan-500 shadow-inner"
+              placeholder="e.g. -1003940299676"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
             />
-            <p className="text-xs text-slate-500 mt-1.5">
-              The private Telegram group ID where packing video evidence will be automatically uploaded.
-            </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">
-              Packing Station ID
+            <label className="block font-semibold text-zinc-300 mb-1.5">
+              Station ID
             </label>
             <input
               type="text"
               value={stationId}
               onChange={(e) => setStationId(e.target.value)}
               placeholder="Packing-01"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 shadow-inner"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
             />
           </div>
 
           {saveSuccess && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-400 flex items-center space-x-2">
-              <Check className="w-4 h-4" />
-              <span>Settings saved successfully!</span>
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2 text-emerald-400 flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              <span>Settings saved!</span>
             </div>
           )}
 
-          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-sm font-medium transition-colors"
+              className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:text-white font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-bold shadow-lg transition-all cursor-pointer flex items-center space-x-2"
+              className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold cursor-pointer"
             >
-              {isSaving ? <span>Saving...</span> : <span>Save Settings</span>}
+              {isSaving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
 

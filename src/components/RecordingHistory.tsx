@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { History, Download, Filter, RefreshCw, ExternalLink, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import React from 'react';
+import { Download, RefreshCw, ExternalLink } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface RecordingHistoryProps {
@@ -8,25 +8,14 @@ interface RecordingHistoryProps {
 }
 
 export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRefresh }) => {
-  const [filterStation, setFilterStation] = useState('ALL');
-  const [filterStatus, setFilterStatus] = useState('ALL');
-
-  const filtered = orders.filter(o => {
-    const matchStation = filterStation === 'ALL' || o.stationId === filterStation;
-    const matchStatus = filterStatus === 'ALL' || o.uploadStatus === filterStatus;
-    return matchStation && matchStatus;
-  });
-
   const exportCSV = () => {
-    const headers = ['Order ID', 'Staff ID', 'Station ID', 'Duration (s)', 'Recording Status', 'Upload Status', 'Telegram Message ID', 'Timestamp'];
-    const rows = filtered.map(o => [
+    const headers = ['Order ID', 'Staff ID', 'Station ID', 'Duration (s)', 'Upload Status', 'Timestamp'];
+    const rows = orders.map(o => [
       o.orderId,
       o.staffId,
       o.stationId,
       o.durationSeconds,
-      o.recordingStatus,
       o.uploadStatus,
-      o.telegramMessageId || '',
       o.createdAt
     ]);
 
@@ -34,140 +23,79 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `packvision_vms_history_${Date.now()}.csv`);
+    link.setAttribute('download', `vms_history_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const stations = Array.from(new Set(orders.map(o => o.stationId)));
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-            <History className="w-6 h-6 text-cyan-400" />
-            <span>Complete Recording History</span>
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Full audit trail of all order packing videos recorded across warehouse stations.
-          </p>
+          <h2 className="text-lg font-bold text-white">Recording History Audit Log</h2>
+          <p className="text-xs text-zinc-400">Recorded packing evidence and Telegram upload references</p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={exportCSV}
-            className="bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl flex items-center space-x-2 border border-slate-700 transition-colors cursor-pointer shadow"
+            className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Download className="w-4 h-4 text-cyan-400" />
+            <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
           </button>
-
           <button
             onClick={onRefresh}
-            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-bold px-4 py-2.5 rounded-xl flex items-center space-x-2 transition-colors cursor-pointer shadow"
+            className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <RefreshCw className="w-4 h-4" />
-            <span>Refresh Audit Log</span>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg mb-6 flex flex-wrap items-center gap-4">
-        <div className="flex items-center space-x-2 text-sm text-slate-300">
-          <Filter className="w-4 h-4 text-cyan-400" />
-          <span>Filters:</span>
-        </div>
-
-        <div>
-          <select
-            value={filterStation}
-            onChange={(e) => setFilterStation(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All Stations</option>
-            {stations.map(st => (
-              <option key={st} value={st}>{st}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="SUCCESS">Success</option>
-            <option value="PENDING">Pending</option>
-            <option value="FAILED">Failed</option>
-          </select>
-        </div>
-
-        <div className="text-xs text-slate-500 ml-auto">
-          Showing {filtered.length} of {orders.length} recordings
-        </div>
-      </div>
-
-      {/* History Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-950 text-xs uppercase text-slate-400 font-semibold border-b border-slate-800">
+          <table className="w-full text-left text-xs text-zinc-300 font-mono">
+            <thead className="bg-zinc-950 text-zinc-500 uppercase border-b border-zinc-800">
               <tr>
-                <th className="px-6 py-4">Order ID</th>
-                <th className="px-6 py-4">Station</th>
-                <th className="px-6 py-4">Staff ID</th>
-                <th className="px-6 py-4">Duration</th>
-                <th className="px-6 py-4">Upload Status</th>
-                <th className="px-6 py-4">Recorded Date</th>
-                <th className="px-6 py-4 text-right">Telegram Link</th>
+                <th className="px-5 py-3">Order ID</th>
+                <th className="px-5 py-3">Station</th>
+                <th className="px-5 py-3">Staff</th>
+                <th className="px-5 py-3">Duration</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Recorded At</th>
+                <th className="px-5 py-3 text-right">Telegram</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
-              {filtered.map(order => (
-                <tr key={order.orderId} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="px-6 py-4 font-mono font-bold text-white">
-                    {order.orderId}
-                  </td>
-                  <td className="px-6 py-4 font-medium text-white">
-                    {order.stationId}
-                  </td>
-                  <td className="px-6 py-4 text-slate-300">
-                    {order.staffId}
-                  </td>
-                  <td className="px-6 py-4 font-mono text-cyan-400">
-                    {order.durationSeconds}s
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                      order.uploadStatus === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                      order.uploadStatus === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                      'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}>
-                      <span>{order.uploadStatus}</span>
+            <tbody className="divide-y divide-zinc-800/60">
+              {orders.map(order => (
+                <tr key={order.orderId} className="hover:bg-zinc-800/40 transition-colors">
+                  <td className="px-5 py-3.5 font-bold text-white">{order.orderId}</td>
+                  <td className="px-5 py-3.5 text-zinc-400">{order.stationId}</td>
+                  <td className="px-5 py-3.5 text-zinc-400">{order.staffId}</td>
+                  <td className="px-5 py-3.5 text-zinc-400">{order.durationSeconds}s</td>
+                  <td className="px-5 py-3.5">
+                    <span className={order.uploadStatus === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'}>
+                      {order.uploadStatus}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-xs text-slate-400">
-                    {new Date(order.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-5 py-3.5 text-zinc-500">{new Date(order.createdAt).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right font-sans">
                     {order.telegramMessageLink ? (
                       <a
                         href={order.telegramMessageLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20 font-medium"
+                        className="text-emerald-400 hover:underline inline-flex items-center gap-1 text-xs"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>View in Telegram</span>
+                        <span>View</span>
+                        <ExternalLink className="w-3 h-3" />
                       </a>
                     ) : (
-                      <span className="text-xs text-slate-500">Not linked</span>
+                      <span className="text-zinc-600">-</span>
                     )}
                   </td>
                 </tr>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Video, Search, History, BarChart3, Settings as SettingsIcon, Package, ShieldCheck, User } from 'lucide-react';
+import { Video, Settings as SettingsIcon, User } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
 interface NavbarProps {
@@ -26,141 +26,102 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings
 }) => {
   return (
-    <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-50 shadow-lg">
+    <header className="bg-zinc-950 border-b border-zinc-800/80 text-zinc-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-14 gap-8">
           
-          {/* Logo & Title */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('station')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/20">
-              <Video className="w-6 h-6 text-white" />
+          {/* Zone 1: Wordmark */}
+          <div className="flex items-center gap-2.5 cursor-pointer shrink-0" onClick={() => setActiveTab('station')}>
+            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-zinc-950 font-bold">
+              <Video className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <div>
-              <div className="font-bold text-lg tracking-tight flex items-center space-x-2">
-                <span>PackVision</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-medium border border-cyan-500/30">VMS 2.0</span>
-              </div>
-              <p className="text-xs text-slate-400">E-Commerce Packing Evidence System</p>
-            </div>
+            <span className="font-bold text-base tracking-tight text-white whitespace-nowrap">PackVision VMS</span>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="hidden md:flex items-center space-x-1">
+          {/* Zone 2: Navigation Links */}
+          <nav className="hidden md:flex items-center gap-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-800">
             <button
               onClick={() => setActiveTab('station')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'station'
-                  ? 'bg-cyan-500 text-slate-950 font-semibold shadow'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-zinc-800 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <Package className="w-4 h-4" />
-              <span>Packing Station</span>
+              Packing Station
             </button>
 
             <button
               onClick={() => setActiveTab('search')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'search'
-                  ? 'bg-cyan-500 text-slate-950 font-semibold shadow'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-zinc-800 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <Search className="w-4 h-4" />
-              <span>Search & Retrieve</span>
+              Search
             </button>
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'history'
-                  ? 'bg-cyan-500 text-slate-950 font-semibold shadow'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-zinc-800 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <History className="w-4 h-4" />
-              <span>History</span>
+              History
             </button>
 
             <button
               onClick={() => setActiveTab('admin')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === 'admin'
-                  ? 'bg-cyan-500 text-slate-950 font-semibold shadow'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-zinc-800 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <BarChart3 className="w-4 h-4" />
-              <span>Admin Dashboard</span>
+              Dashboard
             </button>
           </nav>
 
-          {/* Right Utilities: Staff switcher & Settings */}
-          <div className="flex items-center space-x-3">
-            <div className="hidden lg:flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-              <User className="w-4 h-4 text-cyan-400" />
+          {/* Zone 3: Actions & Staff Switcher */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden lg:flex items-center gap-2 bg-zinc-900 px-2.5 py-1 rounded-md border border-zinc-800 text-xs">
+              <User className="w-3.5 h-3.5 text-zinc-400" />
               <select
                 value={currentStaff.id}
                 onChange={(e) => {
                   const found = STAFF_LIST.find(s => s.id === e.target.value);
                   if (found) setCurrentStaff(found);
                 }}
-                className="bg-transparent text-sm text-white focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs text-zinc-200 focus:outline-none cursor-pointer"
               >
                 {STAFF_LIST.map(st => (
-                  <option key={st.id} value={st.id} className="bg-slate-900 text-white">
-                    {st.name} ({st.role})
+                  <option key={st.id} value={st.id} className="bg-zinc-900 text-white">
+                    {st.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-xs text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-medium text-white">{settings.stationId || 'Packing-01'}</span>
-            </div>
-
             <button
               onClick={onOpenSettings}
-              className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors border border-slate-700"
-              title="System Settings & Telegram Config"
+              className="p-1.5 rounded-md bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800 transition-colors cursor-pointer"
+              title="Telegram & Settings"
             >
-              <SettingsIcon className="w-5 h-5" />
+              <SettingsIcon className="w-4 h-4" />
             </button>
           </div>
 
         </div>
 
-        {/* Mobile Nav */}
-        <div className="flex md:hidden items-center justify-around py-2 border-t border-slate-800">
-          <button
-            onClick={() => setActiveTab('station')}
-            className={`flex flex-col items-center text-xs py-1 px-3 rounded ${activeTab === 'station' ? 'text-cyan-400 font-bold' : 'text-slate-400'}`}
-          >
-            <Package className="w-4 h-4 mb-1" />
-            <span>Station</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`flex flex-col items-center text-xs py-1 px-3 rounded ${activeTab === 'search' ? 'text-cyan-400 font-bold' : 'text-slate-400'}`}
-          >
-            <Search className="w-4 h-4 mb-1" />
-            <span>Search</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`flex flex-col items-center text-xs py-1 px-3 rounded ${activeTab === 'history' ? 'text-cyan-400 font-bold' : 'text-slate-400'}`}
-          >
-            <History className="w-4 h-4 mb-1" />
-            <span>History</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`flex flex-col items-center text-xs py-1 px-3 rounded ${activeTab === 'admin' ? 'text-cyan-400 font-bold' : 'text-slate-400'}`}
-          >
-            <BarChart3 className="w-4 h-4 mb-1" />
-            <span>Admin</span>
-          </button>
+        {/* Mobile Navigation */}
+        <div className="flex md:hidden items-center justify-around py-2 border-t border-zinc-800 text-xs text-zinc-400">
+          <button onClick={() => setActiveTab('station')} className={activeTab === 'station' ? 'text-emerald-400 font-bold' : ''}>Station</button>
+          <button onClick={() => setActiveTab('search')} className={activeTab === 'search' ? 'text-emerald-400 font-bold' : ''}>Search</button>
+          <button onClick={() => setActiveTab('history')} className={activeTab === 'history' ? 'text-emerald-400 font-bold' : ''}>History</button>
+          <button onClick={() => setActiveTab('admin')} className={activeTab === 'admin' ? 'text-emerald-400 font-bold' : ''}>Admin</button>
         </div>
 
       </div>
