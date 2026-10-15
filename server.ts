@@ -164,6 +164,8 @@ interface OrderRecord {
   weight?: string;
   productSku?: string;
   customerName?: string;
+  contactPerson?: string;
+  contactPhone?: string;
   itemCount?: string | number;
   notes?: string;
   createdAt: string;
@@ -814,6 +816,8 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
         record.itemCount ? `<b>🔢 Qty:</b> ${escapeHtml(String(record.itemCount))}` : '',
         record.customerName ? `<b>👤 Customer / City:</b> ${escapeHtml(record.customerName)}` : '',
+        record.contactPerson ? `<b>📞 Contact Person:</b> ${escapeHtml(record.contactPerson)}` : '',
+        record.contactPhone ? `<b>📱 Contact Phone:</b> ${escapeHtml(record.contactPhone)}` : '',
         `<b>👷 Staff:</b> ${safeStaffId}`,
         `<b>📍 Station:</b> ${safeStationId}`,
         `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,

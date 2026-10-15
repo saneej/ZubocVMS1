@@ -139,6 +139,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const [weightInput, setWeightInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
   const [customerInput, setCustomerInput] = useState('');
+  const [contactPersonInput, setContactPersonInput] = useState('');
+  const [contactPhoneInput, setContactPhoneInput] = useState('');
+  const [fulfillFromInput, setFulfillFromInput] = useState('Customized Order');
+  const [orderReceivedDateInput, setOrderReceivedDateInput] = useState('');
+  const [dispatchDateInput, setDispatchDateInput] = useState('');
+  const [orderAmountInput, setOrderAmountInput] = useState('');
+  const [shippingAmountInput, setShippingAmountInput] = useState('');
+  const [orderTotalInput, setOrderTotalInput] = useState('');
+  const [deliveredDateInput, setDeliveredDateInput] = useState('');
   const [itemCountInput, setItemCountInput] = useState('1');
   const [notesInput, setNotesInput] = useState('');
   const [showPackageDetails, setShowPackageDetails] = useState(true);
@@ -511,6 +520,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       weight: weightInput.trim() || undefined,
       productSku: skuInput.trim() || undefined,
       customerName: customerInput.trim() || undefined,
+      contactPerson: contactPersonInput.trim() || undefined,
+      contactPhone: contactPhoneInput.trim() || undefined,
+      fulfillFrom: fulfillFromInput.trim() || undefined,
+      orderReceivedDate: orderReceivedDateInput.trim() || undefined,
+      dispatchDate: dispatchDateInput.trim() || undefined,
+      orderAmount: orderAmountInput.trim() || undefined,
+      shippingAmount: shippingAmountInput.trim() || undefined,
+      orderTotal: orderTotalInput.trim() || undefined,
+      deliveredDate: deliveredDateInput.trim() || undefined,
       itemCount: itemCountInput.trim() || undefined,
       notes: notesInput.trim() || undefined
     });
@@ -530,6 +548,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       weight: weightInput.trim() || undefined,
       productSku: skuInput.trim() || undefined,
       customerName: customerInput.trim() || undefined,
+      contactPerson: contactPersonInput.trim() || undefined,
+      contactPhone: contactPhoneInput.trim() || undefined,
+      fulfillFrom: fulfillFromInput.trim() || undefined,
+      orderReceivedDate: orderReceivedDateInput.trim() || undefined,
+      dispatchDate: dispatchDateInput.trim() || undefined,
+      orderAmount: orderAmountInput.trim() || undefined,
+      shippingAmount: shippingAmountInput.trim() || undefined,
+      orderTotal: orderTotalInput.trim() || undefined,
+      deliveredDate: deliveredDateInput.trim() || undefined,
       itemCount: itemCountInput.trim() || undefined,
       notes: notesInput.trim() || undefined,
       createdAt: new Date().toISOString(),
@@ -550,6 +577,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     setWeightInput('');
     setSkuInput('');
     setCustomerInput('');
+    setContactPersonInput('');
+    setContactPhoneInput('');
+    setFulfillFromInput('Customized Order');
+    setOrderReceivedDateInput('');
+    setDispatchDateInput('');
+    setOrderAmountInput('');
+    setShippingAmountInput('');
+    setOrderTotalInput('');
+    setDeliveredDateInput('');
     setItemCountInput('1');
     setNotesInput('');
     setRecordedBlob(null);
@@ -863,13 +899,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                           <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
                             Courier Partner:
                           </label>
-                          <div className="flex flex-wrap gap-1.5 mb-1.5">
+                          <div className="flex flex-wrap gap-1.5 mb-2">
                             {['Delhivery', 'Blue Dart', 'DTDC', 'Shiprocket', 'Ekart', 'Xpressbees', 'India Post'].map((c) => (
                               <button
                                 key={c}
                                 type="button"
                                 onClick={() => setCourierInput(courierInput === c ? '' : c)}
-                                className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold cursor-pointer transition-colors border ${
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold cursor-pointer transition-colors border ${
                                   courierInput === c
                                     ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -878,6 +914,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                                 {c}
                               </button>
                             ))}
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              value={courierInput}
+                              onChange={(e) => setCourierInput(e.target.value)}
+                              placeholder="Or type custom courier name..."
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
                           </div>
                         </div>
 
@@ -958,6 +1003,34 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                               value={customerInput}
                               onChange={(e) => setCustomerInput(e.target.value)}
                               placeholder="e.g. Rajesh • Mumbai"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Contact Person Name */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Contact Person Name
+                            </label>
+                            <input
+                              type="text"
+                              value={contactPersonInput}
+                              onChange={(e) => setContactPersonInput(e.target.value)}
+                              placeholder="e.g. Amit Sharma"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Contact Person Phone Number */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Contact Phone Number
+                            </label>
+                            <input
+                              type="text"
+                              value={contactPhoneInput}
+                              onChange={(e) => setContactPhoneInput(e.target.value)}
+                              placeholder="e.g. +91 9876543210"
                               className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
                             />
                           </div>
@@ -1150,7 +1223,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                   </div>
 
                   {/* Package Metadata Summary Badge */}
-                  {(awbInput || courierInput || weightInput || skuInput || customerInput || notesInput) && (
+                  {(awbInput || courierInput || weightInput || skuInput || customerInput || contactPersonInput || contactPhoneInput || notesInput) && (
                     <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 font-mono text-xs">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Package Details for Telegram Caption & Dashboard:
@@ -1162,6 +1235,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                         {skuInput && <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200">🏷️ SKU: <strong>{skuInput}</strong></span>}
                         {itemCountInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Qty: <strong>{itemCountInput}</strong></span>}
                         {customerInput && <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">👤 Customer: <strong>{customerInput}</strong></span>}
+                        {contactPersonInput && <span className="bg-cyan-50 text-cyan-800 px-2 py-0.5 rounded border border-cyan-200">📞 Contact: <strong>{contactPersonInput}</strong></span>}
+                        {contactPhoneInput && <span className="bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">📱 Phone: <strong>{contactPhoneInput}</strong></span>}
                         {notesInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">📝 Notes: <strong>{notesInput}</strong></span>}
                       </div>
                     </div>

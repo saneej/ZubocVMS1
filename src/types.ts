@@ -20,6 +20,15 @@ export interface OrderRecord {
   weight?: string;
   productSku?: string;
   customerName?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  fulfillFrom?: string;
+  orderReceivedDate?: string;
+  dispatchDate?: string;
+  orderAmount?: string;
+  shippingAmount?: string;
+  orderTotal?: string;
+  deliveredDate?: string;
   itemCount?: string | number;
   notes?: string;
   createdAt: string;

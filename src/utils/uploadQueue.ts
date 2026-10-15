@@ -22,6 +22,15 @@ export interface UploadTask {
   weight?: string;
   productSku?: string;
   customerName?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  fulfillFrom?: string;
+  orderReceivedDate?: string;
+  dispatchDate?: string;
+  orderAmount?: string;
+  shippingAmount?: string;
+  orderTotal?: string;
+  deliveredDate?: string;
   itemCount?: string | number;
   notes?: string;
   progress: number; // 0 to 100
@@ -154,6 +163,8 @@ class UploadQueueManager {
           task.productSku ? `<b>🏷️ SKU / Item:</b> ${task.productSku}` : '',
           task.itemCount ? `<b>🔢 Qty:</b> ${task.itemCount}` : '',
           task.customerName ? `<b>👤 Customer / City:</b> ${task.customerName}` : '',
+          task.contactPerson ? `<b>📞 Contact Person:</b> ${task.contactPerson}` : '',
+          task.contactPhone ? `<b>📱 Contact Phone:</b> ${task.contactPhone}` : '',
           `<b>👷 Staff:</b> ${safeStaffId}`,
           `<b>📍 Station:</b> ${safeStationId}`,
           `<b>📅 Recorded:</b> ${formattedDate} (IST)`,
