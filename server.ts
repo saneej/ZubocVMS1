@@ -1,12 +1,10 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { GoogleGenAI } from '@google/genai';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 dotenv.config();
@@ -34,7 +32,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configure multer for binary uploads with unlimited payload capacity
+// Configure multer for binary uploads
 const upload = multer({
   limits: { fileSize: 2000 * 1024 * 1024 } // 2 GB limit
 });
@@ -42,30 +40,54 @@ const upload = multer({
 app.use(express.json({ limit: '2gb' }));
 app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 
-// Initialize Firebase App
+// Initialize Firebase App safely for both local server and Vercel serverless env
 let firebaseApp: any = null;
 let firestoreDb: any = null;
 
 try {
-  const configPath = path.join(__dirname, 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
-    const rawConfig = fs.readFileSync(configPath, 'utf-8');
-    const firebaseConfig = JSON.parse(rawConfig);
-    firebaseApp = initializeApp(firebaseConfig, 'SERVER_APP');
-    firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
-    console.log('Server initialized Firebase Firestore:', firebaseConfig.projectId);
-  } else if (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID) {
-    const firebaseConfig = {
+  let firebaseConfig: any = null;
+
+  const configPaths = [
+    path.join(process.cwd(), 'firebase-applet-config.json'),
+    path.join(__dirname, 'firebase-applet-config.json'),
+    path.join(__dirname, '..', 'firebase-applet-config.json')
+  ];
+
+  for (const cp of configPaths) {
+    if (fs.existsSync(cp)) {
+      try {
+        const rawConfig = fs.readFileSync(cp, 'utf-8');
+        firebaseConfig = JSON.parse(rawConfig);
+        break;
+      } catch (e) {
+        console.error('Error reading config file at', cp, e);
+      }
+    }
+  }
+
+  if (!firebaseConfig && (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID)) {
+    firebaseConfig = {
       projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
       appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID,
       apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
       authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)'
     };
-    firebaseApp = initializeApp(firebaseConfig, 'SERVER_APP');
-    firestoreDb = getFirestore(firebaseApp, process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)');
-    console.log('Server initialized Firebase Firestore from environment variables');
+  }
+
+  if (firebaseConfig) {
+    if (getApps().some(a => a.name === 'SERVER_APP')) {
+      firebaseApp = getApp('SERVER_APP');
+    } else {
+      firebaseApp = initializeApp(firebaseConfig, 'SERVER_APP');
+    }
+    const dbId = firebaseConfig.firestoreDatabaseId || process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)';
+    firestoreDb = getFirestore(firebaseApp, dbId);
+    console.log('Server initialized Firebase Firestore:', firebaseConfig.projectId, 'Database:', dbId);
+  } else {
+    console.warn('No Firebase configuration found on server.');
   }
 } catch (e) {
   console.error('Error initializing Firebase in server.ts:', e);
@@ -181,6 +203,16 @@ syncSettingsFromFirestore();
 
 // API Router supporting both /api/... and direct serverless paths
 const apiRouter = express.Router();
+
+// Base / Root endpoint
+apiRouter.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'Zuboc VMS API',
+    firebaseConnected: Boolean(firestoreDb),
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Health check
 apiRouter.get('/health', (req, res) => {
@@ -653,22 +685,29 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({
+        server: { middlewareMode: true, hmr: false },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn('Vite dev server middleware omitted:', e);
+    }
+  } else if (!process.env.VERCEL) {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`TrackVid VMS Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Zuboc VMS Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 if (!process.env.VERCEL) {
