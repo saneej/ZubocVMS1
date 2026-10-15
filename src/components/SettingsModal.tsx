@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, ShieldCheck, Key, Hash, Monitor } from 'lucide-react';
+import { X, Check, ShieldCheck, Key, Hash, Monitor, Send, AlertCircle } from 'lucide-react';
 import { AppSettings } from '../types';
 import { safeFetchJson } from '../utils/api';
 
@@ -63,7 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setSaveSuccess(true);
         setTimeout(() => {
           onClose();
-        }, 1000);
+        }, 800);
       } else {
         setErrorMessage(data.error || 'Failed to save settings');
       }
@@ -75,30 +75,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn font-sans">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fadeIn font-mono">
+      <div className="bg-[#0e111a] border border-[#222c3f] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
         
-        <div className="bg-slate-950 px-8 py-6 border-b border-slate-800 flex items-center justify-between">
+        {/* Header */}
+        <div className="bg-[#06080d] px-6 py-5 border-b border-[#1f2738] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base tracking-tight">Zuboc Integration Settings</h3>
-              <p className="text-xs text-slate-400 font-mono">Telegram Bot & Station Configuration</p>
+              <h3 className="font-extrabold text-white text-base font-mono">VMS INTEGRATION CONFIG</h3>
+              <p className="text-xs text-slate-400">Telegram Bot & Station Identifiers</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer">
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-[#161c2b] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-8 space-y-6 text-xs">
+        {/* Form Body */}
+        <form onSubmit={handleSave} className="p-6 space-y-5 text-xs">
           
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
-              <Key className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Telegram Bot Token</span>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 font-bold text-slate-300 uppercase tracking-wider text-[11px]">
+              <Key className="w-3.5 h-3.5 text-emerald-400" />
+              <span>TELEGRAM BOT TOKEN</span>
             </label>
             <input
               type="password"
@@ -108,14 +110,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-white font-mono focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all shadow-inner"
+              className="w-full bg-[#06080d] border border-[#222c3f] rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
-              <Hash className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Telegram Channel / Group ID</span>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 font-bold text-slate-300 uppercase tracking-wider text-[11px]">
+              <Hash className="w-3.5 h-3.5 text-emerald-400" />
+              <span>TELEGRAM CHANNEL CHAT ID</span>
             </label>
             <input
               type="text"
@@ -125,14 +127,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-white font-mono focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all shadow-inner"
+              className="w-full bg-[#06080d] border border-[#222c3f] rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
-              <Monitor className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Packing Station Identifier</span>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 font-bold text-slate-300 uppercase tracking-wider text-[11px]">
+              <Monitor className="w-3.5 h-3.5 text-emerald-400" />
+              <span>PACKING STATION IDENTIFIER</span>
             </label>
             <input
               type="text"
@@ -142,37 +144,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-white font-sans focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all shadow-inner"
+              className="w-full bg-[#06080d] border border-[#222c3f] rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
             />
           </div>
 
           {errorMessage && (
-            <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 text-rose-400 font-medium">
-              ⚠️ {errorMessage}
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3.5 text-rose-400 font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           )}
 
           {saveSuccess && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-emerald-400 font-medium flex items-center gap-2">
-              <Check className="w-4 h-4" />
-              <span>Settings successfully synchronized!</span>
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3.5 text-emerald-400 font-bold flex items-center gap-2">
+              <Check className="w-4 h-4 shrink-0" />
+              <span>Parameters saved & synchronized!</span>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1f2738]">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white font-bold cursor-pointer transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-[#161c2b] text-slate-300 hover:text-white font-bold cursor-pointer transition-colors"
             >
-              Cancel
+              CANCEL
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-black shadow-lg shadow-cyan-500/20 hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-lg shadow-emerald-500/20 uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
             >
-              {isSaving ? 'Saving...' : 'Save Configuration'}
+              {isSaving ? 'SAVING...' : 'SAVE CONFIG'}
             </button>
           </div>
 

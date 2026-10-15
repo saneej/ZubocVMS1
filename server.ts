@@ -161,19 +161,29 @@ async function syncSettingsFromFirestore() {
   }
 }
 
+// Helper to safely escape strings for Telegram HTML parse_mode
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Clean Bot Tokens & Chat IDs from extra quotes or whitespace
+function cleanTelegramCredential(str: string): string {
+  if (!str) return '';
+  return str.trim().replace(/^["']|["']$/g, '');
+}
+
 syncSettingsFromFirestore();
 
-// Vercel Serverless URL Normalization Middleware
-// Ensures requests like /health or /api/health are both correctly mapped to /api/...
-app.use((req, res, next) => {
-  if (req.url && !req.url.startsWith('/api/') && req.url !== '/api') {
-    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
-  }
-  next();
-});
+// API Router supporting both /api/... and direct serverless paths
+const apiRouter = express.Router();
 
-// API Routes
-app.get('/api/health', (req, res) => {
+// Health check
+apiRouter.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     firebaseConnected: Boolean(firestoreDb),
@@ -181,7 +191,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/settings', async (req, res) => {
+// Settings GET
+apiRouter.get('/settings', async (req, res) => {
   await syncSettingsFromFirestore();
   const maskedToken = settings.telegramBotToken
     ? settings.telegramBotToken.substring(0, 6) + '...' + settings.telegramBotToken.slice(-4)
@@ -194,7 +205,8 @@ app.get('/api/settings', async (req, res) => {
   });
 });
 
-app.post('/api/settings', async (req, res) => {
+// Settings POST
+apiRouter.post('/settings', async (req, res) => {
   const { telegramBotToken, telegramChatId, autoUpload, stationId } = req.body;
   if (telegramBotToken !== undefined) {
     const cleanToken = sanitizeString(telegramBotToken);
@@ -227,7 +239,8 @@ app.post('/api/settings', async (req, res) => {
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
 });
 
-app.get('/api/orders', async (req, res) => {
+// Orders GET
+apiRouter.get('/orders', async (req, res) => {
   if (firestoreDb) {
     try {
       const colRef = collection(firestoreDb, 'orders');
@@ -256,7 +269,8 @@ app.get('/api/orders', async (req, res) => {
   res.json(orders);
 });
 
-app.get('/api/orders/:orderId', async (req, res) => {
+// Orders GET by ID
+apiRouter.get('/orders/:orderId', async (req, res) => {
   const orderId = sanitizeString(req.params.orderId);
   if (firestoreDb) {
     try {
@@ -278,7 +292,7 @@ app.get('/api/orders/:orderId', async (req, res) => {
 });
 
 // Create or update order record metadata
-app.post('/api/orders', async (req, res) => {
+apiRouter.post('/orders', async (req, res) => {
   const orderId = sanitizeString(req.body.orderId);
   const staffId = sanitizeString(req.body.staffId);
   const stationId = sanitizeString(req.body.stationId);
@@ -330,7 +344,7 @@ app.post('/api/orders', async (req, res) => {
 });
 
 // Delete order record
-app.delete('/api/orders/:orderId', async (req, res) => {
+apiRouter.delete('/orders/:orderId', async (req, res) => {
   const orderId = sanitizeString(req.params.orderId);
   if (!orderId) {
     return res.status(400).json({ error: 'orderId is required' });
@@ -350,24 +364,8 @@ app.delete('/api/orders/:orderId', async (req, res) => {
   res.json({ success: true, message: `Order ${orderId} deleted successfully` });
 });
 
-// Helper to safely escape strings for Telegram HTML parse_mode
-function escapeHtml(str: string): string {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// Clean Bot Tokens & Chat IDs from extra quotes or whitespace
-function cleanTelegramCredential(str: string): string {
-  if (!str) return '';
-  return str.trim().replace(/^["']|["']$/g, '');
-}
-
-// Primary Upload Route
-app.post('/api/telegram/upload', (req, res, next) => {
+// Telegram Primary Upload Route
+apiRouter.post('/telegram/upload', (req, res, next) => {
   upload.single('video')(req, res, (err) => {
     if (err) {
       console.warn('Multer upload warning:', err.message);
@@ -490,7 +488,6 @@ app.post('/api/telegram/upload', (req, res, next) => {
     const messageId = tgResult.result?.message_id?.toString();
     const fileId = tgResult.result?.video?.file_id || tgResult.result?.document?.file_id;
 
-    // Safe Telegram deep link URL construction
     let cleanChannelId = chatId;
     let numericId = cleanChannelId;
     if (numericId.startsWith('-100')) {
@@ -536,8 +533,8 @@ app.post('/api/telegram/upload', (req, res, next) => {
   }
 });
 
-// Telegram Webhook for commands like /video <orderId>
-app.post('/api/telegram/webhook', async (req, res) => {
+// Telegram Webhook
+apiRouter.post('/telegram/webhook', async (req, res) => {
   try {
     const update = req.body;
     const message = update?.message;
@@ -608,8 +605,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
   }
 });
 
-// Test Telegram connection by sending a demo message
-app.post('/api/telegram/test-connection', async (req, res) => {
+// Telegram Test Connection
+apiRouter.post('/telegram/test-connection', async (req, res) => {
   const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
   const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
   const botToken = cleanTelegramCredential(rawBotToken);
@@ -620,7 +617,7 @@ app.post('/api/telegram/test-connection', async (req, res) => {
   }
 
   try {
-    const text = `🟢 <b>PackVision VMS Connected Successfully!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour PackVision VMS packing station is online and connected to this Telegram channel. Recorded order packing evidence will be delivered here automatically.`;
+    const text = `🟢 <b>Zuboc VMS Connected Successfully!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour Zuboc VMS packing station is online and connected to this Telegram channel. Recorded order packing evidence will be delivered here automatically.`;
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -644,6 +641,10 @@ app.post('/api/telegram/test-connection', async (req, res) => {
     res.status(500).json({ error: err.message || 'Failed to send test message' });
   }
 });
+
+// Attach API Router under /api AND /
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // Global Express Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

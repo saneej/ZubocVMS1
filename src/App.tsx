@@ -137,15 +137,15 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
-        <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-medium font-mono text-xs">Initializing Zuboc VMS Vault...</p>
+      <div className="min-h-screen bg-[#08090c] flex flex-col items-center justify-center text-white font-mono">
+        <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING ZUBOC VMS CONTROL ROOM...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#08090c] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 bg-tech-grid">
       
       <Navbar
         activeTab={activeTab}
@@ -208,8 +208,12 @@ export default function App() {
 
       <UploadQueueBanner />
 
-      <footer className="bg-slate-900 border-t border-slate-800 py-6 text-center text-xs text-slate-500 font-mono">
-        Zuboc VMS — Enterprise Order Packing Evidence & Telegram Video Portal
+      <footer className="bg-[#050608] border-t border-[#181f2f] py-4 text-center text-[11px] text-slate-500 font-mono flex items-center justify-between px-6">
+        <div>ZUBOC VMS — PHYSICAL LOGISTICS & EVIDENCE GATEWAY</div>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 led-emerald"></span>
+          <span>SECURE TELEMETRY ACTIVE</span>
+        </div>
       </footer>
 
     </div>
