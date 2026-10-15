@@ -70,27 +70,144 @@ class UploadQueueManager {
     this.notify();
 
     try {
-      // Primary: Binary FormData XHR
+      // Primary: Binary FormData XHR via Server API
       await this.uploadTaskBinaryXHR(nextTask);
       nextTask.status = 'SUCCESS';
       nextTask.progress = 100;
     } catch (err: any) {
-      console.warn(`Binary upload failed for ${nextTask.orderId}, retrying via base64 fallback...`, err);
+      console.warn(`Server API upload failed for ${nextTask.orderId}, trying direct client-to-Telegram upload...`, err);
       try {
-        // Secondary: Base64 JSON fallback
-        await this.uploadTaskBase64Fallback(nextTask);
+        // Secondary: Direct Client-to-Telegram Upload (bypasses Vercel 4.5MB serverless body limit)
+        await this.uploadTaskDirectTelegram(nextTask);
         nextTask.status = 'SUCCESS';
         nextTask.progress = 100;
-      } catch (fallbackErr: any) {
-        console.error(`Upload error for ${nextTask.orderId}:`, fallbackErr);
-        nextTask.status = 'FAILED';
-        nextTask.error = fallbackErr.message || 'Upload failed';
+      } catch (directErr: any) {
+        console.warn(`Direct Telegram upload failed for ${nextTask.orderId}, trying base64 fallback...`, directErr);
+        try {
+          // Tertiary: Base64 JSON fallback
+          await this.uploadTaskBase64Fallback(nextTask);
+          nextTask.status = 'SUCCESS';
+          nextTask.progress = 100;
+        } catch (fallbackErr: any) {
+          console.error(`Upload error for ${nextTask.orderId}:`, fallbackErr);
+          nextTask.status = 'FAILED';
+          nextTask.error = fallbackErr.message || 'Upload failed';
+        }
       }
     } finally {
       this.activeUploads--;
       this.notify();
       this.processQueue();
     }
+  }
+
+  private async uploadTaskDirectTelegram(task: UploadTask): Promise<void> {
+    let token = '';
+    let chatId = '';
+
+    try {
+      const settingsRes = await fetch(getApiUrl('/api/settings'));
+      if (settingsRes.ok) {
+        const s = await settingsRes.json();
+        token = s.telegramBotToken || '';
+        chatId = s.telegramChatId || '';
+      }
+    } catch (e) {
+      console.warn('Could not fetch settings for direct upload:', e);
+    }
+
+    if (!token || !chatId) {
+      throw new Error('Telegram credentials not available for direct upload');
+    }
+
+    const cleanToken = token.trim().replace(/^["']|["']$/g, '');
+    const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '');
+
+    const durMin = Math.floor((task.durationSeconds || 0) / 60);
+    const durSec = (task.durationSeconds || 0) % 60;
+    const durationStr = `${durMin}m ${durSec}s`;
+    const formattedDate = task.recordingDate
+      ? new Date(task.recordingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const caption = `<b>ZUBOC VMS Packing Recording</b>\n\n` +
+      `📦 <b>Order ID:</b> <code>${task.orderId}</code>\n` +
+      `👤 <b>Staff ID:</b> ${task.staffId}\n` +
+      `🏬 <b>Station ID:</b> ${task.stationId}\n` +
+      `⏱️ <b>Duration:</b> ${durationStr}\n` +
+      `📅 <b>Date:</b> ${formattedDate}`;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('chat_id', cleanChatId);
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'HTML');
+      formData.append('video', task.videoBlob, `${task.orderId}.mp4`);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          task.progress = percentComplete;
+          this.notify();
+        }
+      };
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const tgRes = JSON.parse(xhr.responseText);
+            if (tgRes.ok) {
+              const messageId = tgRes.result.message_id;
+              let link = '';
+              const rawChatId = String(cleanChatId);
+              if (rawChatId.startsWith('-100')) {
+                const subId = rawChatId.substring(4);
+                link = `https://t.me/c/${subId}/${messageId}`;
+              }
+              task.telegramMessageLink = link;
+
+              // Save order record to server/firestore
+              try {
+                await fetch(getApiUrl('/api/orders'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    orderId: task.orderId,
+                    staffId: task.staffId,
+                    stationId: task.stationId,
+                    recordingStartedAt: task.recordingDate ? new Date(task.recordingDate).toISOString() : new Date().toISOString(),
+                    recordingCompletedAt: new Date().toISOString(),
+                    durationSeconds: task.durationSeconds,
+                    recordingStatus: 'COMPLETED',
+                    uploadStatus: 'SUCCESS',
+                    telegramChatId: cleanChatId,
+                    telegramMessageId: String(messageId),
+                    telegramMessageLink: link
+                  })
+                });
+              } catch (saveErr) {
+                console.warn('Error saving order record after direct upload:', saveErr);
+              }
+
+              resolve();
+            } else {
+              reject(new Error(tgRes.description || 'Telegram API upload failed'));
+            }
+          } catch {
+            reject(new Error('Failed to parse Telegram API response'));
+          }
+        } else {
+          reject(new Error(`Telegram API returned HTTP ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error during Telegram upload'));
+      xhr.ontimeout = () => reject(new Error('Direct Telegram upload timed out'));
+
+      xhr.open('POST', `https://api.telegram.org/bot${cleanToken}/sendVideo`, true);
+      xhr.send(formData);
+    });
   }
 
   private uploadTaskBinaryXHR(task: UploadTask): Promise<void> {

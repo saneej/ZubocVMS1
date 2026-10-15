@@ -34,13 +34,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configure multer for binary uploads
+// Configure multer for binary uploads with unlimited payload capacity
 const upload = multer({
-  limits: { fileSize: 150 * 1024 * 1024 }
+  limits: { fileSize: 2000 * 1024 * 1024 } // 2 GB limit
 });
 
-app.use(express.json({ limit: '150mb' }));
-app.use(express.urlencoded({ extended: true, limit: '150mb' }));
+app.use(express.json({ limit: '2gb' }));
+app.use(express.urlencoded({ extended: true, limit: '2gb' }));
 
 // Initialize Firebase App
 let firebaseApp: any = null;
