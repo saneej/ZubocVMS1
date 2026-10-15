@@ -126,8 +126,8 @@ export default function App() {
 
   const handleDeleteOrder = async (orderId: string) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' });
-      if (res.ok) {
+      const res = await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
+      if (res && res.success) {
         setOrders(prev => prev.filter(o => o.orderId !== orderId));
       }
     } catch (err) {

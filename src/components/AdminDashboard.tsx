@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle2, Activity, BarChart3, Settings, Zap, Server, ShieldCheck, Radio, Clock, Cpu } from 'lucide-react';
 import { OrderRecord, AppSettings } from '../types';
+import { safeFetchJson } from '../utils/api';
 
 interface AdminDashboardProps {
   orders: OrderRecord[];
@@ -21,15 +22,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
     setIsSendingDemo(true);
     setDemoStatus(null);
     try {
-      const res = await fetch('/api/telegram/test-connection', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await safeFetchJson('/api/telegram/test-connection', { method: 'POST' });
+      if (data && data.success) {
         setDemoStatus('Test ping successfully dispatched to Telegram channel!');
       } else {
-        setDemoStatus('Error: ' + (data.error || 'Failed to send ping'));
+        setDemoStatus('Error: ' + (data?.error || 'Failed to send ping'));
       }
     } catch (err: any) {
-      setDemoStatus('Error: ' + err.message);
+      setDemoStatus('Error: ' + (err.message || 'Failed to dispatch test ping'));
     } finally {
       setIsSendingDemo(false);
     }
