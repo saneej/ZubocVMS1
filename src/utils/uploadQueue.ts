@@ -8,7 +8,10 @@ export interface UploadTask {
   staffId: string;
   stationId: string;
   durationSeconds: number;
-  videoBlob: Blob;
+  evidenceType?: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO';
+  videoBlob?: Blob | null;
+  photoBlobs?: Blob[];
+  photoDataUrls?: string[];
   recordingDate: string;
   width?: number;
   height?: number;
@@ -106,94 +109,136 @@ class UploadQueueManager {
   }
 
   // Primary Method: Upload directly from browser to Telegram API (Fast, no server body limit)
-  private uploadTaskDirectTelegram(task: UploadTask): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const token = localStorage.getItem('zuboc_telegram_token') || '8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE';
-      const chatId = localStorage.getItem('zuboc_telegram_chatid') || '-1003940299676';
+  private async uploadTaskDirectTelegram(task: UploadTask): Promise<void> {
+    const token = localStorage.getItem('zuboc_telegram_token') || '8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE';
+    const chatId = localStorage.getItem('zuboc_telegram_chatid') || '-1003940299676';
 
-      if (!token || !chatId) {
-        return reject(new Error('Telegram Bot Token or Chat ID not configured in settings.'));
+    if (!token || !chatId) {
+      throw new Error('Telegram Bot Token or Chat ID not configured in settings.');
+    }
+
+    const cleanToken = token.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+    const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+
+    const formattedDate = task.recordingDate 
+      ? new Date(task.recordingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const safeOrderId = task.orderId;
+    const safeStaffId = task.staffId || 'Staff-01';
+    const safeStationId = task.stationId || 'Packing-01';
+
+    let primaryMessageId = '';
+    let primaryFileId = '';
+    let primaryMessageLink = '';
+
+    // CASE 1: Video Upload (Video Only OR Photo+Video)
+    if (task.videoBlob) {
+      await new Promise<void>((resolve, reject) => {
+        const durMin = Math.floor((task.durationSeconds || 0) / 60);
+        const durSec = (task.durationSeconds || 0) % 60;
+        const durationStr = `${durMin}m ${durSec}s`;
+
+        const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${formattedDate}\n<b>Duration:</b> ${durationStr}${task.photoBlobs?.length ? `\n<b>Photos Attached:</b> ${task.photoBlobs.length}` : ''}`;
+
+        const formData = new FormData();
+        formData.append('chat_id', cleanChatId);
+        formData.append('caption', caption);
+        formData.append('parse_mode', 'HTML');
+        formData.append('supports_streaming', 'true');
+        
+        if (task.width && task.height && task.width > 0 && task.height > 0) {
+          formData.append('width', task.width.toString());
+          formData.append('height', task.height.toString());
+        }
+        if (task.durationSeconds > 0) {
+          formData.append('duration', Math.round(task.durationSeconds).toString());
+        }
+
+        formData.append('video', task.videoBlob!, `${safeOrderId}.mp4`);
+
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            task.progress = Math.round((event.loaded / event.total) * (task.photoBlobs?.length ? 70 : 100));
+            this.notify();
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const resData = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300 && resData.ok) {
+              primaryMessageId = resData.result?.message_id?.toString();
+              primaryFileId = resData.result?.video?.file_id || resData.result?.document?.file_id;
+              resolve();
+            } else {
+              reject(new Error(resData?.description || `Video upload failed (HTTP ${xhr.status})`));
+            }
+          } catch {
+            reject(new Error('Invalid response from Telegram video upload'));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during Telegram video upload'));
+        xhr.open('POST', `https://api.telegram.org/bot${cleanToken}/sendVideo`, true);
+        xhr.send(formData);
+      });
+    }
+
+    // CASE 2: Photo Upload (Photo Only OR snapshots attached to Photo+Video)
+    if (task.photoBlobs && task.photoBlobs.length > 0) {
+      for (let i = 0; i < task.photoBlobs.length; i++) {
+        const photoBlob = task.photoBlobs[i];
+        await new Promise<void>((resolve, reject) => {
+          const photoCaption = task.videoBlob 
+            ? `<b>📷 Photo Snapshot #${i + 1} • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`
+            : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Captured:</b> ${formattedDate}`;
+
+          const photoForm = new FormData();
+          photoForm.append('chat_id', cleanChatId);
+          photoForm.append('caption', photoCaption);
+          photoForm.append('parse_mode', 'HTML');
+          photoForm.append('photo', photoBlob, `${safeOrderId}_photo_${i + 1}.jpg`);
+
+          const xhr = new XMLHttpRequest();
+          xhr.onload = () => {
+            try {
+              const resData = JSON.parse(xhr.responseText);
+              if (xhr.status >= 200 && xhr.status < 300 && resData.ok) {
+                if (!primaryMessageId) {
+                  primaryMessageId = resData.result?.message_id?.toString();
+                  primaryFileId = resData.result?.photo?.[resData.result.photo.length - 1]?.file_id;
+                }
+                resolve();
+              } else {
+                reject(new Error(resData?.description || `Photo upload failed (HTTP ${xhr.status})`));
+              }
+            } catch {
+              reject(new Error('Invalid response from Telegram photo upload'));
+            }
+          };
+          xhr.onerror = () => reject(new Error('Network error during Telegram photo upload'));
+          xhr.open('POST', `https://api.telegram.org/bot${cleanToken}/sendPhoto`, true);
+          xhr.send(photoForm);
+        });
       }
+    }
 
-      const cleanToken = token.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
-      const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+    // Build Telegram message link
+    let numericId = cleanChatId;
+    if (numericId.startsWith('-100')) numericId = numericId.substring(4);
+    else if (numericId.startsWith('-')) numericId = numericId.substring(1);
 
-      const formattedDate = task.recordingDate 
-        ? new Date(task.recordingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-        : new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    if (primaryMessageId) {
+      primaryMessageLink = cleanChatId.startsWith('@')
+        ? `https://t.me/${cleanChatId.substring(1)}/${primaryMessageId}`
+        : `https://t.me/c/${numericId}/${primaryMessageId}`;
+    }
 
-      const durMin = Math.floor((task.durationSeconds || 0) / 60);
-      const durSec = (task.durationSeconds || 0) % 60;
-      const durationStr = `${durMin}m ${durSec}s`;
+    task.telegramMessageLink = primaryMessageLink;
 
-      const safeOrderId = task.orderId;
-      const safeStaffId = task.staffId || 'Staff-01';
-      const safeStationId = task.stationId || 'Packing-01';
-
-      const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${formattedDate}\n<b>Duration:</b> ${durationStr}`;
-
-      const formData = new FormData();
-      formData.append('chat_id', cleanChatId);
-      formData.append('caption', caption);
-      formData.append('parse_mode', 'HTML');
-      formData.append('supports_streaming', 'true');
-      
-      const width = task.width || 1920;
-      const height = task.height || 1080;
-      formData.append('width', width.toString());
-      formData.append('height', height.toString());
-      if (task.durationSeconds > 0) {
-        formData.append('duration', Math.round(task.durationSeconds).toString());
-      }
-
-      formData.append('video', task.videoBlob, `${safeOrderId}.mp4`);
-
-      const xhr = new XMLHttpRequest();
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          task.progress = percent;
-          this.notify();
-        }
-      };
-
-      xhr.onload = async () => {
-        let resData: any = null;
-        try {
-          resData = JSON.parse(xhr.responseText);
-        } catch {
-          return reject(new Error(`Telegram API non-JSON response: ${xhr.responseText.slice(0, 100)}`));
-        }
-
-        if (xhr.status >= 200 && xhr.status < 300 && resData.ok) {
-          const messageId = resData.result?.message_id?.toString();
-          const fileId = resData.result?.video?.file_id || resData.result?.document?.file_id;
-
-          let numericId = cleanChatId;
-          if (numericId.startsWith('-100')) numericId = numericId.substring(4);
-          else if (numericId.startsWith('-')) numericId = numericId.substring(1);
-
-          const messageLink = cleanChatId.startsWith('@')
-            ? `https://t.me/${cleanChatId.substring(1)}/${messageId}`
-            : `https://t.me/c/${numericId}/${messageId}`;
-
-          task.telegramMessageLink = messageLink;
-
-          // Save record locally & to Firestore
-          await this.saveOrderRecord(task, messageId, fileId, messageLink, cleanChatId);
-          resolve();
-        } else {
-          reject(new Error(resData?.description || `Telegram upload failed (HTTP ${xhr.status})`));
-        }
-      };
-
-      xhr.onerror = () => reject(new Error('Network error during direct Telegram upload'));
-      xhr.ontimeout = () => reject(new Error('Direct Telegram upload request timed out'));
-
-      xhr.open('POST', `https://api.telegram.org/bot${cleanToken}/sendVideo`, true);
-      xhr.send(formData);
-    });
+    // Save record locally & to Firestore
+    await this.saveOrderRecord(task, primaryMessageId, primaryFileId, primaryMessageLink, cleanChatId);
   }
 
   // Fallback 2: Server Binary Multipart Upload
@@ -206,10 +251,18 @@ class UploadQueueManager {
       formData.append('staffId', task.staffId);
       formData.append('stationId', task.stationId);
       formData.append('durationSeconds', task.durationSeconds.toString());
-      formData.append('recordingDate', task.recordingDate);
-      formData.append('width', (task.width || 1920).toString());
-      formData.append('height', (task.height || 1080).toString());
-      formData.append('video', task.videoBlob, `${task.orderId}.mp4`);
+      if (task.width && task.height && task.width > 0 && task.height > 0) {
+        formData.append('width', task.width.toString());
+        formData.append('height', task.height.toString());
+      }
+      formData.append('evidenceType', task.evidenceType || (task.videoBlob ? 'VIDEO' : 'PHOTO'));
+
+      if (task.videoBlob) {
+        formData.append('video', task.videoBlob, `${task.orderId}.mp4`);
+      }
+      if (task.photoBlobs && task.photoBlobs.length > 0) {
+        formData.append('photo', task.photoBlobs[0], `${task.orderId}.jpg`);
+      }
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -257,11 +310,41 @@ class UploadQueueManager {
   // Fallback 3: Base64 JSON Upload via Server
   private async uploadTaskBase64Json(task: UploadTask): Promise<void> {
     return new Promise((resolve, reject) => {
+      const payload: any = {
+        orderId: task.orderId,
+        staffId: task.staffId,
+        stationId: task.stationId,
+        durationSeconds: task.durationSeconds,
+        recordingDate: task.recordingDate,
+        width: task.width || 1920,
+        height: task.height || 1080,
+        evidenceType: task.evidenceType || (task.videoBlob ? 'VIDEO' : 'PHOTO'),
+        photoBase64: task.photoDataUrls?.[0]
+      };
+
+      if (!task.videoBlob) {
+        const url = getApiUrl('/api/telegram/upload');
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.record?.telegramMessageLink) task.telegramMessageLink = data.record.telegramMessageLink;
+            this.saveOrderRecord(task, data.record?.telegramMessageId, data.record?.telegramFileId, data.record?.telegramMessageLink, data.record?.telegramChatId);
+            task.progress = 100;
+            resolve();
+          })
+          .catch(reject);
+        return;
+      }
+
       const reader = new FileReader();
       reader.readAsDataURL(task.videoBlob);
       reader.onloadend = async () => {
         try {
-          const base64data = reader.result as string;
+          payload.videoBase64 = reader.result as string;
           task.progress = 50;
           this.notify();
 
@@ -269,16 +352,7 @@ class UploadQueueManager {
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              orderId: task.orderId,
-              staffId: task.staffId,
-              stationId: task.stationId,
-              durationSeconds: task.durationSeconds,
-              recordingDate: task.recordingDate,
-              width: task.width || 1920,
-              height: task.height || 1080,
-              videoBase64: base64data
-            })
+            body: JSON.stringify(payload)
           });
 
           const rawText = await res.text();
@@ -322,6 +396,9 @@ class UploadQueueManager {
       staffId: task.staffId || 'Staff-01',
       stationId: task.stationId || 'Packing-01',
       durationSeconds: task.durationSeconds || 0,
+      evidenceType: task.evidenceType || (task.videoBlob && task.photoBlobs?.length ? 'PHOTO_VIDEO' : task.videoBlob ? 'VIDEO' : 'PHOTO'),
+      photoDataUrl: task.photoDataUrls?.[0],
+      photoUrls: task.photoDataUrls || [],
       recordingStartedAt: task.recordingDate || now,
       recordingCompletedAt: now,
       recordingStatus: 'COMPLETED',

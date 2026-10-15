@@ -398,7 +398,11 @@ apiRouter.delete('/orders/:orderId', async (req, res) => {
 
 // Telegram Primary Upload Route
 apiRouter.post('/telegram/upload', (req, res, next) => {
-  upload.single('video')(req, res, (err) => {
+  upload.fields([
+    { name: 'video', maxCount: 1 },
+    { name: 'photo', maxCount: 1 },
+    { name: 'photos', maxCount: 5 }
+  ])(req, res, (err) => {
     if (err) {
       console.warn('Multer upload warning:', err.message);
     }
@@ -412,6 +416,8 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     const durationSeconds = Number(req.body.durationSeconds) || 0;
     const recordingDate = req.body.recordingDate;
     const videoBase64 = req.body.videoBase64;
+    const photoBase64 = req.body.photoBase64;
+    const evidenceType = req.body.evidenceType || 'VIDEO';
 
     if (!orderId) {
       return res.status(400).json({ error: 'orderId is required' });
@@ -463,71 +469,123 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       });
     }
 
+    // Extract files from multer
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     let videoBuffer: Buffer | null = null;
+    let photoBuffer: Buffer | null = null;
 
-    if (req.file && req.file.buffer) {
-      videoBuffer = req.file.buffer;
+    if (files?.video?.[0]?.buffer) {
+      videoBuffer = files.video[0].buffer;
     } else if (videoBase64) {
       const base64Data = videoBase64.replace(/^data:.*;base64,/, '');
       videoBuffer = Buffer.from(base64Data, 'base64');
     }
 
-    if (!videoBuffer) {
-      return res.status(400).json({ error: 'No video payload received in request' });
+    if (files?.photo?.[0]?.buffer) {
+      photoBuffer = files.photo[0].buffer;
+    } else if (files?.photos?.[0]?.buffer) {
+      photoBuffer = files.photos[0].buffer;
+    } else if (photoBase64) {
+      const base64Data = photoBase64.replace(/^data:.*;base64,/, '');
+      photoBuffer = Buffer.from(base64Data, 'base64');
+    }
+
+    if (!videoBuffer && !photoBuffer) {
+      return res.status(400).json({ error: 'No video or photo payload received in request' });
     }
 
     const formattedDate = recordingDate 
       ? new Date(recordingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    const durMin = Math.floor((durationSeconds || record.durationSeconds || 0) / 60);
-    const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
-    const durationStr = `${durMin}m ${durSec}s`;
-
     const safeOrderId = escapeHtml(orderId);
     const safeStaffId = escapeHtml(staffId || record.staffId);
     const safeStationId = escapeHtml(stationId || record.stationId);
 
-    const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${escapeHtml(formattedDate)}\n<b>Duration:</b> ${escapeHtml(durationStr)}`;
+    let messageId = '';
+    let fileId = '';
+    let tgResult: any = null;
 
-    const formData = new FormData();
-    formData.append('chat_id', chatId);
-    formData.append('caption', caption);
-    formData.append('parse_mode', 'HTML');
-    formData.append('supports_streaming', 'true');
+    // 1. Upload Video if present
+    if (videoBuffer) {
+      const durMin = Math.floor((durationSeconds || record.durationSeconds || 0) / 60);
+      const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
+      const durationStr = `${durMin}m ${durSec}s`;
 
-    const width = Number(req.body.width) || 1920;
-    const height = Number(req.body.height) || 1080;
-    formData.append('width', width.toString());
-    formData.append('height', height.toString());
-    if (durationSeconds > 0) {
-      formData.append('duration', Math.round(durationSeconds).toString());
+      const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${escapeHtml(formattedDate)}\n<b>Duration:</b> ${escapeHtml(durationStr)}${photoBuffer ? '\n<b>Photos Attached:</b> Yes' : ''}`;
+
+      const formData = new FormData();
+      formData.append('chat_id', chatId);
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'HTML');
+      formData.append('supports_streaming', 'true');
+
+      const width = Number(req.body.width);
+      const height = Number(req.body.height);
+      if (width > 0 && height > 0) {
+        formData.append('width', width.toString());
+        formData.append('height', height.toString());
+      }
+      if (durationSeconds > 0) {
+        formData.append('duration', Math.round(durationSeconds).toString());
+      }
+      
+      const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/mp4' });
+      formData.append('video', videoBlob, `${safeOrderId}.mp4`);
+
+      const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const responseText = await tgResponse.text();
+      try {
+        tgResult = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Telegram API non-JSON response: ${responseText.substring(0, 150)}`);
+      }
+
+      if (!tgResult.ok) {
+        throw new Error(tgResult.description || 'Telegram Video upload error');
+      }
+
+      messageId = tgResult.result?.message_id?.toString();
+      fileId = tgResult.result?.video?.file_id || tgResult.result?.document?.file_id;
     }
-    
-    const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/mp4' });
-    formData.append('video', videoBlob, `${safeOrderId}.mp4`);
 
-    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendVideo`;
+    // 2. Upload Photo if present
+    if (photoBuffer) {
+      const photoCaption = videoBuffer 
+        ? `<b>📷 Photo Snapshot • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`
+        : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Captured:</b> ${escapeHtml(formattedDate)}`;
 
-    const tgResponse = await fetch(telegramUrl, {
-      method: 'POST',
-      body: formData
-    });
+      const photoFormData = new FormData();
+      photoFormData.append('chat_id', chatId);
+      photoFormData.append('caption', photoCaption);
+      photoFormData.append('parse_mode', 'HTML');
 
-    const responseText = await tgResponse.text();
-    let tgResult: any;
-    try {
-      tgResult = JSON.parse(responseText);
-    } catch {
-      throw new Error(`Telegram API non-JSON response: ${responseText.substring(0, 150)}`);
+      const photoBlob = new Blob([new Uint8Array(photoBuffer)], { type: 'image/jpeg' });
+      photoFormData.append('photo', photoBlob, `${safeOrderId}.jpg`);
+
+      const photoTgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+        method: 'POST',
+        body: photoFormData
+      });
+
+      const photoResponseText = await photoTgResponse.text();
+      let photoTgResult: any;
+      try {
+        photoTgResult = JSON.parse(photoResponseText);
+      } catch {
+        photoTgResult = null;
+      }
+
+      if (!videoBuffer && photoTgResult && photoTgResult.ok) {
+        messageId = photoTgResult.result?.message_id?.toString();
+        fileId = photoTgResult.result?.photo?.[photoTgResult.result.photo.length - 1]?.file_id;
+        tgResult = photoTgResult;
+      }
     }
-
-    if (!tgResult.ok) {
-      throw new Error(tgResult.description || 'Telegram API returned error');
-    }
-
-    const messageId = tgResult.result?.message_id?.toString();
-    const fileId = tgResult.result?.video?.file_id || tgResult.result?.document?.file_id;
 
     let cleanChannelId = chatId;
     let numericId = cleanChannelId;
@@ -538,10 +596,12 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     }
 
     let messageLink = '';
-    if (cleanChannelId.startsWith('@')) {
-      messageLink = `https://t.me/${cleanChannelId.substring(1)}/${messageId}`;
-    } else {
-      messageLink = `https://t.me/c/${numericId}/${messageId}`;
+    if (messageId) {
+      if (cleanChannelId.startsWith('@')) {
+        messageLink = `https://t.me/${cleanChannelId.substring(1)}/${messageId}`;
+      } else {
+        messageLink = `https://t.me/c/${numericId}/${messageId}`;
+      }
     }
 
     record.uploadStatus = 'SUCCESS';

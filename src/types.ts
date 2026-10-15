@@ -12,6 +12,9 @@ export interface OrderRecord {
   telegramFileId?: string;
   telegramMessageLink?: string;
   videoUrl?: string;
+  photoUrls?: string[];
+  photoDataUrl?: string;
+  evidenceType?: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO';
   notes?: string;
   createdAt: string;
   updatedAt: string;
