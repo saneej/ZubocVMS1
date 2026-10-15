@@ -17,6 +17,13 @@ export interface UploadTask {
   recordingDate: string;
   width?: number;
   height?: number;
+  awbNumber?: string;
+  courier?: string;
+  weight?: string;
+  productSku?: string;
+  customerName?: string;
+  itemCount?: string | number;
+  notes?: string;
   progress: number; // 0 to 100
   status: 'QUEUED' | 'UPLOADING' | 'SUCCESS' | 'FAILED';
   error?: string;
@@ -139,7 +146,23 @@ class UploadQueueManager {
         const durSec = (task.durationSeconds || 0) % 60;
         const durationStr = `${durMin}m ${durSec}s`;
 
-        const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${formattedDate}\n<b>Duration:</b> ${durationStr}${task.photoBlobs?.length ? `\n<b>Photos Attached:</b> ${task.photoBlobs.length}` : ''}`;
+        const captionParts = [
+          `<b>📦 Order ID: ${safeOrderId}</b>`,
+          task.awbNumber ? `<b>🚚 AWB / Tracking:</b> ${task.awbNumber}` : '',
+          task.courier ? `<b>🏢 Courier:</b> ${task.courier}` : '',
+          task.weight ? `<b>⚖️ Weight:</b> ${task.weight}` : '',
+          task.productSku ? `<b>🏷️ SKU / Item:</b> ${task.productSku}` : '',
+          task.itemCount ? `<b>🔢 Qty:</b> ${task.itemCount}` : '',
+          task.customerName ? `<b>👤 Customer / City:</b> ${task.customerName}` : '',
+          `<b>👷 Staff:</b> ${safeStaffId}`,
+          `<b>📍 Station:</b> ${safeStationId}`,
+          `<b>📅 Recorded:</b> ${formattedDate} (IST)`,
+          `<b>⏱️ Duration:</b> ${durationStr}`,
+          task.notes ? `<b>📝 Notes:</b> ${task.notes}` : '',
+          task.photoBlobs?.length ? `<b>📷 Photos Attached:</b> ${task.photoBlobs.length}` : ''
+        ].filter(Boolean);
+
+        const caption = captionParts.join('\n');
 
         const formData = new FormData();
         formData.append('chat_id', cleanChatId);
@@ -198,9 +221,19 @@ class UploadQueueManager {
       for (let i = 0; i < task.photoBlobs.length; i++) {
         const photoBlob = task.photoBlobs[i];
         await new Promise<void>((resolve, reject) => {
-          const photoCaption = task.videoBlob 
-            ? `<b>📷 Photo Snapshot #${i + 1} • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`
-            : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Captured:</b> ${formattedDate}`;
+          const photoCaptionParts = [
+            task.videoBlob 
+              ? `<b>📷 Photo Snapshot #${i + 1} • Order ID: ${safeOrderId}</b>`
+              : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>`,
+            task.awbNumber ? `<b>AWB:</b> ${task.awbNumber}` : '',
+            task.courier ? `<b>Courier:</b> ${task.courier}` : '',
+            task.weight ? `<b>Weight:</b> ${task.weight}` : '',
+            task.productSku ? `<b>Item:</b> ${task.productSku}` : '',
+            `<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
+            `<b>Captured:</b> ${formattedDate} (IST)`,
+            task.notes ? `<b>Notes:</b> ${task.notes}` : ''
+          ].filter(Boolean);
+          const photoCaption = photoCaptionParts.join('\n');
 
           const photoForm = new FormData();
           photoForm.append('chat_id', cleanChatId);
@@ -265,6 +298,14 @@ class UploadQueueManager {
       }
       formData.append('evidenceType', task.evidenceType || (task.videoBlob ? 'VIDEO' : 'PHOTO'));
 
+      if (task.awbNumber) formData.append('awbNumber', task.awbNumber);
+      if (task.courier) formData.append('courier', task.courier);
+      if (task.weight) formData.append('weight', task.weight);
+      if (task.productSku) formData.append('productSku', task.productSku);
+      if (task.customerName) formData.append('customerName', task.customerName);
+      if (task.itemCount) formData.append('itemCount', String(task.itemCount));
+      if (task.notes) formData.append('notes', task.notes);
+
       if (task.videoBlob) {
         formData.append('video', task.videoBlob, `${task.orderId}.mp4`);
       }
@@ -327,7 +368,14 @@ class UploadQueueManager {
         width: task.width || 1920,
         height: task.height || 1080,
         evidenceType: task.evidenceType || (task.videoBlob ? 'VIDEO' : 'PHOTO'),
-        photoBase64: task.photoDataUrls?.[0]
+        photoBase64: task.photoDataUrls?.[0],
+        awbNumber: task.awbNumber,
+        courier: task.courier,
+        weight: task.weight,
+        productSku: task.productSku,
+        customerName: task.customerName,
+        itemCount: task.itemCount,
+        notes: task.notes
       };
 
       if (!task.videoBlob) {
@@ -407,6 +455,13 @@ class UploadQueueManager {
       evidenceType: task.evidenceType || (task.videoBlob && task.photoBlobs?.length ? 'PHOTO_VIDEO' : task.videoBlob ? 'VIDEO' : 'PHOTO'),
       photoDataUrl: task.photoDataUrls?.[0],
       photoUrls: task.photoDataUrls || [],
+      awbNumber: task.awbNumber || '',
+      courier: task.courier || '',
+      weight: task.weight || '',
+      productSku: task.productSku || '',
+      customerName: task.customerName || '',
+      itemCount: task.itemCount || '',
+      notes: task.notes || '',
       recordingStartedAt: task.recordingDate || now,
       recordingCompletedAt: now,
       recordingStatus: 'COMPLETED',

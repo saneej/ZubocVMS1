@@ -159,6 +159,12 @@ interface OrderRecord {
   telegramFileId?: string;
   telegramMessageLink?: string;
   videoUrl?: string;
+  awbNumber?: string;
+  courier?: string;
+  weight?: string;
+  productSku?: string;
+  customerName?: string;
+  itemCount?: string | number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -594,7 +600,13 @@ apiRouter.post('/orders', async (req, res) => {
   const recordingStatus = req.body.recordingStatus;
   const uploadStatus = req.body.uploadStatus;
   const videoUrl = req.body.videoUrl;
-  const notes = req.body.notes;
+  const awbNumber = sanitizeString(req.body.awbNumber);
+  const courier = sanitizeString(req.body.courier);
+  const weight = sanitizeString(req.body.weight);
+  const productSku = sanitizeString(req.body.productSku);
+  const customerName = sanitizeString(req.body.customerName);
+  const itemCount = sanitizeString(req.body.itemCount);
+  const notes = sanitizeString(req.body.notes);
 
   if (!orderId) {
     return res.status(400).json({ error: 'orderId is required' });
@@ -617,6 +629,12 @@ apiRouter.post('/orders', async (req, res) => {
     telegramFileId: existing?.telegramFileId,
     telegramMessageLink: existing?.telegramMessageLink,
     videoUrl: videoUrl || existing?.videoUrl,
+    awbNumber: awbNumber || existing?.awbNumber || '',
+    courier: courier || existing?.courier || '',
+    weight: weight || existing?.weight || '',
+    productSku: productSku || existing?.productSku || '',
+    customerName: customerName || existing?.customerName || '',
+    itemCount: itemCount || existing?.itemCount || '',
     notes: notes || existing?.notes || '',
     createdAt: existing?.createdAt || now,
     updatedAt: now
@@ -679,6 +697,13 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     const videoBase64 = req.body.videoBase64;
     const photoBase64 = req.body.photoBase64;
     const evidenceType = req.body.evidenceType || 'VIDEO';
+    const awbNumber = sanitizeString(req.body.awbNumber);
+    const courier = sanitizeString(req.body.courier);
+    const weight = sanitizeString(req.body.weight);
+    const productSku = sanitizeString(req.body.productSku);
+    const customerName = sanitizeString(req.body.customerName);
+    const itemCount = sanitizeString(req.body.itemCount);
+    const notes = sanitizeString(req.body.notes);
 
     if (!orderId) {
       return res.status(400).json({ error: 'orderId is required' });
@@ -711,6 +736,14 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         updatedAt: now
       };
     }
+
+    if (awbNumber) record.awbNumber = awbNumber;
+    if (courier) record.courier = courier;
+    if (weight) record.weight = weight;
+    if (productSku) record.productSku = productSku;
+    if (customerName) record.customerName = customerName;
+    if (itemCount) record.itemCount = itemCount;
+    if (notes) record.notes = notes;
 
     const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
     const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
@@ -756,8 +789,8 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     }
 
     const formattedDate = recordingDate 
-      ? new Date(recordingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      ? new Date(recordingDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     const safeOrderId = escapeHtml(orderId);
     const safeStaffId = escapeHtml(staffId || record.staffId);
@@ -773,7 +806,23 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
       const durationStr = `${durMin}m ${durSec}s`;
 
-      const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${escapeHtml(formattedDate)}\n<b>Duration:</b> ${escapeHtml(durationStr)}${photoBuffer ? '\n<b>Photos Attached:</b> Yes' : ''}`;
+      const captionLines = [
+        `<b>📦 Order ID: ${safeOrderId}</b>`,
+        record.awbNumber ? `<b>🚚 AWB / Tracking:</b> ${escapeHtml(record.awbNumber)}` : '',
+        record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
+        record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
+        record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
+        record.itemCount ? `<b>🔢 Qty:</b> ${escapeHtml(String(record.itemCount))}` : '',
+        record.customerName ? `<b>👤 Customer / City:</b> ${escapeHtml(record.customerName)}` : '',
+        `<b>👷 Staff:</b> ${safeStaffId}`,
+        `<b>📍 Station:</b> ${safeStationId}`,
+        `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
+        `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`,
+        record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : '',
+        photoBuffer ? '<b>📷 Photos Attached:</b> Yes' : ''
+      ].filter(Boolean);
+
+      const caption = captionLines.join('\n');
 
       // Transcode video using FFmpeg to faststart H.264 baseline MP4 + generate thumbnail
       const { mp4Buffer, thumbBuffer } = await transcodeToTelegramMp4(videoBuffer, safeOrderId);
@@ -828,9 +877,19 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
 
     // 2. Upload Photo if present
     if (photoBuffer) {
-      const photoCaption = videoBuffer 
-        ? `<b>📷 Photo Snapshot • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`
-        : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Captured:</b> ${escapeHtml(formattedDate)}`;
+      const photoCaptionLines = [
+        videoBuffer 
+          ? `<b>📷 Photo Snapshot • Order ID: ${safeOrderId}</b>`
+          : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>`,
+        record.awbNumber ? `<b>AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
+        record.courier ? `<b>Courier:</b> ${escapeHtml(record.courier)}` : '',
+        record.weight ? `<b>Weight:</b> ${escapeHtml(record.weight)}` : '',
+        record.productSku ? `<b>Item:</b> ${escapeHtml(record.productSku)}` : '',
+        `<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
+        `<b>Captured:</b> ${escapeHtml(formattedDate)} (IST)`,
+        record.notes ? `<b>Notes:</b> ${escapeHtml(record.notes)}` : ''
+      ].filter(Boolean);
+      const photoCaption = photoCaptionLines.join('\n');
 
       const photoFormData = new FormData();
       photoFormData.append('chat_id', chatId);

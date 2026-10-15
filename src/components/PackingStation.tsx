@@ -16,7 +16,14 @@ import {
   Image as ImageIcon, 
   Plus, 
   Trash2,
-  Maximize2
+  Maximize2,
+  Truck,
+  Scale,
+  Tag,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Box
 } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
@@ -125,6 +132,16 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const [mode, setMode] = useState<EvidenceMode>('both'); // Default: Photo + Video
   const [orderIdInput, setOrderIdInput] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string>('');
+
+  // Package & Shipment metadata
+  const [awbInput, setAwbInput] = useState('');
+  const [courierInput, setCourierInput] = useState('');
+  const [weightInput, setWeightInput] = useState('');
+  const [skuInput, setSkuInput] = useState('');
+  const [customerInput, setCustomerInput] = useState('');
+  const [itemCountInput, setItemCountInput] = useState('1');
+  const [notesInput, setNotesInput] = useState('');
+  const [showPackageDetails, setShowPackageDetails] = useState(true);
 
   // Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -488,7 +505,14 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       photoDataUrls: photosToDispatch.map(p => p.dataUrl),
       recordingDate: new Date().toISOString(),
       width,
-      height
+      height,
+      awbNumber: awbInput.trim() || undefined,
+      courier: courierInput.trim() || undefined,
+      weight: weightInput.trim() || undefined,
+      productSku: skuInput.trim() || undefined,
+      customerName: customerInput.trim() || undefined,
+      itemCount: itemCountInput.trim() || undefined,
+      notes: notesInput.trim() || undefined
     });
 
     onOrderCompleted({
@@ -501,6 +525,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       uploadStatus: 'PENDING',
       evidenceType,
       photoDataUrl: photosToDispatch[0]?.dataUrl,
+      awbNumber: awbInput.trim() || undefined,
+      courier: courierInput.trim() || undefined,
+      weight: weightInput.trim() || undefined,
+      productSku: skuInput.trim() || undefined,
+      customerName: customerInput.trim() || undefined,
+      itemCount: itemCountInput.trim() || undefined,
+      notes: notesInput.trim() || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -514,6 +545,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const handleResetForNextOrder = () => {
     setActiveOrderId('');
     setOrderIdInput('');
+    setAwbInput('');
+    setCourierInput('');
+    setWeightInput('');
+    setSkuInput('');
+    setCustomerInput('');
+    setItemCountInput('1');
+    setNotesInput('');
     setRecordedBlob(null);
     setRecordedVideoUrl(null);
     setCapturedPhotos([]);
@@ -803,6 +841,148 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                     </div>
                   </div>
 
+                  {/* Package & Shipment Details Panel */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setShowPackageDetails(!showPackageDetails)}
+                        className="flex items-center gap-2 text-xs font-mono font-bold text-slate-800 hover:text-blue-600 cursor-pointer"
+                      >
+                        <Box className="w-4 h-4 text-blue-600" />
+                        <span>PACKAGE & SHIPMENT DETAILS</span>
+                        {showPackageDetails ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                      </button>
+                      <span className="text-[10px] font-mono text-slate-500 font-medium">Shared in Telegram caption & stored in Dashboard</span>
+                    </div>
+
+                    {showPackageDetails && (
+                      <div className="space-y-2.5 pt-1">
+                        {/* Courier Partner Quick Selector */}
+                        <div>
+                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
+                            Courier Partner:
+                          </label>
+                          <div className="flex flex-wrap gap-1.5 mb-1.5">
+                            {['Delhivery', 'Blue Dart', 'DTDC', 'Shiprocket', 'Ekart', 'Xpressbees', 'India Post'].map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setCourierInput(courierInput === c ? '' : c)}
+                                className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold cursor-pointer transition-colors border ${
+                                  courierInput === c
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Grid of Inputs: AWB, Weight, SKU, Qty, Customer, Notes */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 font-mono text-xs">
+                          {/* AWB / Tracking No */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              AWB / Tracking Barcode
+                            </label>
+                            <div className="relative">
+                              <Truck className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                              <input
+                                type="text"
+                                value={awbInput}
+                                onChange={(e) => setAwbInput(e.target.value)}
+                                placeholder="Scan or enter AWB..."
+                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Weight */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Package Weight
+                            </label>
+                            <div className="relative">
+                              <Scale className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                              <input
+                                type="text"
+                                value={weightInput}
+                                onChange={(e) => setWeightInput(e.target.value)}
+                                placeholder="e.g. 0.45 kg / 450g"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Item / SKU */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Item / SKU Name
+                            </label>
+                            <div className="relative">
+                              <Tag className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                              <input
+                                type="text"
+                                value={skuInput}
+                                onChange={(e) => setSkuInput(e.target.value)}
+                                placeholder="e.g. ZB-TEE-L"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Qty */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Items Quantity
+                            </label>
+                            <input
+                              type="text"
+                              value={itemCountInput}
+                              onChange={(e) => setItemCountInput(e.target.value)}
+                              placeholder="1"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Customer / City */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Customer / City
+                            </label>
+                            <input
+                              type="text"
+                              value={customerInput}
+                              onChange={(e) => setCustomerInput(e.target.value)}
+                              placeholder="e.g. Rajesh • Mumbai"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Notes / QC Remarks */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Notes / QC Remarks
+                            </label>
+                            <div className="relative">
+                              <FileText className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+                              <input
+                                type="text"
+                                value={notesInput}
+                                onChange={(e) => setNotesInput(e.target.value)}
+                                placeholder="e.g. Packed OK, Bubble wrap"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Primary Trigger Buttons depending on Selected Mode */}
                   <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
                     
@@ -968,6 +1148,24 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                     )}
 
                   </div>
+
+                  {/* Package Metadata Summary Badge */}
+                  {(awbInput || courierInput || weightInput || skuInput || customerInput || notesInput) && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 font-mono text-xs">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Package Details for Telegram Caption & Dashboard:
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {awbInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">🚚 AWB: <strong>{awbInput}</strong></span>}
+                        {courierInput && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">🏢 Courier: <strong>{courierInput}</strong></span>}
+                        {weightInput && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">⚖️ Weight: <strong>{weightInput}</strong></span>}
+                        {skuInput && <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200">🏷️ SKU: <strong>{skuInput}</strong></span>}
+                        {itemCountInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Qty: <strong>{itemCountInput}</strong></span>}
+                        {customerInput && <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">👤 Customer: <strong>{customerInput}</strong></span>}
+                        {notesInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">📝 Notes: <strong>{notesInput}</strong></span>}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Confirm & Dispatch Buttons */}
                   <div className="flex items-center justify-end gap-3 pt-2">

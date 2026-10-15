@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface SearchRetrievalProps {
@@ -16,10 +16,16 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
   const [activeVideoModal, setActiveVideoModal] = useState<OrderRecord | null>(null);
 
   const filteredOrders = orders.filter(order => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch = 
-      order.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.staffId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.stationId.toLowerCase().includes(searchTerm.toLowerCase());
+      order.orderId.toLowerCase().includes(q) ||
+      (order.awbNumber && order.awbNumber.toLowerCase().includes(q)) ||
+      (order.courier && order.courier.toLowerCase().includes(q)) ||
+      (order.productSku && order.productSku.toLowerCase().includes(q)) ||
+      (order.customerName && order.customerName.toLowerCase().includes(q)) ||
+      (order.notes && order.notes.toLowerCase().includes(q)) ||
+      order.staffId.toLowerCase().includes(q) ||
+      order.stationId.toLowerCase().includes(q);
 
     const matchesStatus = 
       statusFilter === 'ALL' || 
@@ -39,15 +45,22 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
   };
 
   const exportFilteredCSV = () => {
-    const headers = ['Order AWB / ID', 'Station', 'Operator', 'Duration (s)', 'Upload Status', 'Telegram Link', 'Timestamp'];
+    const headers = ['Order ID', 'AWB Number', 'Courier', 'Weight', 'Product SKU', 'Quantity', 'Customer', 'Notes', 'Station', 'Operator', 'Duration (s)', 'Upload Status', 'Telegram Link', 'Timestamp (IST)'];
     const rows = filteredOrders.map(o => [
-      o.orderId,
-      o.stationId,
-      o.staffId,
+      `"${o.orderId}"`,
+      `"${o.awbNumber || ''}"`,
+      `"${o.courier || ''}"`,
+      `"${o.weight || ''}"`,
+      `"${o.productSku || ''}"`,
+      `"${o.itemCount || ''}"`,
+      `"${o.customerName || ''}"`,
+      `"${(o.notes || '').replace(/"/g, '""')}"`,
+      `"${o.stationId}"`,
+      `"${o.staffId}"`,
       o.durationSeconds,
       o.uploadStatus,
-      o.telegramMessageLink || 'N/A',
-      o.createdAt
+      `"${o.telegramMessageLink || ''}"`,
+      `"${formatIST(o.createdAt)}"`
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -111,39 +124,103 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
           <table className="w-full text-left border-collapse text-xs font-sans">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[11px] uppercase tracking-wider">
-                <th className="p-4">Order ID / AWB</th>
-                <th className="p-4">Station</th>
-                <th className="p-4">Operator</th>
-                <th className="p-4">Duration</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Date & Time</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-3">Order ID & AWB</th>
+                <th className="p-3">Courier</th>
+                <th className="p-3">Weight</th>
+                <th className="p-3">Item / SKU</th>
+                <th className="p-3">Customer / City</th>
+                <th className="p-3">Station & Operator</th>
+                <th className="p-3">Duration</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Date & Time (IST)</th>
+                <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400 font-mono">
+                  <td colSpan={10} className="p-8 text-center text-slate-400 font-mono">
                     No recordings match query
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-4 font-mono font-bold text-slate-900 text-sm">
-                      {order.orderId}
+                    <td className="p-3">
+                      <div className="font-mono font-bold text-slate-900 text-xs">{order.orderId}</div>
+                      {order.awbNumber ? (
+                        <div className="font-mono text-[11px] text-blue-600 flex items-center gap-1 mt-0.5">
+                          <Truck className="w-3 h-3 text-blue-500 shrink-0" />
+                          <span>{order.awbNumber}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-mono">—</span>
+                      )}
                     </td>
-                    <td className="p-4 font-mono text-slate-600">
-                      {order.stationId}
+
+                    <td className="p-3 font-mono text-xs">
+                      {order.courier ? (
+                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200 text-[11px]">
+                          {order.courier}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">—</span>
+                      )}
                     </td>
-                    <td className="p-4 font-medium text-slate-700">
-                      {order.staffId}
+
+                    <td className="p-3 font-mono text-xs">
+                      {order.weight ? (
+                        <span className="font-bold text-slate-800 flex items-center gap-1">
+                          <Scale className="w-3 h-3 text-emerald-600" />
+                          {order.weight}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">—</span>
+                      )}
                     </td>
-                    <td className="p-4 font-mono text-slate-600">
+
+                    <td className="p-3 font-mono text-xs">
+                      {order.productSku ? (
+                        <div>
+                          <div className="font-bold text-slate-800 flex items-center gap-1">
+                            <Tag className="w-3 h-3 text-purple-600" />
+                            <span>{order.productSku}</span>
+                          </div>
+                          {order.itemCount && (
+                            <span className="text-[10px] text-slate-500">Qty: {order.itemCount}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">—</span>
+                      )}
+                    </td>
+
+                    <td className="p-3 text-xs">
+                      {order.customerName ? (
+                        <div className="text-slate-800 font-medium">{order.customerName}</div>
+                      ) : null}
+                      {order.notes ? (
+                        <div className="text-slate-500 text-[10px] italic flex items-center gap-1 mt-0.5">
+                          <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[120px]">{order.notes}</span>
+                        </div>
+                      ) : null}
+                      {!order.customerName && !order.notes && (
+                        <span className="text-slate-400 text-[10px]">—</span>
+                      )}
+                    </td>
+
+                    <td className="p-3 font-mono text-xs">
+                      <div className="text-slate-700 font-medium">{order.stationId}</div>
+                      <div className="text-slate-400 text-[10px]">{order.staffId}</div>
+                    </td>
+
+                    <td className="p-3 font-mono text-slate-600 text-xs">
                       {order.durationSeconds}s
                     </td>
-                    <td className="p-4 font-mono">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+
+                    <td className="p-3 font-mono">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         order.uploadStatus === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' :
                         order.uploadStatus === 'FAILED' ? 'bg-rose-100 text-rose-800' :
                         'bg-amber-100 text-amber-800'
@@ -151,7 +228,10 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                         {order.uploadStatus}
                       </span>
                     </td>
-                    <td className="p-4 text-slate-500 text-[11px]">{formatIST(order.createdAt)}</td>
+
+                    <td className="p-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                      {formatIST(order.createdAt)}
+                    </td>
                     <td className="p-4 text-right space-x-2 font-mono">
                       {(order.telegramMessageLink || order.uploadStatus === 'SUCCESS') && (
                         <a

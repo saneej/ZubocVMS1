@@ -192,6 +192,12 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
         recordingStatus: body.recordingStatus || 'COMPLETED',
         uploadStatus: body.uploadStatus || 'PENDING',
         videoUrl: body.videoUrl || '',
+        awbNumber: body.awbNumber || '',
+        courier: body.courier || '',
+        weight: body.weight || '',
+        productSku: body.productSku || '',
+        customerName: body.customerName || '',
+        itemCount: body.itemCount || '',
         notes: body.notes || '',
         createdAt: existingIdx >= 0 ? orders[existingIdx].createdAt : now,
         updatedAt: now

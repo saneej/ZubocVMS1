@@ -15,6 +15,12 @@ export interface OrderRecord {
   photoUrls?: string[];
   photoDataUrl?: string;
   evidenceType?: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO';
+  awbNumber?: string;
+  courier?: string;
+  weight?: string;
+  productSku?: string;
+  customerName?: string;
+  itemCount?: string | number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
