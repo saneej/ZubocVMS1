@@ -163,6 +163,15 @@ async function syncSettingsFromFirestore() {
 
 syncSettingsFromFirestore();
 
+// Vercel Serverless URL Normalization Middleware
+// Ensures requests like /health or /api/health are both correctly mapped to /api/...
+app.use((req, res, next) => {
+  if (req.url && !req.url.startsWith('/api/') && req.url !== '/api') {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
+
 // API Routes
 app.get('/api/health', (req, res) => {
   res.json({

@@ -207,15 +207,16 @@ export const DiagnosePage: React.FC<DiagnosePageProps> = ({ settings, orders, on
       });
       addLog('✅ Backend API health endpoint responded OK');
     } catch (apiErr: any) {
+      const errText = typeof apiErr === 'string' ? apiErr : (apiErr?.message || JSON.stringify(apiErr));
       results.push({
         id: 't3_api',
         category: 'API',
         title: 'Backend API Service (/api/health)',
         status: 'FAIL',
-        details: `API Server Endpoint Error: ${apiErr.message}`,
+        details: `API Server Endpoint Error: ${errText}`,
         remedy: 'Ensure Node.js/Vercel server function is running and server route handlers are deployed.'
       });
-      addLog(`❌ API health check failed: ${apiErr.message}`);
+      addLog(`❌ API health check failed: ${errText}`);
     }
 
     // TEST 4: Telegram Bot Integration Diagnostic

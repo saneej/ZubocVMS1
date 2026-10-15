@@ -21,7 +21,13 @@ export async function safeFetchJson(path: string, options: RequestInit = {}): Pr
     let errMsg = `HTTP ${response.status} ${response.statusText}`;
     try {
       const errJson = await response.json();
-      if (errJson.error) errMsg = errJson.error;
+      if (errJson.error) {
+        errMsg = typeof errJson.error === 'string'
+          ? errJson.error
+          : (errJson.error.message || JSON.stringify(errJson.error));
+      } else if (errJson.message) {
+        errMsg = typeof errJson.message === 'string' ? errJson.message : JSON.stringify(errJson.message);
+      }
     } catch {}
     throw new Error(errMsg);
   }
