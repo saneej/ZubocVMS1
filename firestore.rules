@@ -25,7 +25,7 @@ service cloud.firestore {
 
     // Staffs collection for staff management & authentication
     match /staffs/{staffId} {
-      allow read, write: if isValidId(staffId);
+      allow read, write: if true;
     }
   }
 }

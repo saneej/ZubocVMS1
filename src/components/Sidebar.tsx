@@ -20,11 +20,11 @@ interface SidebarProps {
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
   pendingCount?: number;
+  staffList?: StaffMember[];
+  onLogout?: () => void;
 }
 
-const STAFF_LIST: StaffMember[] = [
-  { id: 'Staff-01', name: 'Alex Packer', role: 'PACKER', stationId: 'Packing-01' },
-  { id: 'Staff-02', name: 'Sarah Supervisor', role: 'SUPERVISOR', stationId: 'Packing-01' },
+const DEFAULT_STAFF_LIST: StaffMember[] = [
   { id: 'Admin-01', name: 'David Admin', role: 'ADMIN', stationId: 'Packing-HQ' },
 ];
 
@@ -37,8 +37,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   isMobileOpen,
   setIsMobileOpen,
-  pendingCount = 0
+  pendingCount = 0,
+  staffList,
+  onLogout
 }) => {
+  const effectiveStaffList = staffList && staffList.length > 0 ? staffList : DEFAULT_STAFF_LIST;
 
   const navItems = [
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
@@ -146,29 +149,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </button>
 
-          {/* Operator Switcher */}
-          <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between shadow-2xs">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                {currentStaff.name.charAt(0)}
+          {/* Operator Switcher & Account */}
+          <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                  {currentStaff.name.charAt(0)}
+                </div>
+                <select
+                  value={currentStaff.id}
+                  onChange={(e) => {
+                    const found = effectiveStaffList.find(s => s.id === e.target.value);
+                    if (found) setCurrentStaff(found);
+                  }}
+                  className="bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer pr-1 max-w-[130px] truncate"
+                >
+                  {effectiveStaffList.map(st => (
+                    <option key={st.id} value={st.id} className="bg-white text-slate-800">
+                      {st.name} ({st.role})
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                value={currentStaff.id}
-                onChange={(e) => {
-                  const found = STAFF_LIST.find(s => s.id === e.target.value);
-                  if (found) setCurrentStaff(found);
-                }}
-                className="bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer pr-1"
-              >
-                {STAFF_LIST.map(st => (
-                  <option key={st.id} value={st.id} className="bg-white text-slate-800">
-                    {st.name}
-                  </option>
-                ))}
-              </select>
+
+              <span className="w-2 h-2 rounded-full bg-emerald-500" title="Online" />
             </div>
 
-            <span className="w-2 h-2 rounded-full bg-emerald-500" title="Online" />
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="w-full py-1.5 px-2 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 rounded-lg text-[11px] font-mono font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
 
         </div>

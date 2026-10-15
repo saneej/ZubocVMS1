@@ -7,6 +7,7 @@ import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SettingsModal } from './components/SettingsModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
+import { LoginPage } from './components/LoginPage';
 import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -49,14 +50,31 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+const DEFAULT_STAFF: StaffMember = {
+  id: 'Admin-01',
+  name: 'David Admin',
+  role: 'ADMIN',
+  stationId: 'Packing-HQ'
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin'>('station');
-  const [currentStaff, setCurrentStaff] = useState<StaffMember>({
-    id: 'Staff-01',
-    name: 'Alex Packer',
-    role: 'PACKER',
-    stationId: 'Packing-01'
+  
+  // Authentication State
+  const [currentStaff, setCurrentStaff] = useState<StaffMember>(() => {
+    try {
+      const saved = localStorage.getItem('zuboc_auth_user');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_STAFF;
   });
+
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem('zuboc_auth_user'));
+  });
+
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+
   const [settings, setSettings] = useState<AppSettings>({
     telegramBotToken: '',
     telegramChatId: '',
@@ -64,6 +82,7 @@ export default function App() {
     autoUpload: true,
     stationId: 'Packing-01'
   });
+
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -91,8 +110,19 @@ export default function App() {
     }
   };
 
+  const fetchStaffsAPI = async () => {
+    try {
+      const data = await safeFetchJson('/api/staffs');
+      if (Array.isArray(data)) {
+        setStaffList(data);
+      }
+    } catch (err) {
+      console.warn('Error fetching staffs via API:', err);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchOrdersAPI(), fetchSettingsAPI()]).finally(() => {
+    Promise.all([fetchOrdersAPI(), fetchSettingsAPI(), fetchStaffsAPI()]).finally(() => {
       setIsLoading(false);
     });
 
@@ -121,6 +151,17 @@ export default function App() {
     }
   }, []);
 
+  const handleLoginSuccess = (staff: StaffMember) => {
+    setCurrentStaff(staff);
+    setIsLoggedIn(true);
+    localStorage.setItem('zuboc_auth_user', JSON.stringify(staff));
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('zuboc_auth_user');
+    setIsLoggedIn(false);
+  };
+
   const handleOrderCompleted = (newRecord: OrderRecord) => {
     setOrders(prev => [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)]);
   };
@@ -145,6 +186,11 @@ export default function App() {
     );
   }
 
+  // IF NOT LOGGED IN, RENDER LOGIN PAGE
+  if (!isLoggedIn) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
       
@@ -153,11 +199,16 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         currentStaff={currentStaff}
-        setCurrentStaff={setCurrentStaff}
+        setCurrentStaff={(st) => {
+          setCurrentStaff(st);
+          localStorage.setItem('zuboc_auth_user', JSON.stringify(st));
+        }}
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
+        staffList={staffList}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
@@ -171,6 +222,7 @@ export default function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           setIsMobileOpen={setIsMobileOpen}
           onRefreshOrders={fetchOrdersAPI}
+          onLogout={handleLogout}
         />
 
         {/* Dynamic Page Views */}
@@ -215,7 +267,7 @@ export default function App() {
           <div>ZUBOC VMS — Enterprise Physical Logistics Portal</div>
           <div className="flex items-center gap-2 text-slate-600">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>SYSTEM OPERATIONAL</span>
+            <span>OPERATOR: {currentStaff.name} ({currentStaff.role})</span>
             <span className="text-slate-300">|</span>
             <span>STATION: {settings.stationId || 'Packing-01'}</span>
           </div>
@@ -228,6 +280,8 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSaveSettings={(newSet) => setSettings(newSet)}
+        currentStaff={currentStaff}
+        onStaffUpdated={fetchStaffsAPI}
       />
 
     </div>

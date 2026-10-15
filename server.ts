@@ -188,14 +188,10 @@ interface StaffMember {
 
 const DEFAULT_STAFFS: StaffMember[] = [
   { id: 'Admin-01', name: 'David Admin', role: 'ADMIN', stationId: 'Packing-HQ', password: 'password123', createdAt: new Date().toISOString() },
-  { id: 'Staff-01', name: 'Alex Packer', role: 'PACKER', stationId: 'Packing-01', password: 'password123', createdAt: new Date().toISOString() },
-  { id: 'Staff-02', name: 'Sarah Supervisor', role: 'SUPERVISOR', stationId: 'Packing-01', password: 'password123', createdAt: new Date().toISOString() },
 ];
 
 let staffsStore: Record<string, StaffMember> = {
   'Admin-01': DEFAULT_STAFFS[0],
-  'Staff-01': DEFAULT_STAFFS[1],
-  'Staff-02': DEFAULT_STAFFS[2],
 };
 
 let ordersStore: Record<string, OrderRecord> = {};

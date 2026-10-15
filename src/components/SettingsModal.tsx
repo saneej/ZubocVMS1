@@ -1,15 +1,33 @@
-import React, { useState } from 'react';
-import { X, Check, ShieldCheck, Key, Hash, Monitor, AlertCircle } from 'lucide-react';
-import { AppSettings } from '../types';
+import React, { useState, useEffect } from 'react';
+import { 
+  X, 
+  Check, 
+  ShieldCheck, 
+  Key, 
+  Hash, 
+  Monitor, 
+  AlertCircle, 
+  Users, 
+  UserPlus, 
+  Trash2, 
+  RotateCcw, 
+  Settings as SettingsIcon,
+  Shield,
+  Eye,
+  EyeOff
+} from 'lucide-react';
+import { AppSettings, StaffMember } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
   onSaveSettings: (newSettings: AppSettings) => void;
+  currentStaff: StaffMember;
+  onStaffUpdated?: () => void;
 }
 
 function cleanInputString(val: string): string {
@@ -21,8 +39,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   settings,
-  onSaveSettings
+  onSaveSettings,
+  currentStaff,
+  onStaffUpdated
 }) => {
+  const [activeTab, setActiveTab] = useState<'telegram' | 'staffs'>('telegram');
+
+  // Telegram Config
   const [botToken, setBotToken] = useState(settings.telegramBotToken || '');
   const [chatId, setChatId] = useState(settings.telegramChatId || '');
   const [stationId, setStationId] = useState(settings.stationId || 'Packing-01');
@@ -30,9 +53,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Staffs State
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [isLoadingStaffs, setIsLoadingStaffs] = useState(false);
+  const [staffActionError, setStaffActionError] = useState<string | null>(null);
+  const [staffActionSuccess, setStaffActionSuccess] = useState<string | null>(null);
+
+  // Add Staff Form
+  const [newStaffId, setNewStaffId] = useState('');
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState<'PACKER' | 'SUPERVISOR' | 'ADMIN'>('PACKER');
+  const [newStaffStation, setNewStaffStation] = useState(settings.stationId || 'Packing-01');
+  const [newStaffPassword, setNewStaffPassword] = useState('password123');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
+
+  // Reset Password Modal / Action
+  const [resettingStaffId, setResettingStaffId] = useState<string | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      setBotToken(settings.telegramBotToken || '');
+      setChatId(settings.telegramChatId || '');
+      setStationId(settings.stationId || 'Packing-01');
+      fetchStaffs();
+    }
+  }, [isOpen]);
+
+  const fetchStaffs = async () => {
+    setIsLoadingStaffs(true);
+    try {
+      const data = await safeFetchJson('/api/staffs');
+      if (Array.isArray(data)) {
+        setStaffList(data);
+      }
+    } catch (err: any) {
+      console.warn('Failed to load staffs from API:', err);
+    } finally {
+      setIsLoadingStaffs(false);
+    }
+  };
+
   if (!isOpen) return null;
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveTelegramSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setSaveSuccess(false);
@@ -95,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setSaveSuccess(true);
       setTimeout(() => {
         onClose();
-      }, 800);
+      }, 700);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error saving settings');
     } finally {
@@ -103,98 +169,472 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStaffActionError(null);
+    setStaffActionSuccess(null);
+    setIsSubmittingStaff(true);
+
+    const cleanId = cleanInputString(newStaffId);
+    const cleanName = cleanInputString(newStaffName);
+    const cleanStation = cleanInputString(newStaffStation) || settings.stationId;
+    const cleanPass = newStaffPassword.trim();
+
+    if (!cleanId || !cleanName) {
+      setStaffActionError('Staff ID and Full Name are required.');
+      setIsSubmittingStaff(false);
+      return;
+    }
+
+    try {
+      const res = await safeFetchJson('/api/staffs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: cleanId,
+          name: cleanName,
+          role: newStaffRole,
+          stationId: cleanStation,
+          password: cleanPass || 'password123'
+        })
+      });
+
+      if (res && res.success) {
+        setStaffActionSuccess(`Staff member ${cleanName} (${cleanId}) added!`);
+        setNewStaffId('');
+        setNewStaffName('');
+        setNewStaffPassword('password123');
+        setShowAddForm(false);
+        await fetchStaffs();
+        onStaffUpdated?.();
+      } else {
+        throw new Error(res?.error || 'Failed to add staff member');
+      }
+    } catch (err: any) {
+      setStaffActionError(err.message || 'Error adding staff');
+    } finally {
+      setIsSubmittingStaff(false);
+    }
+  };
+
+  const handleRemoveStaff = async (staffId: string, staffName: string) => {
+    if (staffId === currentStaff.id) {
+      setStaffActionError('You cannot delete your own currently logged-in account.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to remove staff member "${staffName}" (${staffId})?`)) {
+      return;
+    }
+
+    setStaffActionError(null);
+    setStaffActionSuccess(null);
+
+    try {
+      const res = await safeFetchJson(`/api/staffs/${staffId}`, { method: 'DELETE' });
+      if (res && res.success) {
+        setStaffActionSuccess(`Staff member ${staffName} removed.`);
+        await fetchStaffs();
+        onStaffUpdated?.();
+      } else {
+        throw new Error(res?.error || 'Failed to remove staff');
+      }
+    } catch (err: any) {
+      setStaffActionError(err.message || 'Error removing staff');
+    }
+  };
+
+  const handleResetPassword = async (staffId: string) => {
+    if (!resetNewPassword || resetNewPassword.trim().length < 4) {
+      setStaffActionError('New password must be at least 4 characters.');
+      return;
+    }
+
+    setStaffActionError(null);
+    setStaffActionSuccess(null);
+
+    try {
+      const res = await safeFetchJson('/api/staffs/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: staffId,
+          newPassword: resetNewPassword.trim()
+        })
+      });
+
+      if (res && res.success) {
+        setStaffActionSuccess(`Password reset successfully for ${staffId}!`);
+        setResettingStaffId(null);
+        setResetNewPassword('');
+        await fetchStaffs();
+      } else {
+        throw new Error(res?.error || 'Failed to reset password');
+      }
+    } catch (err: any) {
+      setStaffActionError(err.message || 'Error resetting password');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn font-sans">
-      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="w-5 h-5 text-blue-600" />
-            <h3 className="font-extrabold text-slate-900 text-sm font-mono uppercase tracking-wider">VMS Configuration</h3>
+            <h3 className="font-extrabold text-slate-900 text-sm font-mono uppercase tracking-wider">Workstation Settings</h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSave} className="p-6 space-y-4 text-xs font-mono">
+        {/* Tab Bar */}
+        <div className="flex border-b border-slate-200 bg-slate-100/70 px-6 pt-2 font-mono text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('telegram')}
+            className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'telegram'
+                ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <SettingsIcon className="w-3.5 h-3.5" />
+            <span>TELEGRAM & STATION</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('staffs')}
+            className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'staffs'
+                ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>STAFF MEMBERS ({staffList.length})</span>
+          </button>
+        </div>
+
+        {/* Modal Content Body */}
+        <div className="p-6 overflow-y-auto space-y-4 font-mono text-xs">
           
-          <div className="space-y-1">
-            <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-              <Key className="w-3.5 h-3.5 text-blue-600" />
-              <span>Telegram Bot Token</span>
-            </label>
-            <input
-              type="password"
-              value={botToken}
-              onChange={(e) => setBotToken(e.target.value)}
-              placeholder="e.g. 8372063656:AAGc8AP..."
-              className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
-            />
-          </div>
+          {/* TAB 1: Telegram & Station */}
+          {activeTab === 'telegram' && (
+            <form onSubmit={handleSaveTelegramSettings} className="space-y-4">
+              
+              <div className="space-y-1">
+                <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  <Key className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Telegram Bot Token</span>
+                </label>
+                <input
+                  type="password"
+                  value={botToken}
+                  onChange={(e) => setBotToken(e.target.value)}
+                  placeholder="e.g. 8372063656:AAGc8AP..."
+                  className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
+                />
+              </div>
 
-          <div className="space-y-1">
-            <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-              <Hash className="w-3.5 h-3.5 text-blue-600" />
-              <span>Telegram Channel Chat ID</span>
-            </label>
-            <input
-              type="text"
-              value={chatId}
-              onChange={(e) => setChatId(e.target.value)}
-              placeholder="e.g. -1003940299676"
-              className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
-            />
-          </div>
+              <div className="space-y-1">
+                <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  <Hash className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Telegram Channel Chat ID</span>
+                </label>
+                <input
+                  type="text"
+                  value={chatId}
+                  onChange={(e) => setChatId(e.target.value)}
+                  placeholder="e.g. -1003940299676"
+                  className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
+                />
+              </div>
 
-          <div className="space-y-1">
-            <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-              <Monitor className="w-3.5 h-3.5 text-blue-600" />
-              <span>Packing Station Identifier</span>
-            </label>
-            <input
-              type="text"
-              value={stationId}
-              onChange={(e) => setStationId(e.target.value)}
-              placeholder="Packing-01"
-              className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
-            />
-          </div>
+              <div className="space-y-1">
+                <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  <Monitor className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Packing Station Identifier</span>
+                </label>
+                <input
+                  type="text"
+                  value={stationId}
+                  onChange={(e) => setStationId(e.target.value)}
+                  placeholder="e.g. Packing-01"
+                  className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
+                />
+              </div>
 
-          {errorMessage && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-700 font-bold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
+              {errorMessage && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {saveSuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Settings saved successfully!</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer transition-colors"
+                >
+                  CANCEL
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all uppercase tracking-wider"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSaving ? 'SAVING...' : 'SAVE CONFIGURATION'}</span>
+                </button>
+              </div>
+
+            </form>
+          )}
+
+          {/* TAB 2: Staff Members Management */}
+          {activeTab === 'staffs' && (
+            <div className="space-y-4">
+              
+              {/* Feedback messages */}
+              {staffActionError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{staffActionError}</span>
+                  </div>
+                  <button onClick={() => setStaffActionError(null)} className="font-bold cursor-pointer">✕</button>
+                </div>
+              )}
+
+              {staffActionSuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{staffActionSuccess}</span>
+                  </div>
+                  <button onClick={() => setStaffActionSuccess(null)} className="font-bold cursor-pointer">✕</button>
+                </div>
+              )}
+
+              {/* Action Toolbar */}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="font-bold text-slate-700 text-[11px] uppercase">
+                  Active Operators & Staff ({staffList.length})
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all text-xs"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>{showAddForm ? 'CANCEL' : '+ ADD STAFF'}</span>
+                </button>
+              </div>
+
+              {/* ADD STAFF INLINE FORM */}
+              {showAddForm && (
+                <form onSubmit={handleAddStaff} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                  <h4 className="font-bold text-slate-900 text-xs uppercase flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-blue-600" />
+                    <span>Create New Staff Member</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Staff ID (Login User ID)</label>
+                      <input
+                        type="text"
+                        value={newStaffId}
+                        onChange={(e) => setNewStaffId(e.target.value)}
+                        placeholder="e.g. Staff-03 or EMP-105"
+                        required
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        value={newStaffName}
+                        onChange={(e) => setNewStaffName(e.target.value)}
+                        placeholder="e.g. Michael Scott"
+                        required
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Role</label>
+                      <select
+                        value={newStaffRole}
+                        onChange={(e) => setNewStaffRole(e.target.value as any)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none cursor-pointer"
+                      >
+                        <option value="PACKER">PACKER</option>
+                        <option value="SUPERVISOR">SUPERVISOR</option>
+                        <option value="ADMIN">ADMIN</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Assigned Station</label>
+                      <input
+                        type="text"
+                        value={newStaffStation}
+                        onChange={(e) => setNewStaffStation(e.target.value)}
+                        placeholder="e.g. Packing-01"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Initial Password</label>
+                      <input
+                        type="text"
+                        value={newStaffPassword}
+                        onChange={(e) => setNewStaffPassword(e.target.value)}
+                        placeholder="Default: password123"
+                        required
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(false)}
+                      className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingStaff}
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold cursor-pointer shadow-xs"
+                    >
+                      {isSubmittingStaff ? 'Adding...' : 'Save Staff'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STAFF LIST TABLE */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">Staff ID / Name</th>
+                      <th className="p-3">Role</th>
+                      <th className="p-3">Station</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {staffList.map((staff) => (
+                      <tr key={staff.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="p-3">
+                          <div className="font-bold text-slate-900">{staff.name}</div>
+                          <div className="text-[10px] text-slate-500 font-mono">ID: {staff.id}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            staff.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
+                            staff.role === 'SUPERVISOR' ? 'bg-blue-100 text-blue-800' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {staff.role}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {staff.stationId}
+                        </td>
+                        <td className="p-3 text-right space-x-1.5">
+                          {/* Reset Password Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setResettingStaffId(resettingStaffId === staff.id ? null : staff.id);
+                              setResetNewPassword('');
+                            }}
+                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[10px] font-bold cursor-pointer"
+                            title="Reset staff password"
+                          >
+                            Reset PWD
+                          </button>
+
+                          {/* Delete Staff Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveStaff(staff.id, staff.name)}
+                            disabled={staff.id === currentStaff.id}
+                            className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded disabled:opacity-30 cursor-pointer"
+                            title={staff.id === currentStaff.id ? 'Cannot remove yourself' : 'Remove staff member'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 inline" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* INLINE PASSWORD RESET PANEL */}
+              {resettingStaffId && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-900 text-xs">
+                      Reset Password for Staff ID: <strong>{resettingStaffId}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setResettingStaffId(null)}
+                      className="text-amber-800 hover:text-amber-950 font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      placeholder="Enter new password (min 4 characters)..."
+                      className="flex-1 bg-white border border-amber-300 rounded-lg px-3 py-2 text-slate-900 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleResetPassword(resettingStaffId)}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs cursor-pointer shadow-2xs"
+                    >
+                      Update Password
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
-          {saveSuccess && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 font-bold flex items-center gap-2">
-              <Check className="w-4 h-4 shrink-0" />
-              <span>Saved successfully!</span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-2xs uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isSaving ? 'Saving...' : 'Save Config'}
-            </button>
-          </div>
-
-        </form>
+        </div>
 
       </div>
     </div>

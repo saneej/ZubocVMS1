@@ -3,7 +3,9 @@ import {
   Menu, 
   Clock, 
   Settings, 
-  RefreshCw
+  RefreshCw,
+  LogOut,
+  User
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
@@ -14,6 +16,7 @@ interface TopHeaderProps {
   onOpenSettings: () => void;
   setIsMobileOpen: (open: boolean) => void;
   onRefreshOrders?: () => void;
+  onLogout?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -22,7 +25,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   settings,
   onOpenSettings,
   setIsMobileOpen,
-  onRefreshOrders
+  onRefreshOrders,
+  onLogout
 }) => {
   const [timeUtc, setTimeUtc] = useState<string>('');
 
@@ -96,6 +100,28 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
+
+          {/* Active Staff Info */}
+          <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-200">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-mono">
+              <User className="w-3.5 h-3.5 text-blue-600" />
+              <span className="font-bold text-slate-800">{currentStaff.name}</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 font-bold">
+                {currentStaff.role}
+              </span>
+            </div>
+
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 border border-slate-200 transition-colors cursor-pointer"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
         </div>
 
