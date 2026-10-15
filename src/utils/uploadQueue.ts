@@ -1,3 +1,5 @@
+import { getApiUrl } from './api';
+
 export interface UploadTask {
   id: string;
   orderId: string;
@@ -18,7 +20,7 @@ class UploadQueueManager {
   private tasks: UploadTask[] = [];
   private listeners: QueueListener[] = [];
   private activeUploads = 0;
-  private maxParallelUploads = 2;
+  private maxParallelUploads = 3;
 
   public subscribe(listener: QueueListener) {
     this.listeners.push(listener);
@@ -68,14 +70,14 @@ class UploadQueueManager {
     this.notify();
 
     try {
-      // First attempt: Multipart FormData XHR
+      // Primary: Binary FormData XHR with live percentage
       await this.uploadTaskBinaryXHR(nextTask);
       nextTask.status = 'SUCCESS';
       nextTask.progress = 100;
     } catch (err: any) {
-      console.warn(`Binary upload failed for ${nextTask.orderId}, retrying via JSON base64 fallback...`, err);
+      console.warn(`Binary upload failed for ${nextTask.orderId}, retrying via base64 fallback...`, err);
       try {
-        // Fallback attempt: JSON Base64 fetch
+        // Secondary: Base64 JSON fallback
         await this.uploadTaskBase64Fallback(nextTask);
         nextTask.status = 'SUCCESS';
         nextTask.progress = 100;
@@ -132,10 +134,10 @@ class UploadQueueManager {
         }
       };
 
-      xhr.onerror = () => reject(new Error('Network error during binary upload'));
-      xhr.ontimeout = () => reject(new Error('Upload timed out'));
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.ontimeout = () => reject(new Error('Upload request timed out'));
 
-      const uploadEndpoint = '/api/telegram/upload';
+      const uploadEndpoint = getApiUrl('/api/telegram/upload');
       xhr.open('POST', uploadEndpoint, true);
       xhr.send(formData);
     });
@@ -151,7 +153,8 @@ class UploadQueueManager {
           task.progress = 50;
           this.notify();
 
-          const res = await fetch('/api/telegram/upload', {
+          const url = getApiUrl('/api/telegram/upload');
+          const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

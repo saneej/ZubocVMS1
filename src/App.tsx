@@ -7,8 +7,9 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { SettingsModal } from './components/SettingsModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { OrderRecord, StaffMember, AppSettings } from './types';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db, auth } from './firebase';
+import { safeFetchJson } from './utils/api';
 
 enum OperationType {
   CREATE = 'create',
@@ -68,8 +69,7 @@ export default function App() {
 
   const fetchOrdersAPI = async () => {
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
+      const data = await safeFetchJson('/api/orders');
       if (Array.isArray(data)) {
         setOrders(data);
       }
@@ -80,9 +80,10 @@ export default function App() {
 
   const fetchSettingsAPI = async () => {
     try {
-      const res = await fetch('/api/settings');
-      const data = await res.json();
-      setSettings(data);
+      const data = await safeFetchJson('/api/settings');
+      if (data) {
+        setSettings(data);
+      }
     } catch (err) {
       console.error('Error fetching settings via API:', err);
     }
@@ -125,14 +126,14 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
-        <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-medium">Connecting to Firebase & PackVision VMS...</p>
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-400 font-medium">Connecting to PackVision VMS...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
       
       <Navbar
         activeTab={activeTab}
@@ -186,7 +187,7 @@ export default function App() {
       <UploadQueueBanner />
 
       <footer className="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        PackVision VMS — Firebase Cloud Database & Telegram Integration Active
+        PackVision VMS — Enterprise Order Packing Evidence System
       </footer>
 
     </div>
