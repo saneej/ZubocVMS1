@@ -128,11 +128,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleQuickFill = (user: string, pass: string) => {
-    setUserId(user);
-    setPassword(pass);
-    setErrorMessage(null);
-  };
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-sans selection:bg-blue-600 selection:text-white">
@@ -346,24 +342,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </form>
           )}
 
-          {/* Quick Demo Credentials Footer */}
-          <div className="pt-3 border-t border-slate-100 space-y-2">
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-              Quick 1-Click Login (Admin):
-            </span>
-            <div className="flex flex-wrap gap-1.5 font-mono text-[11px]">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('Admin-01', 'password123')}
-                className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-bold cursor-pointer transition-colors"
-              >
-                🔑 Admin-01 (Password: password123)
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 font-mono">
-              Use Admin-01 to sign in, then create new staff/operators in Settings.
-            </p>
-          </div>
+
 
         </div>
 

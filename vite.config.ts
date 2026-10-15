@@ -24,9 +24,9 @@ export default defineConfig(() => {
           scope: '/',
           icons: [
             {
-              src: 'https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=500',
+              src: 'https://i.ibb.co/LhSXsZ2G/zuboc-logo-1.png',
               sizes: '192x192 512x512',
-              type: 'image/svg+xml',
+              type: 'image/png',
               purpose: 'any maskable'
             }
           ]
