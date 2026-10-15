@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatIST } from '../utils/time';
 import { Download, RefreshCw, ExternalLink, Trash2 } from 'lucide-react';
 import { OrderRecord } from '../types';
 
@@ -105,7 +106,7 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
                         {order.uploadStatus}
                       </span>
                     </td>
-                    <td className="p-4 text-slate-500 text-[11px]">{new Date(order.createdAt).toLocaleString()}</td>
+                    <td className="p-4 text-slate-500 text-[11px]">{formatIST(order.createdAt)}</td>
                     <td className="p-4 text-right space-x-2">
                       {(order.telegramMessageLink || order.uploadStatus === 'SUCCESS') && (
                         <a

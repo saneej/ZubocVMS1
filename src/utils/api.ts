@@ -269,7 +269,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: cleanChatId,
-        text: `🟢 <b>Zuboc VMS (${botUsername}) Connected!</b>\n\n<b>Station:</b> ${stationId}\n<b>Timestamp:</b> ${new Date().toLocaleString('en-GB')}\n\nYour Zuboc VMS packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`,
+        text: `🟢 <b>Zuboc VMS (${botUsername}) Connected!</b>\n\n<b>Station:</b> ${stationId}\n<b>Timestamp:</b> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })} IST\n\nYour Zuboc VMS packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`,
         parse_mode: 'HTML'
       })
     });

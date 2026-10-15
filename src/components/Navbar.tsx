@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getCurrentISTString } from '../utils/time';
 import { Video, Settings as SettingsIcon, User, Activity, Search, History, Cpu, ChevronRight, ShieldCheck, Radio, Clock } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
@@ -23,12 +24,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   settings,
   onOpenSettings
 }) => {
-  const [timeUtc, setTimeUtc] = useState<string>('');
+  const [timeIst, setTimeUtc] = useState<string>('');
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
-      setTimeUtc(now.toISOString().substring(11, 19) + ' UTC');
+      setTimeUtc(getCurrentISTString());
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -66,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="text-slate-600 hidden sm:inline-block">|</span>
           <span className="flex items-center gap-1 text-slate-300">
             <Clock className="w-3 h-3 text-cyan-400" />
-            <span>{timeUtc}</span>
+            <span>{timeIst}</span>
           </span>
         </div>
 

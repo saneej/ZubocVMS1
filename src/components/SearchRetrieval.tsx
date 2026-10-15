@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatIST } from '../utils/time';
 import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X } from 'lucide-react';
 import { OrderRecord } from '../types';
 
@@ -115,13 +116,14 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                 <th className="p-4">Operator</th>
                 <th className="p-4">Duration</th>
                 <th className="p-4">Status</th>
+                <th className="p-4">Date & Time</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400 font-mono">
+                  <td colSpan={7} className="p-8 text-center text-slate-400 font-mono">
                     No recordings match query
                   </td>
                 </tr>
@@ -149,6 +151,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                         {order.uploadStatus}
                       </span>
                     </td>
+                    <td className="p-4 text-slate-500 text-[11px]">{formatIST(order.createdAt)}</td>
                     <td className="p-4 text-right space-x-2 font-mono">
                       {(order.telegramMessageLink || order.uploadStatus === 'SUCCESS') && (
                         <a

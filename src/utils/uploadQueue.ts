@@ -1,4 +1,5 @@
 import { getApiUrl, safeFetchJson } from './api';
+import { formatISTShort } from './time';
 import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { cleanForFirestore } from './firestoreHelper';
@@ -121,9 +122,7 @@ class UploadQueueManager {
     const cleanToken = token.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
     const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
 
-    const formattedDate = task.recordingDate 
-      ? new Date(task.recordingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const formattedDate = formatISTShort(task.recordingDate || new Date());
 
     const safeOrderId = task.orderId;
     const safeStaffId = task.staffId || 'Staff-01';

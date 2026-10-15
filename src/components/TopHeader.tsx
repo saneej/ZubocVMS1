@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getCurrentISTString } from '../utils/time';
 import { 
   Menu, 
   Clock, 
@@ -29,12 +30,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onRefreshOrders,
   onLogout
 }) => {
-  const [timeUtc, setTimeUtc] = useState<string>('');
+  const [timeIst, setTimeUtc] = useState<string>('');
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
-      setTimeUtc(now.toISOString().substring(11, 19) + ' UTC');
+      setTimeUtc(getCurrentISTString());
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -79,7 +79,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           {/* UTC Clock */}
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-mono text-slate-600 font-medium">
             <Clock className="w-3.5 h-3.5 text-blue-600" />
-            <span>{timeUtc}</span>
+            <span>{timeIst}</span>
           </div>
 
           {/* Refresh Data */}

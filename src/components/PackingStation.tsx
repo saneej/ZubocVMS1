@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { formatISTTimeOnly } from '../utils/time';
 import { 
   Camera, 
   StopCircle, 
@@ -1038,7 +1039,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
                     <div className="flex items-center justify-between text-[10px] text-slate-500">
                       <span>{task.evidenceType || (task.videoBlob ? 'VIDEO' : 'PHOTO')}</span>
-                      <span>{new Date(task.recordingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{formatISTTimeOnly(task.recordingDate)}</span>
                     </div>
 
                     {task.status === 'SUCCESS' && task.telegramMessageLink && (

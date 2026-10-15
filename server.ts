@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import ffmpegPath from 'ffmpeg-static';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
@@ -22,8 +23,9 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
   try {
     fs.writeFileSync(inputPath, inputBuffer);
 
+    const bin = ffmpegPath || 'ffmpeg';
     // Fast transcode to baseline H.264 MP4 with yuv420p, even dimensions, aac audio, and faststart moov atom
-    const ffmpegCmd = `ffmpeg -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:a aac -b:a 128k -movflags +faststart "${outputPath}" -y`;
+    const ffmpegCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:a aac -b:a 128k -movflags +faststart "${outputPath}" -y`;
     await execPromise(ffmpegCmd, { timeout: 30000 });
 
     if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
@@ -32,7 +34,7 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
       // Extract thumbnail frame
       let thumbBuffer: Buffer | undefined;
       try {
-        await execPromise(`ffmpeg -ss 00:00:00.500 -i "${outputPath}" -vframes 1 -q:v 2 "${thumbPath}" -y`, { timeout: 10000 });
+        await execPromise(`"${bin}" -ss 00:00:00.500 -i "${outputPath}" -vframes 1 -q:v 2 "${thumbPath}" -y`, { timeout: 10000 });
         if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 0) {
           thumbBuffer = fs.readFileSync(thumbPath);
         }
