@@ -7,6 +7,53 @@ import multer from 'multer';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
+import { exec } from 'child_process';
+import util from 'util';
+
+const execPromise = util.promisify(exec);
+
+// Transcode video using FFmpeg to faststart H.264 baseline MP4 + generate thumbnail
+async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Promise<{ mp4Buffer: Buffer; thumbBuffer?: Buffer }> {
+  const tmpId = `${orderId.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`;
+  const inputPath = path.join('/tmp', `${tmpId}_in.tmp`);
+  const outputPath = path.join('/tmp', `${tmpId}_out.mp4`);
+  const thumbPath = path.join('/tmp', `${tmpId}_thumb.jpg`);
+
+  try {
+    fs.writeFileSync(inputPath, inputBuffer);
+
+    // Fast transcode to baseline H.264 MP4 with yuv420p and faststart moov atom
+    const ffmpegCmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -movflags +faststart "${outputPath}" -y`;
+    await execPromise(ffmpegCmd, { timeout: 30000 });
+
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+      const mp4Buffer = fs.readFileSync(outputPath);
+
+      // Extract thumbnail frame
+      let thumbBuffer: Buffer | undefined;
+      try {
+        await execPromise(`ffmpeg -ss 00:00:00.500 -i "${outputPath}" -vframes 1 -q:v 2 "${thumbPath}" -y`, { timeout: 10000 });
+        if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 0) {
+          thumbBuffer = fs.readFileSync(thumbPath);
+        }
+      } catch {
+        // Thumbnail is optional
+      }
+
+      return { mp4Buffer, thumbBuffer };
+    }
+  } catch (err) {
+    console.warn('FFmpeg transcoding fallback:', err);
+  } finally {
+    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
+    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+    try { if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath); } catch {}
+  }
+
+  // Fallback to original buffer if ffmpeg fails
+  return { mp4Buffer: inputBuffer };
+}
+
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -129,6 +176,28 @@ let settings: AppSettings = {
   stationId: 'Packing-01'
 };
 
+interface StaffMember {
+  id: string;
+  name: string;
+  role: 'ADMIN' | 'SUPERVISOR' | 'PACKER';
+  stationId: string;
+  password?: string;
+  email?: string;
+  createdAt?: string;
+}
+
+const DEFAULT_STAFFS: StaffMember[] = [
+  { id: 'Admin-01', name: 'David Admin', role: 'ADMIN', stationId: 'Packing-HQ', password: 'password123', createdAt: new Date().toISOString() },
+  { id: 'Staff-01', name: 'Alex Packer', role: 'PACKER', stationId: 'Packing-01', password: 'password123', createdAt: new Date().toISOString() },
+  { id: 'Staff-02', name: 'Sarah Supervisor', role: 'SUPERVISOR', stationId: 'Packing-01', password: 'password123', createdAt: new Date().toISOString() },
+];
+
+let staffsStore: Record<string, StaffMember> = {
+  'Admin-01': DEFAULT_STAFFS[0],
+  'Staff-01': DEFAULT_STAFFS[1],
+  'Staff-02': DEFAULT_STAFFS[2],
+};
+
 let ordersStore: Record<string, OrderRecord> = {};
 
 try {
@@ -140,6 +209,7 @@ try {
     const raw = fs.readFileSync(activeDataPath, 'utf-8');
     const parsed = JSON.parse(raw);
     if (parsed.orders) ordersStore = parsed.orders;
+    if (parsed.staffs) staffsStore = { ...staffsStore, ...parsed.staffs };
     if (parsed.settings) {
       settings = {
         ...settings,
@@ -154,7 +224,7 @@ try {
 }
 
 function saveLocalBackup() {
-  const payload = JSON.stringify({ orders: ordersStore, settings }, null, 2);
+  const payload = JSON.stringify({ orders: ordersStore, settings, staffs: staffsStore }, null, 2);
   try {
     fs.writeFileSync(DATA_FILE, payload);
   } catch (e: any) {
@@ -163,6 +233,27 @@ function saveLocalBackup() {
     } catch (tmpErr) {
       console.error('Error saving local backup to /tmp:', tmpErr);
     }
+  }
+}
+
+async function syncStaffsFromFirestore() {
+  if (!firestoreDb) return;
+  try {
+    const colRef = collection(firestoreDb, 'staffs');
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      snap.forEach(d => {
+        staffsStore[d.id] = d.data() as StaffMember;
+      });
+      saveLocalBackup();
+    } else {
+      // Seed default staffs into Firestore
+      for (const s of DEFAULT_STAFFS) {
+        await setDoc(doc(firestoreDb, 'staffs', s.id), s, { merge: true });
+      }
+    }
+  } catch (e) {
+    console.error('Error syncing staffs from Firestore:', e);
   }
 }
 
@@ -269,6 +360,178 @@ apiRouter.post('/settings', async (req, res) => {
   }
 
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
+});
+
+// Staffs GET
+apiRouter.get('/staffs', async (req, res) => {
+  await syncStaffsFromFirestore();
+  const staffList = Object.values(staffsStore).map(s => ({
+    id: s.id,
+    name: s.name,
+    role: s.role,
+    stationId: s.stationId,
+    email: s.email,
+    createdAt: s.createdAt,
+    hasPassword: Boolean(s.password)
+  }));
+  res.json(staffList);
+});
+
+// Staffs POST (Add or Update)
+apiRouter.post('/staffs', async (req, res) => {
+  const id = sanitizeString(req.body.id);
+  const name = sanitizeString(req.body.name);
+  const role = sanitizeString(req.body.role) || 'PACKER';
+  const stationId = sanitizeString(req.body.stationId) || settings.stationId || 'Packing-01';
+  const password = req.body.password ? String(req.body.password).trim() : undefined;
+  const email = req.body.email ? sanitizeString(req.body.email) : undefined;
+
+  if (!id || !name) {
+    return res.status(400).json({ error: 'Staff ID and Name are required' });
+  }
+
+  const existing = staffsStore[id];
+  const updatedStaff: StaffMember = {
+    id,
+    name,
+    role: (role === 'ADMIN' || role === 'SUPERVISOR' || role === 'PACKER') ? role : 'PACKER',
+    stationId,
+    password: password || existing?.password || 'password123',
+    email: email || existing?.email,
+    createdAt: existing?.createdAt || new Date().toISOString()
+  };
+
+  staffsStore[id] = updatedStaff;
+  saveLocalBackup();
+
+  if (firestoreDb) {
+    try {
+      await setDoc(doc(firestoreDb, 'staffs', id), updatedStaff, { merge: true });
+    } catch (e) {
+      console.error('Error saving staff to Firestore:', e);
+    }
+  }
+
+  res.json({
+    success: true,
+    staff: {
+      id: updatedStaff.id,
+      name: updatedStaff.name,
+      role: updatedStaff.role,
+      stationId: updatedStaff.stationId,
+      email: updatedStaff.email,
+      hasPassword: Boolean(updatedStaff.password)
+    }
+  });
+});
+
+// Staffs DELETE (Remove staff)
+apiRouter.delete('/staffs/:id', async (req, res) => {
+  const id = sanitizeString(req.params.id);
+  if (!id) {
+    return res.status(400).json({ error: 'Staff ID is required' });
+  }
+
+  const existing = staffsStore[id];
+  if (!existing) {
+    return res.status(404).json({ error: 'Staff member not found' });
+  }
+
+  // Guard: Don't allow deleting the last admin
+  if (existing.role === 'ADMIN') {
+    const adminCount = Object.values(staffsStore).filter(s => s.role === 'ADMIN').length;
+    if (adminCount <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the only remaining Admin account' });
+    }
+  }
+
+  delete staffsStore[id];
+  saveLocalBackup();
+
+  if (firestoreDb) {
+    try {
+      await deleteDoc(doc(firestoreDb, 'staffs', id));
+    } catch (e) {
+      console.error('Error deleting staff from Firestore:', e);
+    }
+  }
+
+  res.json({ success: true, message: `Staff member ${id} removed successfully` });
+});
+
+// Staffs / Auth Reset Password
+apiRouter.post(['/staffs/reset-password', '/auth/reset-password'], async (req, res) => {
+  const userId = sanitizeString(req.body.userId || req.body.id);
+  const newPassword = req.body.newPassword ? String(req.body.newPassword).trim() : '';
+
+  if (!userId || !newPassword) {
+    return res.status(400).json({ error: 'User ID and New Password are required' });
+  }
+
+  if (newPassword.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
+
+  const staffKey = Object.keys(staffsStore).find(
+    k => k.toLowerCase() === userId.toLowerCase() ||
+         staffsStore[k].name.toLowerCase() === userId.toLowerCase() ||
+         (staffsStore[k].email && staffsStore[k].email!.toLowerCase() === userId.toLowerCase())
+  );
+
+  if (!staffKey || !staffsStore[staffKey]) {
+    return res.status(404).json({ error: `Staff user '${userId}' not found` });
+  }
+
+  staffsStore[staffKey].password = newPassword;
+  saveLocalBackup();
+
+  if (firestoreDb) {
+    try {
+      await setDoc(doc(firestoreDb, 'staffs', staffKey), { password: newPassword }, { merge: true });
+    } catch (e) {
+      console.error('Error updating password in Firestore:', e);
+    }
+  }
+
+  res.json({ success: true, message: `Password for ${staffsStore[staffKey].name} has been reset successfully!` });
+});
+
+// Auth Login
+apiRouter.post('/auth/login', async (req, res) => {
+  await syncStaffsFromFirestore();
+  const userId = sanitizeString(req.body.userId || req.body.id || req.body.username);
+  const password = req.body.password ? String(req.body.password).trim() : '';
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Please enter User ID' });
+  }
+
+  const staffKey = Object.keys(staffsStore).find(
+    k => k.toLowerCase() === userId.toLowerCase() ||
+         staffsStore[k].name.toLowerCase() === userId.toLowerCase() ||
+         (staffsStore[k].email && staffsStore[k].email!.toLowerCase() === userId.toLowerCase())
+  );
+
+  if (!staffKey) {
+    return res.status(401).json({ error: 'Staff account not found with this User ID' });
+  }
+
+  const staff = staffsStore[staffKey];
+  const expectedPassword = staff.password || 'password123';
+  if (expectedPassword !== password) {
+    return res.status(401).json({ error: 'Incorrect password. Default password is password123' });
+  }
+
+  res.json({
+    success: true,
+    staff: {
+      id: staff.id,
+      name: staff.name,
+      role: staff.role,
+      stationId: staff.stationId,
+      email: staff.email
+    }
+  });
 });
 
 // Orders GET
@@ -514,6 +777,9 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
 
       const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${escapeHtml(formattedDate)}\n<b>Duration:</b> ${escapeHtml(durationStr)}${photoBuffer ? '\n<b>Photos Attached:</b> Yes' : ''}`;
 
+      // Transcode video using FFmpeg to faststart H.264 baseline MP4 + generate thumbnail
+      const { mp4Buffer, thumbBuffer } = await transcodeToTelegramMp4(videoBuffer, safeOrderId);
+
       const formData = new FormData();
       formData.append('chat_id', chatId);
       formData.append('caption', caption);
@@ -530,8 +796,17 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         formData.append('duration', Math.round(durationSeconds).toString());
       }
       
-      const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/mp4' });
+      const videoBlob = new Blob([new Uint8Array(mp4Buffer)], { type: 'video/mp4' });
       formData.append('video', videoBlob, `${safeOrderId}.mp4`);
+
+      // Add thumbnail if generated or if photo attached
+      if (thumbBuffer && thumbBuffer.length > 0) {
+        const thumbBlob = new Blob([new Uint8Array(thumbBuffer)], { type: 'image/jpeg' });
+        formData.append('thumb', thumbBlob, `${safeOrderId}_thumb.jpg`);
+      } else if (photoBuffer && photoBuffer.length > 0) {
+        const thumbBlob = new Blob([new Uint8Array(photoBuffer)], { type: 'image/jpeg' });
+        formData.append('thumb', thumbBlob, `${safeOrderId}_thumb.jpg`);
+      }
 
       const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
         method: 'POST',

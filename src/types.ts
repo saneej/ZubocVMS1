@@ -34,4 +34,7 @@ export interface StaffMember {
   name: string;
   role: 'ADMIN' | 'SUPERVISOR' | 'PACKER';
   stationId: string;
+  password?: string;
+  email?: string;
+  createdAt?: string;
 }

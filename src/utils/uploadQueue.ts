@@ -77,28 +77,34 @@ class UploadQueueManager {
     this.notify();
 
     try {
-      // Primary Method 1: Direct Client-to-Telegram API upload (100% reliable, zero server memory/proxy limits)
-      await this.uploadTaskDirectTelegram(nextTask);
+      // Primary Method 1: Server Binary Upload with automatic FFmpeg H.264 transcoding + Thumbnail
+      await this.uploadTaskBinaryXHR(nextTask);
       nextTask.status = 'SUCCESS';
       nextTask.progress = 100;
     } catch (err: any) {
-      console.warn(`Direct Telegram upload failed for ${nextTask.orderId}, trying server binary upload fallback...`, err);
+      console.warn(`Server binary upload failed for ${nextTask.orderId}, trying Base64 JSON fallback...`, err);
       try {
-        // Fallback Method 2: Server Binary Multipart Upload
-        await this.uploadTaskBinaryXHR(nextTask);
+        // Fallback Method 2: Base64 JSON Upload via Server
+        await this.uploadTaskBase64Json(nextTask);
         nextTask.status = 'SUCCESS';
         nextTask.progress = 100;
       } catch (fallbackErr: any) {
-        console.warn(`Server binary upload failed for ${nextTask.orderId}, trying Base64 JSON fallback...`, fallbackErr);
-        try {
-          // Fallback Method 3: Base64 JSON Upload
-          await this.uploadTaskBase64Json(nextTask);
-          nextTask.status = 'SUCCESS';
-          nextTask.progress = 100;
-        } catch (jsonErr: any) {
-          console.error(`All upload protocols failed for ${nextTask.orderId}:`, jsonErr);
+        console.warn(`Server JSON upload failed for ${nextTask.orderId}...`, fallbackErr);
+        if (!nextTask.videoBlob) {
+          try {
+            // Fallback Method 3: Direct Client-to-Telegram API upload (only for photo-only tasks)
+            await this.uploadTaskDirectTelegram(nextTask);
+            nextTask.status = 'SUCCESS';
+            nextTask.progress = 100;
+          } catch (jsonErr: any) {
+            console.error(`All upload protocols failed for ${nextTask.orderId}:`, jsonErr);
+            nextTask.status = 'FAILED';
+            nextTask.error = jsonErr.message || fallbackErr.message || err.message || 'Upload failed';
+          }
+        } else {
+          console.error(`Server-side video transcoding & upload failed for ${nextTask.orderId}:`, fallbackErr);
           nextTask.status = 'FAILED';
-          nextTask.error = jsonErr.message || err.message || 'Upload failed';
+          nextTask.error = fallbackErr.message || err.message || 'Server video transcode upload failed';
         }
       }
     } finally {
@@ -145,7 +151,11 @@ class UploadQueueManager {
         formData.append('chat_id', cleanChatId);
         formData.append('caption', caption);
         formData.append('parse_mode', 'HTML');
-        formData.append('supports_streaming', 'true');
+        
+        const isMp4 = task.videoBlob?.type?.includes('mp4');
+        if (isMp4) {
+          formData.append('supports_streaming', 'true');
+        }
         
         if (task.width && task.height && task.width > 0 && task.height > 0) {
           formData.append('width', task.width.toString());
@@ -155,7 +165,12 @@ class UploadQueueManager {
           formData.append('duration', Math.round(task.durationSeconds).toString());
         }
 
-        formData.append('video', task.videoBlob!, `${safeOrderId}.mp4`);
+        const ext = isMp4 ? 'mp4' : 'webm';
+        formData.append('video', task.videoBlob!, `${safeOrderId}.${ext}`);
+
+        if (task.photoBlobs && task.photoBlobs.length > 0) {
+          formData.append('thumb', task.photoBlobs[0], `${safeOrderId}_thumb.jpg`);
+        }
 
         const xhr = new XMLHttpRequest();
         xhr.upload.onprogress = (event) => {

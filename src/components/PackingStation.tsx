@@ -463,7 +463,17 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     let evidenceType: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO' = 'VIDEO';
     if (recordedBlob && capturedPhotos.length > 0) evidenceType = 'PHOTO_VIDEO';
     else if (capturedPhotos.length > 0 && !recordedBlob) evidenceType = 'PHOTO';
-    else evidenceType = 'VIDEO';
+    const photosToDispatch = [...capturedPhotos];
+    if (photosToDispatch.length === 0 && videoRef.current) {
+      const snap = capturePhoto();
+      if (snap) {
+        photosToDispatch.push({
+          id: `thumb_${Date.now()}`,
+          blob: snap.blob,
+          dataUrl: snap.dataUrl
+        });
+      }
+    }
 
     // Queue task for Telegram dispatch
     uploadQueueManager.addTask({
@@ -473,8 +483,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       durationSeconds: timerSeconds,
       evidenceType,
       videoBlob: recordedBlob,
-      photoBlobs: capturedPhotos.map(p => p.blob),
-      photoDataUrls: capturedPhotos.map(p => p.dataUrl),
+      photoBlobs: photosToDispatch.map(p => p.blob),
+      photoDataUrls: photosToDispatch.map(p => p.dataUrl),
       recordingDate: new Date().toISOString(),
       width,
       height
@@ -489,7 +499,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       recordingStatus: 'COMPLETED',
       uploadStatus: 'PENDING',
       evidenceType,
-      photoDataUrl: capturedPhotos[0]?.dataUrl,
+      photoDataUrl: photosToDispatch[0]?.dataUrl,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });

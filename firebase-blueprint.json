@@ -34,6 +34,21 @@
         "stationId": { "type": "string", "maxLength": 128 },
         "updatedAt": { "type": "string" }
       }
+    },
+    "StaffMember": {
+      "title": "Staff Member",
+      "description": "Warehouse packing staff operator account and credentials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["ADMIN", "SUPERVISOR", "PACKER"] },
+        "stationId": { "type": "string", "maxLength": 128 },
+        "password": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "role", "stationId"]
     }
   },
   "firestore": {
@@ -44,6 +59,10 @@
     "/settings/config": {
       "schema": "AppSettings",
       "description": "Global application configuration document"
+    },
+    "/staffs/{staffId}": {
+      "schema": "StaffMember",
+      "description": "Collection of warehouse packing staff accounts and permissions"
     }
   }
 }
