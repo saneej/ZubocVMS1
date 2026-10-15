@@ -413,8 +413,8 @@ app.post('/api/telegram/upload', (req, res, next) => {
     formData.append('caption', caption);
     formData.append('parse_mode', 'HTML');
     
-    const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/webm' });
-    formData.append('video', videoBlob, `${safeOrderId}.webm`);
+    const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/mp4' });
+    formData.append('video', videoBlob, `${safeOrderId}.mp4`);
 
     const telegramUrl = `https://api.telegram.org/bot${botToken}/sendVideo`;
 
@@ -614,8 +614,12 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`PackVision VMS Server running on http://localhost:${PORT}`);
+    console.log(`TrackVid VMS Server running on http://localhost:${PORT}`);
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

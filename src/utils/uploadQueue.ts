@@ -98,7 +98,7 @@ class UploadQueueManager {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
 
-      const ext = task.videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
+      const ext = 'mp4';
 
       formData.append('orderId', task.orderId);
       formData.append('staffId', task.staffId);

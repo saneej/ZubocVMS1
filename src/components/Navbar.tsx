@@ -30,14 +30,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 gap-8">
           
-          {/* Zone 1: TrackVid Brand Wordmark */}
+          {/* Zone 1: Zuboc Brand Wordmark */}
           <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => setActiveTab('station')}>
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-emerald-500 flex items-center justify-center text-slate-950 font-black shadow-md shadow-cyan-500/20">
               <Video className="w-4 h-4 text-slate-950 stroke-[2.5]" />
             </div>
             <div>
               <div className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
-                <span>TrackVid</span>
+                <span>Zuboc</span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-400 font-mono border border-cyan-500/30">VMS</span>
               </div>
             </div>

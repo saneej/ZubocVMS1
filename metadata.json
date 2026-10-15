@@ -1,6 +1,6 @@
 {
-  "name": "TrackVid VMS",
-  "description": "TrackVid E-Commerce Packing Video Management System and Telegram Evidence Portal",
+  "name": "Zuboc VMS",
+  "description": "Zuboc E-Commerce Packing Video Management System and Telegram Evidence Portal",
   "requestFramePermissions": [
     "camera",
     "microphone"
