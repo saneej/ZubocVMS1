@@ -298,6 +298,22 @@ app.post('/api/orders', async (req, res) => {
   res.json({ success: true, record });
 });
 
+// Helper to safely escape strings for Telegram HTML parse_mode
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Clean Bot Tokens & Chat IDs from extra quotes or whitespace
+function cleanTelegramCredential(str: string): string {
+  if (!str) return '';
+  return str.trim().replace(/^["']|["']$/g, '');
+}
+
 // Primary Upload Route
 app.post('/api/telegram/upload', (req, res, next) => {
   upload.single('video')(req, res, (err) => {
@@ -347,8 +363,10 @@ app.post('/api/telegram/upload', (req, res, next) => {
       };
     }
 
-    const botToken = sanitizeString(settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN);
-    const chatId = sanitizeString(settings.telegramChatId || process.env.TELEGRAM_CHAT_ID);
+    const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+    const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
+    const botToken = cleanTelegramCredential(rawBotToken);
+    const chatId = cleanTelegramCredential(rawChatId);
 
     if (!botToken || !chatId) {
       record.uploadStatus = 'FAILED';
@@ -384,28 +402,34 @@ app.post('/api/telegram/upload', (req, res, next) => {
     const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
     const durationStr = `${durMin}m ${durSec}s`;
 
-    const caption = `<b>Order ID: ${orderId}</b>\n<b>Staff:</b> ${staffId || record.staffId}\n<b>Station:</b> ${stationId || record.stationId}\n<b>Recorded:</b> ${formattedDate}\n<b>Duration:</b> ${durationStr}`;
+    const safeOrderId = escapeHtml(orderId);
+    const safeStaffId = escapeHtml(staffId || record.staffId);
+    const safeStationId = escapeHtml(stationId || record.stationId);
 
-    const boundary = '----TelegramFormBoundary' + Math.random().toString(36).substring(2);
-    let bodyBuffers: Buffer[] = [];
+    const caption = `<b>Order ID: ${safeOrderId}</b>\n<b>Staff:</b> ${safeStaffId}\n<b>Station:</b> ${safeStationId}\n<b>Recorded:</b> ${escapeHtml(formattedDate)}\n<b>Duration:</b> ${escapeHtml(durationStr)}`;
+
+    const formData = new FormData();
+    formData.append('chat_id', chatId);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
     
-    bodyBuffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`));
-    bodyBuffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${caption}\r\n`));
-    bodyBuffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n`));
-    bodyBuffers.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="video"; filename="${orderId}.webm"\r\nContent-Type: video/webm\r\n\r\n`));
-    bodyBuffers.push(videoBuffer);
-    bodyBuffers.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+    const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/webm' });
+    formData.append('video', videoBlob, `${safeOrderId}.webm`);
 
-    const multipartBody = Buffer.concat(bodyBuffers);
     const telegramUrl = `https://api.telegram.org/bot${botToken}/sendVideo`;
 
     const tgResponse = await fetch(telegramUrl, {
       method: 'POST',
-      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-      body: multipartBody
+      body: formData
     });
 
-    const tgResult = await tgResponse.json() as any;
+    const responseText = await tgResponse.text();
+    let tgResult: any;
+    try {
+      tgResult = JSON.parse(responseText);
+    } catch {
+      throw new Error(`Telegram API non-JSON response: ${responseText.substring(0, 150)}`);
+    }
 
     if (!tgResult.ok) {
       throw new Error(tgResult.description || 'Telegram API returned error');
@@ -472,7 +496,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
       const parts = text.split(/\s+/);
       const queryOrderId = sanitizeString(parts[1]);
 
-      const botToken = sanitizeString(settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN);
+      const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+      const botToken = cleanTelegramCredential(rawBotToken);
 
       if (!queryOrderId) {
         if (botToken) {
@@ -499,7 +524,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
 
       if (botToken) {
         if (foundRecord) {
-          const replyText = `📦 <b>Order ID: ${foundRecord.orderId}</b>\n\n<b>Staff:</b> ${foundRecord.staffId}\n<b>Station:</b> ${foundRecord.stationId}\n<b>Status:</b> ${foundRecord.uploadStatus}\n<b>Duration:</b> ${foundRecord.durationSeconds}s\n<b>Recorded:</b> ${new Date(foundRecord.createdAt).toLocaleString()}\n\n🔗 <a href="${foundRecord.telegramMessageLink || '#'}">View Original Telegram Video Message</a>`;
+          const replyText = `📦 <b>Order ID: ${escapeHtml(foundRecord.orderId)}</b>\n\n<b>Staff:</b> ${escapeHtml(foundRecord.staffId)}\n<b>Station:</b> ${escapeHtml(foundRecord.stationId)}\n<b>Status:</b> ${escapeHtml(foundRecord.uploadStatus)}\n<b>Duration:</b> ${foundRecord.durationSeconds}s\n<b>Recorded:</b> ${new Date(foundRecord.createdAt).toLocaleString()}\n\n🔗 <a href="${foundRecord.telegramMessageLink || '#'}">View Original Telegram Video Message</a>`;
           
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',
@@ -516,7 +541,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: chatId,
-              text: `❌ No packing video found for Order ID: <code>${queryOrderId}</code>`,
+              text: `❌ No packing video found for Order ID: <code>${escapeHtml(queryOrderId)}</code>`,
               parse_mode: 'HTML'
             })
           });
@@ -533,15 +558,17 @@ app.post('/api/telegram/webhook', async (req, res) => {
 
 // Test Telegram connection by sending a demo message
 app.post('/api/telegram/test-connection', async (req, res) => {
-  const botToken = sanitizeString(settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN);
-  const chatId = sanitizeString(settings.telegramChatId || process.env.TELEGRAM_CHAT_ID);
+  const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+  const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
+  const botToken = cleanTelegramCredential(rawBotToken);
+  const chatId = cleanTelegramCredential(rawChatId);
 
   if (!botToken || !chatId) {
     return res.status(400).json({ error: 'Telegram Bot Token and Chat ID not configured.' });
   }
 
   try {
-    const text = `🟢 <b>PackVision VMS Connected Successfully!</b>\n\n<b>Station:</b> ${settings.stationId}\n<b>Timestamp:</b> ${new Date().toLocaleString('en-GB')}\n\nYour PackVision VMS packing station is online and connected to this Telegram channel. Recorded order packing evidence will be delivered here automatically.`;
+    const text = `🟢 <b>PackVision VMS Connected Successfully!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour PackVision VMS packing station is online and connected to this Telegram channel. Recorded order packing evidence will be delivered here automatically.`;
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -559,53 +586,10 @@ app.post('/api/telegram/test-connection', async (req, res) => {
       throw new Error(data.description || 'Failed to send message to Telegram');
     }
 
-    res.json({ success: true, message: 'Demo message sent to Telegram channel!', telegramResponse: data });
+    res.json({ success: true, message: 'Test message sent to Telegram channel!', telegramResponse: data });
   } catch (err: any) {
     console.error('Test connection error:', err);
     res.status(500).json({ error: err.message || 'Failed to send test message' });
-  }
-});
-
-// Gemini AI Assistant
-app.post('/api/ai/verify-packing', async (req, res) => {
-  try {
-    const { orderId, imageBase64 } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return res.json({
-        success: true,
-        aiAnalysis: "AI API Key not configured. Order ID: " + orderId
-      });
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-    
-    let contents: any[] = [
-      {
-        text: `Analyze this packing station snapshot for order ID "${orderId}". Check if items appear properly packed and sealed.`
-      }
-    ];
-
-    if (imageBase64) {
-      const base64Data = imageBase64.replace(/^data:.*;base64,/, '');
-      contents.push({
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: base64Data
-        }
-      });
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: contents,
-    });
-
-    res.json({ success: true, aiAnalysis: response.text });
-  } catch (error: any) {
-    console.error('Gemini AI error:', error);
-    res.status(500).json({ error: error.message || 'AI analysis failed' });
   }
 });
 

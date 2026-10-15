@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, StopCircle, Play, Check, Barcode, ShieldAlert, Sparkles, Send, ExternalLink, RefreshCw, Zap, Eye, CheckCircle2 } from 'lucide-react';
+import { Camera, StopCircle, Play, CheckCircle2, Barcode, Send, ExternalLink, RefreshCw, AlertCircle, ArrowLeft, RotateCcw, PackageCheck, ShieldCheck, Check } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
-import { getApiUrl } from '../utils/api';
+import { safeFetchJson } from '../utils/api';
 
 interface PackingStationProps {
   currentStaff: StaffMember;
@@ -10,6 +10,8 @@ interface PackingStationProps {
   onOrderCompleted: (record: OrderRecord) => void;
   existingOrders: OrderRecord[];
 }
+
+type StationStep = 'READY' | 'SCAN' | 'RECORDING' | 'CONFIRM';
 
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
@@ -44,7 +46,7 @@ async function getCameraStream(): Promise<MediaStream> {
       // try fallback
     }
   }
-  throw new Error('Unable to access camera. Please check camera permissions.');
+  throw new Error('Unable to access overhead camera. Please check camera permissions.');
 }
 
 export const PackingStation: React.FC<PackingStationProps> = ({
@@ -53,31 +55,31 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   onOrderCompleted,
   existingOrders
 }) => {
-  const [orderId, setOrderId] = useState('');
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [step, setStep] = useState<StationStep>('READY');
+  const [orderIdInput, setOrderIdInput] = useState('');
+  const [activeOrderId, setActiveOrderId] = useState<string>('');
   const [isRecording, setIsRecording] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [reviewMode, setReviewMode] = useState(false); // false = Instant Auto Mode, true = Review Mode
-  const [lastUploadedOrder, setLastUploadedOrder] = useState<string | null>(null);
-  
-  const [recordedVideoBlob, setRecordedVideoBlob] = useState<Blob | null>(null);
+
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [queueTasks, setQueueTasks] = useState<UploadTask[]>([]);
+  
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [lastCompletedOrder, setLastCompletedOrder] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const reviewVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize camera preview on mount for instant readiness
   useEffect(() => {
-    initCamera();
     const unsubscribe = uploadQueueManager.subscribe((tasks) => {
       setQueueTasks(tasks);
     });
@@ -111,8 +113,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         videoRef.current.srcObject = stream;
       }
     } catch (err: any) {
-      console.error('Camera error:', err);
-      setCameraError('Camera access error. Please grant camera permissions.');
+      console.error('Camera initialization error:', err);
+      setCameraError('Camera access error. Please ensure USB webcam is connected and permissions are granted.');
       setCameraActive(false);
     }
   };
@@ -125,21 +127,32 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }
   };
 
-  // 1-Click Scan / Submit to Start Recording
-  const handleStartRecording = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cleanId = orderId.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
-    if (!cleanId) return;
+  // Step 1 -> Step 2
+  const handleStartSession = () => {
+    setStep('SCAN');
+    setTimeout(() => {
+      if (scanInputRef.current) scanInputRef.current.focus();
+    }, 100);
+  };
 
-    if (!mediaStreamRef.current) {
-      await initCamera();
-    }
+  // Step 2 -> Step 3
+  const handleConfirmOrderAndStartRecording = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanId = orderIdInput.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
+    if (!cleanId) return;
 
     setActiveOrderId(cleanId);
     setTimerSeconds(0);
     chunksRef.current = [];
     setRecordedVideoUrl(null);
-    setRecordedVideoBlob(null);
+    setRecordedBlob(null);
+
+    // Initialize camera stream when entering recording step
+    if (!mediaStreamRef.current) {
+      await initCamera();
+    } else if (videoRef.current) {
+      videoRef.current.srcObject = mediaStreamRef.current;
+    }
 
     try {
       const selectedMime = getSupportedMimeType();
@@ -162,24 +175,22 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       recorder.onstop = () => {
         const actualMime = recorder.mimeType || selectedMime || 'video/mp4';
         const blob = new Blob(chunksRef.current, { type: actualMime });
-        setRecordedVideoBlob(blob);
+        setRecordedBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
-
-        if (!reviewMode) {
-          // Instant Auto-Upload Mode
-          dispatchUpload(cleanId, blob, timerSeconds);
-        }
+        stopCameraStream();
+        setStep('CONFIRM');
       };
 
       recorder.start(1000);
       setIsRecording(true);
+      setStep('RECORDING');
     } catch (err: any) {
-      alert('Failed to start recording: ' + (err.message || String(err)));
+      alert('Failed to start webcam recording: ' + (err.message || String(err)));
     }
   };
 
-  // Stop Recording
+  // Stop recording -> Trigger onstop -> Step 4 Confirmation
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -187,76 +198,70 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }
   };
 
-  // Helper to send to background upload queue
-  const dispatchUpload = (orderToUpload: string, blob: Blob, durationSecs: number) => {
+  // Step 4: Confirm details & Send to Telegram
+  const handleFinalConfirmUpload = () => {
+    if (!activeOrderId || !recordedBlob) return;
+
     uploadQueueManager.addTask({
-      orderId: orderToUpload,
+      orderId: activeOrderId,
       staffId: currentStaff.id,
       stationId: settings.stationId,
-      durationSeconds: durationSecs,
-      videoBlob: blob,
+      durationSeconds: timerSeconds,
+      videoBlob: recordedBlob,
       recordingDate: new Date().toISOString()
     });
 
     onOrderCompleted({
-      orderId: orderToUpload,
+      orderId: activeOrderId,
       staffId: currentStaff.id,
       stationId: settings.stationId,
       recordingStartedAt: new Date().toISOString(),
-      durationSeconds: durationSecs,
+      durationSeconds: timerSeconds,
       recordingStatus: 'COMPLETED',
       uploadStatus: 'PENDING',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
 
-    setLastUploadedOrder(orderToUpload);
-    setActiveOrderId(null);
-    setOrderId('');
-    setRecordedVideoBlob(null);
+    setLastCompletedOrder(activeOrderId);
+    setActiveOrderId('');
+    setOrderIdInput('');
+    setRecordedBlob(null);
+    setRecordedVideoUrl(null);
     setTimerSeconds(0);
+    setStep('SCAN');
 
-    // Re-focus scanner input for immediate next barcode scan
     setTimeout(() => {
-      if (inputRef.current) inputRef.current.focus();
+      if (scanInputRef.current) scanInputRef.current.focus();
+    }, 150);
+  };
+
+  // Re-record
+  const handleReRecord = () => {
+    setRecordedBlob(null);
+    setRecordedVideoUrl(null);
+    setTimerSeconds(0);
+    setStep('SCAN');
+    setTimeout(() => {
+      if (scanInputRef.current) scanInputRef.current.focus();
     }, 100);
   };
 
-  const handleManualConfirmUpload = () => {
-    if (activeOrderId && recordedVideoBlob) {
-      dispatchUpload(activeOrderId, recordedVideoBlob, timerSeconds);
-    }
-  };
-
-  const handleAiCheck = async () => {
-    const currentId = activeOrderId || orderId;
-    if (!currentId) return;
-    setIsAnalyzing(true);
+  // Test Telegram connection
+  const handleTestTelegram = async () => {
+    setTestSending(true);
+    setTestResult(null);
     try {
-      let imageBase64 = undefined;
-      if (videoRef.current) {
-        const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth || 640;
-        canvas.height = videoRef.current.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-          imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-        }
+      const res = await safeFetchJson('/api/telegram/test-connection', { method: 'POST' });
+      if (res && res.success) {
+        setTestResult({ success: true, message: 'Test message sent to Telegram channel!' });
+      } else {
+        setTestResult({ success: false, message: res?.error || 'Failed to send test message.' });
       }
-
-      const url = getApiUrl('/api/ai/verify-packing');
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: currentId, imageBase64 })
-      });
-      const data = await res.json();
-      setAiAnalysisResult(data.aiAnalysis || 'Package Verified.');
-    } catch {
-      setAiAnalysisResult('Package Verified.');
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message || 'Telegram connection failed.' });
     } finally {
-      setIsAnalyzing(false);
+      setTestSending(false);
     }
   };
 
@@ -266,265 +271,373 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const todayCount = existingOrders.filter(o => 
+    new Date(o.createdAt).toDateString() === new Date().toDateString()
+  ).length;
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       
-      {/* Success Notification Banner */}
-      {lastUploadedOrder && !isRecording && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between text-emerald-400 text-xs shadow-lg animate-fadeIn">
-          <div className="flex items-center gap-2 font-bold text-sm">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span>Order <strong>{lastUploadedOrder}</strong> packed & queued for Telegram delivery!</span>
+      {/* Header Bar */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+            <PackageCheck className="w-6 h-6" />
           </div>
-          <span className="text-emerald-500/80 font-mono">Ready for next barcode scan →</span>
+          <div>
+            <h1 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>TrackVid VMS Packing Station</span>
+              <span className="text-xs font-mono font-normal px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                {settings.stationId}
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400">Operator: <strong className="text-slate-200">{currentStaff.name}</strong> ({currentStaff.id})</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs">
+          <button
+            onClick={handleTestTelegram}
+            disabled={testSending}
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-medium rounded-xl border border-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Send className={`w-3.5 h-3.5 text-cyan-400 ${testSending ? 'animate-bounce' : ''}`} />
+            <span>{testSending ? 'Testing...' : 'Test Telegram Connection'}</span>
+          </button>
+
+          <div className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl font-mono text-slate-400">
+            <span>Packed Today: <strong className="text-emerald-400">{todayCount}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      {/* Test Result Toast */}
+      {testResult && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-medium animate-fadeIn ${
+          testResult.success 
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+        }`}>
+          <div className="flex items-center gap-2">
+            {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+            <span>{testResult.message}</span>
+          </div>
+          <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-white font-bold">×</button>
         </div>
       )}
 
-      {/* Main Command Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-        
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* STEP 1: READY / WELCOME SCREEN */}
+      {step === 'READY' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl text-center space-y-6 max-w-2xl mx-auto">
+          <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-3xl flex items-center justify-center mx-auto text-emerald-400 shadow-xl">
+            <Camera className="w-10 h-10" />
+          </div>
           
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
-            <button
-              onClick={() => setReviewMode(false)}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                !reviewMode ? 'bg-emerald-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Instant Mode (Auto-Upload)</span>
-            </button>
-            <button
-              onClick={() => setReviewMode(true)}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                reviewMode ? 'bg-cyan-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Review Mode</span>
-            </button>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-white">Overhead Video Recording System</h2>
+            <p className="text-slate-400 text-sm max-w-md mx-auto">
+              Ready to record e-commerce order packing video evidence. Scanned orders will be recorded and dispatched to Telegram.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
-            <span>Station: <strong className="text-white">{settings.stationId}</strong></span>
-            <span>·</span>
-            <span>Operator: <strong className="text-white">{currentStaff.name}</strong></span>
+          <div className="pt-4 flex justify-center">
+            <button
+              onClick={handleStartSession}
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-base px-10 py-4 rounded-xl flex items-center gap-3 cursor-pointer shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-105"
+            >
+              <Barcode className="w-6 h-6" />
+              <span>Start Packing Session</span>
+            </button>
           </div>
-
         </div>
+      )}
 
-        {/* Scan Input & Action Buttons */}
-        <form onSubmit={handleStartRecording} className="flex gap-3 items-center">
-          <div className="relative flex-1">
-            <Barcode className="w-6 h-6 text-cyan-400 absolute left-4 top-3.5" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              placeholder="Scan Barcode or Type Order ID (Press Enter)..."
-              disabled={isRecording}
-              autoFocus
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-13 pr-4 py-3.5 text-white font-mono text-lg font-bold focus:outline-none focus:border-emerald-500 shadow-inner disabled:opacity-50"
-            />
-          </div>
-
-          {!isRecording && (
-            <button
-              type="submit"
-              disabled={!orderId.trim()}
-              className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-extrabold text-base px-8 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xl shadow-emerald-500/20 shrink-0"
-            >
-              <Play className="w-5 h-5 fill-current" />
-              <span>Start Recording</span>
-            </button>
-          )}
-
-          {isRecording && (
-            <button
-              type="button"
-              onClick={handleStopRecording}
-              className="bg-rose-600 hover:bg-rose-500 text-white font-black text-base px-8 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xl shadow-rose-600/30 animate-pulse shrink-0"
-            >
-              <StopCircle className="w-6 h-6" />
-              <span>Complete Packing</span>
-            </button>
-          )}
-        </form>
-
-      </div>
-
-      {/* Grid Layout: Live Camera Feed + Live Queue */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Camera Viewport */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+      {/* MAIN RECORDING / SCAN / CONFIRM WORKFLOW */}
+      {(step === 'SCAN' || step === 'RECORDING' || step === 'CONFIRM') && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
-            <div className="flex items-center gap-2">
-              <Camera className="w-4 h-4 text-emerald-400" />
-              <span className="font-bold text-white text-sm">
-                {activeOrderId ? `Order: ${activeOrderId}` : 'Overhead Packing Camera'}
-              </span>
-            </div>
+          {/* Main Left Panel (2 Columns) */}
+          <div className="lg:col-span-2 space-y-6">
 
-            {isRecording ? (
-              <div className="flex items-center gap-2 font-mono text-rose-400 font-bold bg-rose-500/10 px-3.5 py-1 rounded-full border border-rose-500/30">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                <span>REC {formatTime(timerSeconds)}</span>
-              </div>
-            ) : cameraActive ? (
-              <span className="text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                ● Live Feed Active
-              </span>
-            ) : (
-              <button onClick={initCamera} className="text-cyan-400 underline font-bold">Enable Camera</button>
-            )}
-          </div>
+            {/* STEP 2: SCAN ORDER ID */}
+            {step === 'SCAN' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                
+                {lastCompletedOrder && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between text-xs text-emerald-400">
+                    <div className="flex items-center gap-2 font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Order <strong>{lastCompletedOrder}</strong> recorded & queued for Telegram delivery!</span>
+                    </div>
+                  </div>
+                )}
 
-          <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
-            {cameraError ? (
-              <div className="p-8 text-center text-slate-400">
-                <ShieldAlert className="w-10 h-10 text-amber-400 mx-auto mb-2" />
-                <p className="text-sm font-medium">{cameraError}</p>
-                <button onClick={initCamera} className="mt-3 px-4 py-2 bg-slate-800 text-white rounded-xl text-xs">
-                  Retry Camera
-                </button>
-              </div>
-            ) : (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${reviewMode && recordedVideoUrl && !isRecording ? 'hidden' : 'block'}`}
-              />
-            )}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                    <Barcode className="w-5 h-5 text-emerald-400" />
+                    <span>Step 1 of 3: Scan or Enter Order ID</span>
+                  </h2>
+                  <button onClick={() => setStep('READY')} className="text-xs text-slate-400 hover:text-slate-200">
+                    Exit Session
+                  </button>
+                </div>
 
-            {reviewMode && recordedVideoUrl && !isRecording && (
-              <video src={recordedVideoUrl} controls autoPlay className="w-full h-full object-cover block" />
-            )}
+                <form onSubmit={handleConfirmOrderAndStartRecording} className="space-y-4">
+                  <div className="relative">
+                    <Barcode className="w-7 h-7 text-emerald-400 absolute left-4 top-4" />
+                    <input
+                      ref={scanInputRef}
+                      type="text"
+                      value={orderIdInput}
+                      onChange={(e) => setOrderIdInput(e.target.value)}
+                      placeholder="Scan Barcode or Type Order ID (e.g. ORD-98214)..."
+                      autoFocus
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-14 pr-4 py-4 text-white font-mono text-xl font-bold focus:outline-none focus:border-emerald-500 shadow-inner"
+                    />
+                  </div>
 
-            {isRecording && activeOrderId && (
-              <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-white font-mono text-xs shadow-2xl flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                <span className="text-emerald-400 font-bold text-sm">{activeOrderId}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Toolbar */}
-          <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleAiCheck}
-                disabled={isAnalyzing}
-                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-purple-300 rounded-xl flex items-center gap-1.5 cursor-pointer font-medium"
-              >
-                <Sparkles className="w-4 h-4 text-purple-400" />
-                <span>AI Package Check</span>
-              </button>
-              {aiAnalysisResult && <span className="text-purple-300 italic text-xs">{aiAnalysisResult}</span>}
-            </div>
-
-            {reviewMode && recordedVideoBlob && !isRecording && activeOrderId && (
-              <button
-                onClick={handleManualConfirmUpload}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2 rounded-xl flex items-center gap-1.5 shadow"
-              >
-                <Send className="w-4 h-4" />
-                <span>Confirm & Upload {activeOrderId}</span>
-              </button>
-            )}
-          </div>
-
-        </div>
-
-        {/* Live Background Upload Queue */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
-                <Send className="w-4 h-4 text-emerald-400" />
-                <span>Recent Telegram Uploads ({queueTasks.length})</span>
-              </h3>
-            </div>
-
-            {queueTasks.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs font-mono">
-                No recent uploads in queue. Scan a barcode above to pack orders.
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-                {queueTasks.map((task) => (
-                  <div key={task.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5 text-xs font-mono">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-sm">{task.orderId}</span>
-                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                        task.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' :
-                        task.status === 'FAILED' ? 'bg-rose-500/20 text-rose-400' :
-                        'bg-amber-500/20 text-amber-400'
-                      }`}>
-                        {task.status === 'UPLOADING' ? `${task.progress}%` : task.status}
-                      </span>
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="text-xs text-slate-500 font-mono">
+                      Station: {settings.stationId} | Operator: {currentStaff.id}
                     </div>
 
-                    {task.status === 'UPLOADING' && (
-                      <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-                        <div
-                          className="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full rounded-full transition-all duration-200"
-                          style={{ width: `${task.progress}%` }}
-                        />
-                      </div>
-                    )}
+                    <button
+                      type="submit"
+                      disabled={!orderIdInput.trim()}
+                      className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-extrabold text-sm px-8 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xl shadow-emerald-500/20"
+                    >
+                      <Play className="w-5 h-5 fill-current" />
+                      <span>Confirm & Start Recording</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Duration: {task.durationSeconds}s</span>
-                      <span>{new Date(task.recordingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            {/* STEP 3: LIVE CAMERA RECORDING */}
+            {step === 'RECORDING' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+                <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center gap-2 text-white font-bold text-sm">
+                    <Camera className="w-4 h-4 text-emerald-400" />
+                    <span>Packing Order: <span className="text-emerald-400">{activeOrderId}</span></span>
+                  </div>
+
+                  <div className="flex items-center gap-2 font-mono text-rose-400 font-bold bg-rose-500/10 px-3.5 py-1 rounded-full border border-rose-500/30">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                    <span>REC {formatTime(timerSeconds)}</span>
+                  </div>
+                </div>
+
+                <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                  {cameraError ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <AlertCircle className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+                      <p className="text-sm font-medium">{cameraError}</p>
+                      <button onClick={initCamera} className="mt-3 px-4 py-2 bg-slate-800 text-white rounded-xl text-xs">
+                        Retry Camera
+                      </button>
                     </div>
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover block"
+                    />
+                  )}
 
-                    {task.status === 'FAILED' && (
-                      <div className="pt-1 flex items-center justify-between text-rose-400 text-[11px]">
-                        <span className="truncate max-w-[140px]">{task.error || 'Upload error'}</span>
-                        <button
-                          onClick={() => uploadQueueManager.retryTask(task.id)}
-                          className="px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold rounded border border-rose-500/30 cursor-pointer"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    )}
+                  <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-white font-mono text-xs shadow-2xl flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                    <span className="text-emerald-400 font-bold text-sm">{activeOrderId}</span>
+                  </div>
+                </div>
 
-                    {task.status === 'SUCCESS' && task.telegramMessageLink && (
-                      <div className="pt-1 border-t border-slate-900 flex justify-end font-sans">
-                        <a
-                          href={task.telegramMessageLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline font-medium"
-                        >
-                          <span>View Video in Telegram</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
+                <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">Pack items into box under overhead camera...</span>
+                  
+                  <button
+                    onClick={handleStopRecording}
+                    className="bg-rose-600 hover:bg-rose-500 text-white font-black text-base px-8 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xl shadow-rose-600/30 animate-pulse"
+                  >
+                    <StopCircle className="w-6 h-6" />
+                    <span>Complete Packing & Stop Recording</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: DETAILS CONFIRMATION BEFORE UPLOAD */}
+            {step === 'CONFIRM' && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+                
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                    <span>Step 3 of 3: Confirm Order Details Before Telegram Dispatch</span>
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* Video Review Player */}
+                  <div className="bg-black rounded-xl overflow-hidden border border-slate-800 aspect-video flex items-center justify-center">
+                    {recordedVideoUrl ? (
+                      <video
+                        ref={reviewVideoRef}
+                        src={recordedVideoUrl}
+                        controls
+                        autoPlay
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-500">Video preview non-available</span>
                     )}
                   </div>
-                ))}
+
+                  {/* Summary Card */}
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 text-xs font-mono">
+                    <div className="space-y-1">
+                      <span className="text-slate-500 block">ORDER ID</span>
+                      <input
+                        type="text"
+                        value={activeOrderId}
+                        onChange={(e) => setActiveOrderId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-bold text-base focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <span className="text-slate-500 block">DURATION</span>
+                        <span className="text-white font-bold text-sm">{formatTime(timerSeconds)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">STATION</span>
+                        <span className="text-white font-bold text-sm">{settings.stationId}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">OPERATOR</span>
+                        <span className="text-white font-bold text-sm">{currentStaff.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">DISPATCH TO</span>
+                        <span className="text-emerald-400 font-bold text-xs truncate block">{settings.telegramChatId || 'Telegram Channel'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Confirm Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-3">
+                  <button
+                    onClick={handleReRecord}
+                    className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Discard & Re-Record</span>
+                  </button>
+
+                  <button
+                    onClick={handleFinalConfirmUpload}
+                    className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm rounded-xl flex items-center gap-2 cursor-pointer shadow-xl shadow-emerald-500/20 transition-all"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Confirm Details & Dispatch to Telegram</span>
+                  </button>
+                </div>
+
               </div>
             )}
+
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500 text-center font-mono">
-            PackVision VMS Background Video Delivery Pipeline
+          {/* Right Panel: Recent Telegram Upload Queue & Progress */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+                  <Send className="w-4 h-4 text-emerald-400" />
+                  <span>Telegram Delivery Queue ({queueTasks.length})</span>
+                </h3>
+              </div>
+
+              {queueTasks.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs font-mono">
+                  No uploads currently in queue.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                  {queueTasks.map((task) => (
+                    <div key={task.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs font-mono">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-sm">{task.orderId}</span>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                          task.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' :
+                          task.status === 'FAILED' ? 'bg-rose-500/20 text-rose-400' :
+                          'bg-amber-500/20 text-amber-400'
+                        }`}>
+                          {task.status === 'UPLOADING' ? `${task.progress}%` : task.status}
+                        </span>
+                      </div>
+
+                      {task.status === 'UPLOADING' && (
+                        <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                          <div
+                            className="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full rounded-full transition-all duration-200"
+                            style={{ width: `${task.progress}%` }}
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Duration: {task.durationSeconds}s</span>
+                        <span>{new Date(task.recordingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+
+                      {task.status === 'FAILED' && (
+                        <div className="pt-1 flex items-center justify-between text-rose-400 text-[11px]">
+                          <span className="truncate max-w-[140px]">{task.error || 'Upload error'}</span>
+                          <button
+                            onClick={() => uploadQueueManager.retryTask(task.id)}
+                            className="px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold rounded border border-rose-500/30 cursor-pointer"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      )}
+
+                      {task.status === 'SUCCESS' && task.telegramMessageLink && (
+                        <div className="pt-1 border-t border-slate-900 flex justify-end font-sans">
+                          <a
+                            href={task.telegramMessageLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline font-medium"
+                          >
+                            <span>View Video in Telegram</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500 text-center font-mono">
+              TrackVid VMS Automated Dispatch Pipeline
+            </div>
           </div>
+
         </div>
-
-      </div>
+      )}
 
     </div>
   );
