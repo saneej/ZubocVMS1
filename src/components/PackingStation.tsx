@@ -16,8 +16,13 @@ type StationStep = 'READY' | 'SCAN' | 'RECORDING' | 'CONFIRM';
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
   const types = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1',
     'video/mp4',
+    'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp9',
+    'video/webm;codecs=av1,opus',
+    'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp8',
     'video/webm'
   ];
@@ -35,10 +40,14 @@ function getSupportedMimeType(): string {
 
 async function getCameraStream(): Promise<MediaStream> {
   const constraintsToTry = [
+    // Prioritize Full HD 1080p (1920x1080) for maximum label/barcode clarity
+    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 }, facingMode: { ideal: 'environment' } } },
+    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } },
+    { video: { width: { ideal: 1920 }, height: { ideal: 1080 } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: 'environment' } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
     { video: { facingMode: 'environment' } },
-    { video: true },
-    { video: { facingMode: 'user' } },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 } } }
+    { video: true }
   ];
 
   for (const constraint of constraintsToTry) {
@@ -123,6 +132,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       setCameraActive(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(e => console.warn('Camera preview play warning:', e));
       }
     } catch (err: any) {
       console.error('Camera initialization error:', err);
@@ -138,6 +148,34 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       setCameraActive(false);
     }
   };
+
+  // Ref callback to immediately bind camera stream when <video> mounts in DOM
+  const setVideoRef = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && mediaStreamRef.current) {
+      if (el.srcObject !== mediaStreamRef.current) {
+        el.srcObject = mediaStreamRef.current;
+      }
+      el.play().catch(e => console.warn('Camera preview play warning:', e));
+    }
+  };
+
+  // Pre-warm camera stream on SCAN step & keep stream active
+  useEffect(() => {
+    if (step === 'SCAN' && (!mediaStreamRef.current || !mediaStreamRef.current.active)) {
+      initCamera().catch(err => console.warn('Background camera init:', err));
+    }
+  }, [step]);
+
+  // Sync camera stream to video element when step becomes RECORDING
+  useEffect(() => {
+    if (step === 'RECORDING' && videoRef.current && mediaStreamRef.current) {
+      if (videoRef.current.srcObject !== mediaStreamRef.current) {
+        videoRef.current.srcObject = mediaStreamRef.current;
+      }
+      videoRef.current.play().catch(e => console.warn('Camera preview play warning:', e));
+    }
+  }, [step, cameraActive, isRecording]);
 
   // Keyboard hotkeys for fast operator throughput
   useEffect(() => {
@@ -158,13 +196,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [step, activeOrderId, recordedBlob, isRecording]);
 
-  // Calculate target bitrate based on selected Speed Preset
+  // Calculate target bitrate based on selected Speed Preset (All 1080p Full HD Stream)
   const getTargetBitrate = () => {
     switch (uploadPreset) {
-      case 'turbo': return 1200000; // 1.2 Mbps (~4MB for 30s) -> 1-2s upload!
-      case 'fast':  return 2200000; // 2.2 Mbps (~8MB for 30s) -> 2-4s upload
-      case 'hd':    return 4500000; // 4.5 Mbps (~16MB for 30s) -> 5-10s upload
-      default:      return 1200000;
+      case 'turbo': return 1800000; // 1.8 Mbps (~6.5MB for 30s) -> 1-2s instant upload with crisp 1080p Full HD VP9/H264
+      case 'fast':  return 2800000; // 2.8 Mbps (~10MB for 30s) -> 2-3s fast upload with high clarity 1080p
+      case 'hd':    return 4800000; // 4.8 Mbps (~18MB for 30s) -> 4-6s upload with master studio 1080p clarity
+      default:      return 1800000;
     }
   };
 
@@ -374,8 +412,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         <div className="flex items-center gap-3">
           <Zap className="w-4 h-4 text-amber-400 shrink-0" />
           <div>
-            <span className="text-white font-bold uppercase tracking-wider">UPLOAD SPEED PRESET: </span>
-            <span className="text-slate-400 hidden sm:inline">Optimizes video compression for instant Telegram dispatch</span>
+            <span className="text-white font-bold uppercase tracking-wider">FULL HD 1080P SPEED PRESETS: </span>
+            <span className="text-slate-400 hidden sm:inline">Pristine 1080p clarity with high-efficiency VP9 / H.264 compression</span>
           </div>
         </div>
 
@@ -390,7 +428,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             }`}
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>⚡ ULTRA TURBO (1.2 Mbps · ~1-2s Upload)</span>
+            <span>⚡ 1080P TURBO (1.8 Mbps · Fast Upload)</span>
           </button>
 
           <button
@@ -402,7 +440,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <span>🚀 FAST (2.2 Mbps)</span>
+            <span>🚀 1080P BALANCED (2.8 Mbps)</span>
           </button>
 
           <button
@@ -414,7 +452,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <span>🎥 FULL HD (4.5 Mbps)</span>
+            <span>🎥 1080P ULTRA CLEAR (4.8 Mbps)</span>
           </button>
         </div>
       </div>
@@ -554,7 +592,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                   </div>
                 ) : (
                   <video
-                    ref={videoRef}
+                    ref={setVideoRef}
                     autoPlay
                     playsInline
                     muted
