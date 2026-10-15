@@ -264,7 +264,7 @@ export default function App() {
         <UploadQueueBanner />
 
         <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
-          <div>ZUBOC VMS — Enterprise Physical Logistics Portal</div>
+          <div>Zuboc VMS — Enterprise Packing & Verification Portal</div>
           <div className="flex items-center gap-2 text-slate-600">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>OPERATOR: {currentStaff.name} ({currentStaff.role})</span>
@@ -282,6 +282,10 @@ export default function App() {
         onSaveSettings={(newSet) => setSettings(newSet)}
         currentStaff={currentStaff}
         onStaffUpdated={fetchStaffsAPI}
+        onStaffChanged={(st) => {
+          setCurrentStaff(st);
+          localStorage.setItem('zuboc_auth_user', JSON.stringify(st));
+        }}
       />
 
     </div>

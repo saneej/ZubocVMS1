@@ -150,9 +150,9 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ orders, onRefr
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-2 font-mono">
-                      {order.telegramMessageLink && (
+                      {(order.telegramMessageLink || order.uploadStatus === 'SUCCESS') && (
                         <a
-                          href={order.telegramMessageLink}
+                          href={order.telegramMessageLink || 'https://t.me/'}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-blue-600 hover:underline font-bold px-2.5 py-1 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200"

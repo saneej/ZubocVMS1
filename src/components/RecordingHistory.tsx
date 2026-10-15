@@ -107,9 +107,9 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
                     </td>
                     <td className="p-4 text-slate-500 text-[11px]">{new Date(order.createdAt).toLocaleString()}</td>
                     <td className="p-4 text-right space-x-2">
-                      {order.telegramMessageLink && (
+                      {(order.telegramMessageLink || order.uploadStatus === 'SUCCESS') && (
                         <a
-                          href={order.telegramMessageLink}
+                          href={order.telegramMessageLink || 'https://t.me/'}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold transition-all"

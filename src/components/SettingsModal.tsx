@@ -14,7 +14,8 @@ import {
   Settings as SettingsIcon,
   Shield,
   Eye,
-  EyeOff
+  EyeOff,
+  User
 } from 'lucide-react';
 import { AppSettings, StaffMember } from '../types';
 import { safeFetchJson } from '../utils/api';
@@ -28,6 +29,7 @@ interface SettingsModalProps {
   onSaveSettings: (newSettings: AppSettings) => void;
   currentStaff: StaffMember;
   onStaffUpdated?: () => void;
+  onStaffChanged?: (updatedStaff: StaffMember) => void;
 }
 
 function cleanInputString(val: string): string {
@@ -41,9 +43,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onSaveSettings,
   currentStaff,
-  onStaffUpdated
+  onStaffUpdated,
+  onStaffChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'telegram' | 'staffs'>('telegram');
+  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs'>('telegram');
 
   // Telegram Config
   const [botToken, setBotToken] = useState(settings.telegramBotToken || '');
@@ -52,6 +55,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Profile State
+  const [profileName, setProfileName] = useState(currentStaff.name || '');
+  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Staffs State
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -78,9 +87,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setBotToken(settings.telegramBotToken || '');
       setChatId(settings.telegramChatId || '');
       setStationId(settings.stationId || 'Packing-01');
+      setProfileName(currentStaff.name || '');
       fetchStaffs();
     }
-  }, [isOpen]);
+  }, [isOpen, currentStaff]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(null);
+    setProfileSuccess(false);
+    setIsSavingProfile(true);
+
+    const cleanName = cleanInputString(profileName);
+    if (!cleanName) {
+      setProfileError('Display name cannot be empty.');
+      setIsSavingProfile(false);
+      return;
+    }
+
+    try {
+      const res = await safeFetchJson('/api/staffs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentStaff.id,
+          name: cleanName,
+          role: currentStaff.role,
+          stationId: currentStaff.stationId,
+          email: currentStaff.email
+        })
+      });
+
+      if (res && res.success) {
+        const updatedStaff: StaffMember = {
+          ...currentStaff,
+          name: cleanName
+        };
+        onStaffChanged?.(updatedStaff);
+        setProfileSuccess(true);
+        setTimeout(() => {
+          setProfileSuccess(false);
+          onStaffUpdated?.();
+        }, 1000);
+      } else {
+        throw new Error(res?.error || 'Failed to update profile name');
+      }
+    } catch (err: any) {
+      setProfileError(err.message || 'Error updating profile name');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const fetchStaffs = async () => {
     setIsLoadingStaffs(true);
@@ -308,6 +365,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'profile'
+                ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>MY PROFILE</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('staffs')}
             className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'staffs'
@@ -323,6 +393,84 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal Content Body */}
         <div className="p-6 overflow-y-auto space-y-4 font-mono text-xs">
           
+          {/* TAB: My Profile */}
+          {activeTab === 'profile' && (
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-900 space-y-1">
+                <div className="font-bold">Operator Profile Settings</div>
+                <div className="text-[11px] text-blue-700">Update your display name used across order logs and packing sessions.</div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">User ID (Login Username)</label>
+                <input
+                  type="text"
+                  value={currentStaff.id}
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-500 cursor-not-allowed font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">Role & Access</label>
+                <input
+                  type="text"
+                  value={currentStaff.role}
+                  disabled
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-500 cursor-not-allowed font-mono uppercase"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  <User className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Display Name</span>
+                </label>
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="e.g. David Admin"
+                  required
+                  className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
+                />
+              </div>
+
+              {profileError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{profileError}</span>
+                </div>
+              )}
+
+              {profileSuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Display name updated successfully!</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer transition-colors"
+                >
+                  CANCEL
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 cursor-pointer shadow-sm transition-all uppercase tracking-wider"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSavingProfile ? 'SAVING...' : 'UPDATE NAME'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* TAB 1: Telegram & Station */}
           {activeTab === 'telegram' && (
             <form onSubmit={handleSaveTelegramSettings} className="space-y-4">

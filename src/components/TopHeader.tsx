@@ -8,6 +8,7 @@ import {
   User
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopHeaderProps {
   activeTab: 'station' | 'search' | 'history' | 'admin';
@@ -91,6 +92,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               <RefreshCw className="w-4 h-4" />
             </button>
           )}
+
+          {/* PWA Install Button */}
+          <PWAInstallButton />
 
           {/* Settings Trigger */}
           <button

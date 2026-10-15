@@ -149,7 +149,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             />
           </div>
           <p className="text-xs text-slate-500 font-medium">
-            Warehouse Video Evidence & Packing Verification Portal
+            Zuboc VMS Packing & Verification Portal
           </p>
         </div>
 
@@ -369,7 +369,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         {/* Footer Note */}
         <p className="text-center text-[11px] text-slate-400 font-mono">
-          Zuboc VMS • Enterprise Physical Logistics Video Evidence
+          Zuboc VMS • Enterprise Logistics & Packing Station
         </p>
 
       </div>

@@ -89,22 +89,16 @@ class UploadQueueManager {
         nextTask.status = 'SUCCESS';
         nextTask.progress = 100;
       } catch (fallbackErr: any) {
-        console.warn(`Server JSON upload failed for ${nextTask.orderId}...`, fallbackErr);
-        if (!nextTask.videoBlob) {
-          try {
-            // Fallback Method 3: Direct Client-to-Telegram API upload (only for photo-only tasks)
-            await this.uploadTaskDirectTelegram(nextTask);
-            nextTask.status = 'SUCCESS';
-            nextTask.progress = 100;
-          } catch (jsonErr: any) {
-            console.error(`All upload protocols failed for ${nextTask.orderId}:`, jsonErr);
-            nextTask.status = 'FAILED';
-            nextTask.error = jsonErr.message || fallbackErr.message || err.message || 'Upload failed';
-          }
-        } else {
-          console.error(`Server-side video transcoding & upload failed for ${nextTask.orderId}:`, fallbackErr);
+        console.warn(`Server JSON upload failed for ${nextTask.orderId}, trying Direct Client-to-Telegram upload...`, fallbackErr);
+        try {
+          // Fallback Method 3: Direct Client-to-Telegram API upload (supports video & photo blobs)
+          await this.uploadTaskDirectTelegram(nextTask);
+          nextTask.status = 'SUCCESS';
+          nextTask.progress = 100;
+        } catch (directErr: any) {
+          console.error(`All upload protocols failed for ${nextTask.orderId}:`, directErr);
           nextTask.status = 'FAILED';
-          nextTask.error = fallbackErr.message || err.message || 'Server video transcode upload failed';
+          nextTask.error = directErr.message || fallbackErr.message || err.message || 'Upload failed';
         }
       }
     } finally {
