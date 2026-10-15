@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
@@ -13,6 +14,11 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+
+// Configure multer for fast binary video file uploads
+const upload = multer({
+  limits: { fileSize: 150 * 1024 * 1024 } // 150MB limit
+});
 
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -166,7 +172,6 @@ app.post('/api/settings', async (req, res) => {
 });
 
 app.get('/api/orders', async (req, res) => {
-  // Fetch from Firestore if available
   if (firestoreDb) {
     try {
       const colRef = collection(firestoreDb, 'orders');
@@ -232,7 +237,7 @@ app.post('/api/orders', async (req, res) => {
     stationId: stationId || settings.stationId || 'Packing-01',
     recordingStartedAt: recordingStartedAt || existing?.recordingStartedAt || now,
     recordingCompletedAt: now,
-    durationSeconds: durationSeconds || 0,
+    durationSeconds: Number(durationSeconds) || 0,
     recordingStatus: recordingStatus || 'COMPLETED',
     uploadStatus: uploadStatus || 'PENDING',
     telegramChatId: existing?.telegramChatId,
@@ -259,9 +264,14 @@ app.post('/api/orders', async (req, res) => {
   res.json({ success: true, record });
 });
 
-// Upload video to Telegram & store reference in Firebase
-app.post('/api/telegram/upload', async (req, res) => {
-  const { orderId, videoBase64, staffId, stationId, durationSeconds, recordingDate } = req.body;
+// Fast Binary & Multipart Streamed Upload to Telegram
+app.post('/api/telegram/upload', upload.single('video'), async (req, res) => {
+  const orderId = req.body.orderId;
+  const staffId = req.body.staffId;
+  const stationId = req.body.stationId;
+  const durationSeconds = Number(req.body.durationSeconds) || 0;
+  const recordingDate = req.body.recordingDate;
+  const videoBase64 = req.body.videoBase64;
 
   if (!orderId) {
     return res.status(400).json({ error: 'orderId is required' });
@@ -287,7 +297,7 @@ app.post('/api/telegram/upload', async (req, res) => {
       stationId: stationId || settings.stationId || 'Packing-01',
       recordingStartedAt: now,
       recordingCompletedAt: now,
-      durationSeconds: durationSeconds || 0,
+      durationSeconds,
       recordingStatus: 'COMPLETED',
       uploadStatus: 'PENDING',
       createdAt: now,
@@ -306,18 +316,23 @@ app.post('/api/telegram/upload', async (req, res) => {
       await setDoc(doc(firestoreDb, 'orders', orderId), record, { merge: true });
     }
     return res.status(400).json({
-      error: 'Telegram Bot Token and Chat ID are not configured. Please enter them in Settings.',
+      error: 'Telegram Bot Token and Chat ID are not configured.',
       record
     });
   }
 
   try {
-    let videoBuffer: Buffer;
-    if (videoBase64) {
+    let videoBuffer: Buffer | null = null;
+
+    if (req.file && req.file.buffer) {
+      videoBuffer = req.file.buffer;
+    } else if (videoBase64) {
       const base64Data = videoBase64.replace(/^data:.*;base64,/, '');
       videoBuffer = Buffer.from(base64Data, 'base64');
-    } else {
-      return res.status(400).json({ error: 'No video data provided for upload' });
+    }
+
+    if (!videoBuffer) {
+      return res.status(400).json({ error: 'No video file received' });
     }
 
     const formattedDate = recordingDate 
@@ -425,7 +440,6 @@ app.post('/api/telegram/webhook', async (req, res) => {
         return res.json({ ok: true });
       }
 
-      // Find order in local store or Firestore
       let foundRecord = ordersStore[queryOrderId];
       if (!foundRecord && firestoreDb) {
         const snap = await getDoc(doc(firestoreDb, 'orders', queryOrderId));
@@ -468,6 +482,41 @@ app.post('/api/telegram/webhook', async (req, res) => {
   }
 });
 
+// Test Telegram connection by sending a demo message
+app.post('/api/telegram/test-connection', async (req, res) => {
+  const botToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    return res.status(400).json({ error: 'Telegram Bot Token and Chat ID not configured.' });
+  }
+
+  try {
+    const text = `🟢 <b>PackVision VMS Connected Successfully!</b>\n\n<b>Station:</b> ${settings.stationId}\n<b>Timestamp:</b> ${new Date().toLocaleString('en-GB')}\n\nYour PackVision VMS packing station is online and connected to this Telegram channel. Recorded order packing evidence will be delivered here automatically.`;
+
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text,
+        parse_mode: 'HTML'
+      })
+    });
+
+    const data = await response.json() as any;
+
+    if (!data.ok) {
+      throw new Error(data.description || 'Failed to send message to Telegram');
+    }
+
+    res.json({ success: true, message: 'Demo message sent to Telegram channel!', telegramResponse: data });
+  } catch (err: any) {
+    console.error('Test connection error:', err);
+    res.status(500).json({ error: err.message || 'Failed to send test message' });
+  }
+});
+
 // Gemini AI Assistant for packing verification
 app.post('/api/ai/verify-packing', async (req, res) => {
   try {
@@ -477,7 +526,7 @@ app.post('/api/ai/verify-packing', async (req, res) => {
     if (!apiKey) {
       return res.json({
         success: true,
-        aiAnalysis: "AI API Key not configured. Packing recorded successfully. Order ID: " + orderId
+        aiAnalysis: "AI API Key not configured. Order ID: " + orderId
       });
     }
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, StopCircle, Play, Send, RefreshCw, Barcode, ShieldAlert, Sparkles, ExternalLink, Check } from 'lucide-react';
+import { Camera, StopCircle, Play, Check, Barcode, ShieldAlert, Sparkles } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
+import { uploadQueueManager } from '../utils/uploadQueue';
 
 interface PackingStationProps {
   currentStaff: StaffMember;
@@ -17,12 +18,11 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 }) => {
   const [orderIdInput, setOrderIdInput] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
-  const [recordingState, setRecordingState] = useState<'IDLE' | 'RECORDING' | 'PREVIEW' | 'UPLOADING' | 'UPLOADED'>('IDLE');
+  const [recordingState, setRecordingState] = useState<'IDLE' | 'RECORDING' | 'PREVIEW' | 'COMPLETED'>('IDLE');
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [recordedVideoBlob, setRecordedVideoBlob] = useState<Blob | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
-  const [lastCompletedRecord, setLastCompletedRecord] = useState<OrderRecord | null>(null);
   const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -113,6 +113,29 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         setRecordedVideoBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
+
+        // Instantly queue background parallel upload to Telegram
+        uploadQueueManager.addTask({
+          orderId: cleanId,
+          staffId: currentStaff.id,
+          stationId: settings.stationId,
+          durationSeconds: timerSeconds,
+          videoBlob: blob,
+          recordingDate: new Date().toISOString()
+        });
+
+        // Register initial local record
+        onOrderCompleted({
+          orderId: cleanId,
+          staffId: currentStaff.id,
+          stationId: settings.stationId,
+          recordingStartedAt: new Date().toISOString(),
+          durationSeconds: timerSeconds,
+          recordingStatus: 'COMPLETED',
+          uploadStatus: 'PENDING',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
       };
 
       recorder.start(1000);
@@ -125,55 +148,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && recordingState === 'RECORDING') {
       mediaRecorderRef.current.stop();
-      setRecordingState('PREVIEW');
-      // Automatically upload
-      setTimeout(() => {
-        handleUploadToTelegram();
-      }, 300);
-    }
-  };
-
-  const handleUploadToTelegram = async () => {
-    if (!recordedVideoBlob && !chunksRef.current.length) return;
-    const blobToUpload = recordedVideoBlob || new Blob(chunksRef.current, { type: 'video/webm' });
-
-    setRecordingState('UPLOADING');
-
-    try {
-      const reader = new FileReader();
-      reader.readAsDataURL(blobToUpload);
-      reader.onloadend = async () => {
-        const base64data = reader.result as string;
-
-        const payload = {
-          orderId: activeOrderId || orderIdInput,
-          videoBase64: base64data,
-          staffId: currentStaff.id,
-          stationId: settings.stationId,
-          durationSeconds: timerSeconds,
-          recordingDate: new Date().toISOString()
-        };
-
-        const res = await fetch('/api/telegram/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to upload to Telegram');
-        }
-
-        setLastCompletedRecord(data.record);
-        onOrderCompleted(data.record);
-        setRecordingState('UPLOADED');
-      };
-    } catch (err: any) {
-      console.error('Upload error:', err);
-      alert('Telegram upload error: ' + err.message);
-      setRecordingState('PREVIEW');
+      setRecordingState('COMPLETED');
     }
   };
 
@@ -240,7 +215,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
               value={orderIdInput}
               onChange={(e) => setOrderIdInput(e.target.value)}
               placeholder="Scan Barcode or Type Order ID (e.g. ORD-123456)..."
-              disabled={recordingState !== 'IDLE'}
+              disabled={recordingState === 'RECORDING'}
               autoFocus
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-12 pr-4 py-3 text-white text-base font-mono focus:outline-none focus:border-emerald-500 disabled:opacity-50"
             />
@@ -268,14 +243,14 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             </button>
           )}
 
-          {recordingState === 'UPLOADED' && (
+          {recordingState === 'COMPLETED' && (
             <button
               type="button"
               onClick={handleResetForNextOrder}
               className="bg-zinc-100 hover:bg-white text-zinc-950 font-bold px-6 py-3 rounded-lg flex items-center gap-2 cursor-pointer transition-all shrink-0"
             >
               <Check className="w-4 h-4" />
-              <span>Next Order</span>
+              <span>Next Order (Ready)</span>
             </button>
           )}
         </form>
@@ -299,17 +274,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             </div>
           )}
 
-          {recordingState === 'UPLOADING' && (
-            <div className="flex items-center gap-1.5 text-amber-400 font-medium">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Uploading to Telegram...</span>
-            </div>
-          )}
-
-          {recordingState === 'UPLOADED' && (
+          {recordingState === 'COMPLETED' && (
             <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
               <Check className="w-3.5 h-3.5" />
-              <span>Uploaded to Telegram Channel</span>
+              <span>Packing Completed (Uploading in background)</span>
             </div>
           )}
         </div>
@@ -328,10 +296,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             autoPlay
             playsInline
             muted
-            className={`w-full h-full object-cover ${recordingState === 'PREVIEW' || recordingState === 'UPLOADING' || recordingState === 'UPLOADED' ? 'hidden' : 'block'}`}
+            className={`w-full h-full object-cover ${recordingState === 'COMPLETED' ? 'hidden' : 'block'}`}
           />
 
-          {recordedVideoUrl && (recordingState === 'PREVIEW' || recordingState === 'UPLOADING' || recordingState === 'UPLOADED') && (
+          {recordedVideoUrl && recordingState === 'COMPLETED' && (
             <video
               src={recordedVideoUrl}
               controls
@@ -340,7 +308,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             />
           )}
 
-          {/* Minimal Watermark */}
           {recordingState === 'RECORDING' && activeOrderId && (
             <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-md border border-white/10 text-white font-mono text-xs">
               <span className="text-emerald-400 font-bold">{activeOrderId}</span>
@@ -348,7 +315,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
           )}
         </div>
 
-        {/* Minimal Actions Bar */}
+        {/* Bottom Actions Bar */}
         <div className="p-4 bg-zinc-950 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
           <div className="flex items-center gap-3">
             <button
@@ -362,16 +329,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             {aiAnalysisResult && <span className="text-purple-300 italic">{aiAnalysisResult}</span>}
           </div>
 
-          {lastCompletedRecord?.telegramMessageLink && (
-            <a
-              href={lastCompletedRecord.telegramMessageLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-emerald-400 hover:underline flex items-center gap-1 font-medium"
+          {recordingState === 'COMPLETED' && (
+            <button
+              onClick={handleResetForNextOrder}
+              className="text-emerald-400 hover:underline font-medium"
             >
-              <span>View in Telegram</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+              Scan Next Order
+            </button>
           )}
         </div>
 

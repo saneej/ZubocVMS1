@@ -5,6 +5,7 @@ import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SettingsModal } from './components/SettingsModal';
+import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -181,6 +182,8 @@ export default function App() {
         settings={settings}
         onSaveSettings={(newSet) => setSettings(newSet)}
       />
+
+      <UploadQueueBanner />
 
       <footer className="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
         PackVision VMS — Firebase Cloud Database & Telegram Integration Active
