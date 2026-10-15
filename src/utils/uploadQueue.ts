@@ -18,7 +18,7 @@ class UploadQueueManager {
   private tasks: UploadTask[] = [];
   private listeners: QueueListener[] = [];
   private activeUploads = 0;
-  private maxParallelUploads = 3;
+  private maxParallelUploads = 2;
 
   public subscribe(listener: QueueListener) {
     this.listeners.push(listener);
@@ -40,7 +40,6 @@ class UploadQueueManager {
       status: 'QUEUED'
     };
 
-    // Remove old queued/failed task for same order if re-queued
     this.tasks = this.tasks.filter(t => t.orderId !== taskData.orderId || t.status === 'SUCCESS');
     this.tasks.unshift(task);
     this.notify();
@@ -69,13 +68,22 @@ class UploadQueueManager {
     this.notify();
 
     try {
+      // First attempt: Multipart FormData XHR
       await this.uploadTaskBinaryXHR(nextTask);
       nextTask.status = 'SUCCESS';
       nextTask.progress = 100;
     } catch (err: any) {
-      console.error(`Upload error for ${nextTask.orderId}:`, err);
-      nextTask.status = 'FAILED';
-      nextTask.error = err.message || 'Upload failed';
+      console.warn(`Binary upload failed for ${nextTask.orderId}, retrying via JSON base64 fallback...`, err);
+      try {
+        // Fallback attempt: JSON Base64 fetch
+        await this.uploadTaskBase64Fallback(nextTask);
+        nextTask.status = 'SUCCESS';
+        nextTask.progress = 100;
+      } catch (fallbackErr: any) {
+        console.error(`Upload error for ${nextTask.orderId}:`, fallbackErr);
+        nextTask.status = 'FAILED';
+        nextTask.error = fallbackErr.message || 'Upload failed';
+      }
     } finally {
       this.activeUploads--;
       this.notify();
@@ -124,16 +132,52 @@ class UploadQueueManager {
         }
       };
 
-      xhr.onerror = () => {
-        reject(new Error('Network connection error during upload'));
-      };
+      xhr.onerror = () => reject(new Error('Network error during binary upload'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out'));
 
-      xhr.ontimeout = () => {
-        reject(new Error('Upload timed out'));
-      };
-
-      xhr.open('POST', '/api/telegram/upload', true);
+      const uploadEndpoint = '/api/telegram/upload';
+      xhr.open('POST', uploadEndpoint, true);
       xhr.send(formData);
+    });
+  }
+
+  private async uploadTaskBase64Fallback(task: UploadTask): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(task.videoBlob);
+      reader.onloadend = async () => {
+        try {
+          const base64data = reader.result as string;
+          task.progress = 50;
+          this.notify();
+
+          const res = await fetch('/api/telegram/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: task.orderId,
+              staffId: task.staffId,
+              stationId: task.stationId,
+              durationSeconds: task.durationSeconds,
+              recordingDate: task.recordingDate,
+              videoBase64: base64data
+            })
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || `HTTP ${res.status}`);
+          }
+
+          if (data.record?.telegramMessageLink) {
+            task.telegramMessageLink = data.record.telegramMessageLink;
+          }
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read video blob'));
     });
   }
 

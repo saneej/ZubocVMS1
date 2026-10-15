@@ -9,6 +9,12 @@ interface SettingsModalProps {
   onSaveSettings: (newSettings: AppSettings) => void;
 }
 
+// Utility to replace iOS/WebKit smart dashes with standard ASCII hyphen
+function cleanInputString(val: string): string {
+  if (!val) return '';
+  return val.trim().replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
+}
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -28,33 +34,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsSaving(true);
     setSaveSuccess(false);
 
+    const sanitizedToken = cleanInputString(botToken);
+    const sanitizedChatId = cleanInputString(chatId);
+    const sanitizedStationId = cleanInputString(stationId);
+
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          telegramBotToken: botToken,
-          telegramChatId: chatId,
-          stationId: stationId,
+          telegramBotToken: sanitizedToken,
+          telegramChatId: sanitizedChatId,
+          stationId: sanitizedStationId,
           autoUpload: true
         })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         onSaveSettings({
           ...settings,
-          telegramBotToken: botToken,
-          telegramChatId: chatId,
-          stationId: stationId,
-          hasToken: Boolean(botToken)
+          telegramBotToken: sanitizedToken,
+          telegramChatId: sanitizedChatId,
+          stationId: sanitizedStationId,
+          hasToken: Boolean(sanitizedToken)
         });
         setSaveSuccess(true);
         setTimeout(() => {
           onClose();
         }, 1000);
+      } else {
+        alert('Failed to save settings: ' + (data.error || 'Server error'));
       }
     } catch (err: any) {
-      alert('Failed to save settings: ' + err.message);
+      alert('Failed to save settings: ' + (err.message || String(err)));
     } finally {
       setIsSaving(false);
     }
@@ -82,6 +94,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               value={botToken}
               onChange={(e) => setBotToken(e.target.value)}
               placeholder="e.g. 8372063656:AAG..."
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
             />
           </div>
@@ -95,6 +110,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               value={chatId}
               onChange={(e) => setChatId(e.target.value)}
               placeholder="e.g. -1003940299676"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
             />
           </div>
@@ -108,6 +126,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               value={stationId}
               onChange={(e) => setStationId(e.target.value)}
               placeholder="Packing-01"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
             />
           </div>

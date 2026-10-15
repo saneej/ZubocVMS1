@@ -217,6 +217,9 @@ export const PackingStation: React.FC<PackingStationProps> = ({
               placeholder="Scan Barcode or Type Order ID (e.g. ORD-123456)..."
               disabled={recordingState === 'RECORDING'}
               autoFocus
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-12 pr-4 py-3 text-white text-base font-mono focus:outline-none focus:border-emerald-500 disabled:opacity-50"
             />
           </div>
