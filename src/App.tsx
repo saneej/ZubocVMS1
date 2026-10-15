@@ -141,7 +141,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#080B11] flex flex-col items-center justify-center text-white font-mono">
         <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING BRIGADEZ VMS CONTROL ROOM...</p>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING ZUBOC VMS CONTROL ROOM...</p>
       </div>
     );
   }
@@ -221,8 +221,8 @@ export default function App() {
 
         <UploadQueueBanner />
 
-        <footer className="bg-[#06080E] border-t border-[#151D2F] py-3.5 text-center text-[11px] text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
-          <div>BRIGADEZ VMS — ENTERPRISE LOGISTICS EVIDENCE GATEWAY</div>
+        <footer className="bg-[#06080E] border-t border-[#151D2F] py-3 text-center text-[11px] text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
+          <div>ZUBOC VMS — ENTERPRISE LOGISTICS EVIDENCE GATEWAY</div>
           <div className="flex items-center gap-2 text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 led-emerald"></span>
             <span>SYSTEM OPERATIONAL</span>

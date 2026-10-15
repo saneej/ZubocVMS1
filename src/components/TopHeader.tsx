@@ -93,7 +93,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 {currentInfo.title}
               </h1>
               <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#131B2E] text-blue-400 border border-[#212D4A]">
-                BRIGADEZ VMS
+                ZUBOC VMS
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono hidden sm:block">

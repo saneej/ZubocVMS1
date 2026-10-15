@@ -79,18 +79,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           <div className="p-5 border-b border-[#152E4A] flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setActiveTab('station'); setIsMobileOpen(false); }}>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1769E8] to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 font-mono font-bold">
+              <div className="w-9 h-9 rounded-lg bg-[#1769E8] flex items-center justify-center text-white font-mono font-bold shadow-sm">
                 <Video className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-base tracking-tight text-white font-sans">BRIGADEZ</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-mono">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-black text-lg tracking-widest text-white font-mono">ZUBOC</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono">
                     VMS
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase font-medium">
-                  ENTERPRISE CONTROL
+                  EVIDENCE GATEWAY
                 </p>
               </div>
             </div>
