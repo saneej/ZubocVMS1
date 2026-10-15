@@ -230,7 +230,13 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     const cleanChatId = chatId.trim().replace(/^["']|["']$/g, '');
 
     const meRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
-    const meData = await meRes.json();
+    const meText = await meRes.text();
+    let meData: any;
+    try {
+      meData = JSON.parse(meText);
+    } catch {
+      throw new Error(`Telegram API non-JSON response: ${meText.slice(0, 100)}`);
+    }
     if (!meData.ok) {
       throw new Error(meData.description || 'Invalid Telegram Bot Token');
     }
@@ -245,7 +251,13 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
         parse_mode: 'HTML'
       })
     });
-    const msgData = await msgRes.json();
+    const msgText = await msgRes.text();
+    let msgData: any;
+    try {
+      msgData = JSON.parse(msgText);
+    } catch {
+      throw new Error(`Telegram API non-JSON response: ${msgText.slice(0, 100)}`);
+    }
     if (!msgData.ok) {
       throw new Error(msgData.description || 'Failed to send test message to Telegram chat ID');
     }

@@ -702,9 +702,8 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
   }
 });
 
-// Attach API Router under /api AND /
+// Attach API Router under /api only
 app.use('/api', apiRouter);
-app.use('/', apiRouter);
 
 // Global Express Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

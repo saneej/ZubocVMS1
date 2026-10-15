@@ -261,7 +261,13 @@ export const DiagnosePage: React.FC<DiagnosePageProps> = ({
       try {
         const cleanToken = rawBotToken.trim().replace(/^["']|["']$/g, '');
         const tgRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
-        const tgData = await tgRes.json();
+        const tgText = await tgRes.text();
+        let tgData: any;
+        try {
+          tgData = JSON.parse(tgText);
+        } catch {
+          throw new Error(`Telegram API non-JSON response: ${tgText.slice(0, 100)}`);
+        }
 
         if (tgData.ok) {
           results.push({
@@ -407,7 +413,13 @@ export const DiagnosePage: React.FC<DiagnosePageProps> = ({
     try {
       // 1. Verify token with Telegram API
       const tgRes = await fetch(`https://api.telegram.org/bot${cleanToken}/getMe`);
-      const tgData = await tgRes.json();
+      const tgText = await tgRes.text();
+      let tgData: any;
+      try {
+        tgData = JSON.parse(tgText);
+      } catch {
+        throw new Error(`Telegram API non-JSON response: ${tgText.slice(0, 100)}`);
+      }
 
       if (!tgData.ok) {
         throw new Error(`Telegram API Error: ${tgData.description || 'Invalid token'}`);
