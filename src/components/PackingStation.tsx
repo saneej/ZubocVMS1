@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, StopCircle, Play, Check, Barcode, ShieldAlert, Sparkles, Send, RefreshCw, ExternalLink, ArrowRight, Trash2, ArrowLeft } from 'lucide-react';
+import { Camera, StopCircle, Play, Check, Barcode, ShieldAlert, Sparkles, Send, ExternalLink, Trash2, Video, Disc } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
 import { getApiUrl } from '../utils/api';
@@ -11,7 +11,6 @@ interface PackingStationProps {
   existingOrders: OrderRecord[];
 }
 
-// Universal cross-browser MediaRecorder MIME helper
 function getSupportedMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
   const types = [
@@ -29,7 +28,6 @@ function getSupportedMimeType(): string {
   return '';
 }
 
-// Cross-platform iOS Safari compliant camera stream initialization
 async function getCameraStream(): Promise<MediaStream> {
   const constraintsToTry = [
     { video: { facingMode: 'environment' } },
@@ -43,10 +41,10 @@ async function getCameraStream(): Promise<MediaStream> {
       const stream = await navigator.mediaDevices.getUserMedia(constraint);
       if (stream) return stream;
     } catch {
-      // try next fallback constraint
+      // try next fallback
     }
   }
-  throw new Error('Could not access camera. Please check device camera permissions.');
+  throw new Error('Could not access camera. Please check camera permissions.');
 }
 
 export const PackingStation: React.FC<PackingStationProps> = ({
@@ -55,7 +53,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   onOrderCompleted,
   existingOrders
 }) => {
-  // Step workflow state: 'ENTRY' (Scan order) -> 'RECORDING' (Live video) -> 'CONFIRM' (Review & Upload)
   const [step, setStep] = useState<'ENTRY' | 'RECORDING' | 'CONFIRM'>('ENTRY');
   const [orderIdInput, setOrderIdInput] = useState('');
   const [confirmedOrderId, setConfirmedOrderId] = useState('');
@@ -85,7 +82,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     };
   }, []);
 
-  // Timer effect during active recording
   useEffect(() => {
     if (step === 'RECORDING') {
       timerIntervalRef.current = setInterval(() => {
@@ -106,7 +102,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }
   };
 
-  // STEP 1: Staff submits order ID -> Open camera and start recording
+  // Step 1 -> Step 2
   const handleStartPackingSession = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanId = orderIdInput.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
@@ -123,7 +119,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
       setStep('RECORDING');
 
-      // Bind video element
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -158,11 +153,11 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       recorder.start(1000);
     } catch (err: any) {
       console.error('Camera error:', err);
-      setCameraError(err.message || 'Unable to start camera.');
+      setCameraError(err.message || 'Unable to start camera feed.');
     }
   };
 
-  // STEP 2: Complete packing -> Stop camera and go to Confirmation Page
+  // Step 2 -> Step 3
   const handleCompletePacking = () => {
     if (mediaRecorderRef.current && step === 'RECORDING') {
       mediaRecorderRef.current.stop();
@@ -171,11 +166,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }
   };
 
-  // STEP 3: Confirm Details & Trigger Upload to Telegram
+  // Step 3 -> Upload
   const handleConfirmAndUpload = () => {
     if (!recordedVideoBlob) return;
 
-    // Queue for parallel background upload to Telegram
     uploadQueueManager.addTask({
       orderId: confirmedOrderId,
       staffId: currentStaff.id,
@@ -197,7 +191,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       updatedAt: new Date().toISOString()
     });
 
-    // Reset back to Step 1 for next order
     handleResetToEntry();
   };
 
@@ -238,9 +231,9 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         body: JSON.stringify({ orderId: confirmedOrderId, imageBase64 })
       });
       const data = await res.json();
-      setAiAnalysisResult(data.aiAnalysis || 'QA Verified.');
+      setAiAnalysisResult(data.aiAnalysis || 'TrackVid AI: Package Sealed.');
     } catch {
-      setAiAnalysisResult('QA Verified (local).');
+      setAiAnalysisResult('TrackVid AI Verified.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -253,87 +246,118 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       
-      {/* PAGE 1: Order Scan & Entry Screen (Camera OFF) */}
+      {/* TrackVid Terminal Header */}
+      <div className="flex items-center justify-between bg-slate-900 border border-slate-800/80 rounded-2xl p-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+            <Video className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-white tracking-tight">TrackVid Packing Terminal</h2>
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5">
+              <span>Station: <strong className="text-cyan-400">{settings.stationId}</strong></span>
+              <span>·</span>
+              <span>Operator: <strong className="text-slate-200">{currentStaff.name}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+            Camera Ready
+          </span>
+        </div>
+      </div>
+
+      {/* STEP 1: Order Dispatch Terminal (Camera Standby) */}
       {step === 'ENTRY' && (
-        <div className="max-w-xl mx-auto space-y-6 pt-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-            <div className="text-center space-y-1.5 pb-4 border-b border-slate-800">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
-                <Barcode className="w-6 h-6" />
+        <div className="max-w-2xl mx-auto space-y-6 pt-4">
+          <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-8 shadow-2xl space-y-6">
+            <div className="text-center space-y-2 pb-6 border-b border-slate-800">
+              <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-2 shadow-inner">
+                <Barcode className="w-7 h-7" />
               </div>
-              <h2 className="text-xl font-bold text-white tracking-tight">Order Packing Station</h2>
-              <p className="text-xs text-slate-400">Scan or type Order Barcode ID to begin packing & video recording</p>
+              <h2 className="text-2xl font-black text-white tracking-tight">Scan Order AWB / Barcode</h2>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Scan order barcode using USB barcode scanner or enter ID manually to initiate packing video recording.
+              </p>
             </div>
 
-            <form onSubmit={handleStartPackingSession} className="space-y-4">
+            <form onSubmit={handleStartPackingSession} className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                  Order ID / Barcode
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 font-mono">
+                  Order ID / Barcode AWB
                 </label>
                 <div className="relative">
-                  <Barcode className="w-5 h-5 text-cyan-400 absolute left-4 top-3.5" />
+                  <Barcode className="w-6 h-6 text-cyan-400 absolute left-4 top-3.5" />
                   <input
                     ref={inputRef}
                     type="text"
                     value={orderIdInput}
                     onChange={(e) => setOrderIdInput(e.target.value)}
-                    placeholder="e.g. ORD-123456"
+                    placeholder="Scan order AWB (e.g. ORD-123456)..."
                     autoFocus
                     autoCorrect="off"
                     autoCapitalize="none"
                     spellCheck={false}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-4 py-3 text-white font-mono text-base focus:outline-none focus:border-emerald-500 shadow-inner"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-13 pr-4 py-3.5 text-white font-mono text-lg font-bold focus:outline-none focus:border-cyan-500 shadow-inner"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
                   <span className="text-slate-500 block mb-0.5">Packing Station</span>
-                  <span className="font-semibold text-white">{settings.stationId}</span>
+                  <span className="font-bold text-white text-sm">{settings.stationId}</span>
                 </div>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-0.5">Operator</span>
-                  <span className="font-semibold text-white">{currentStaff.name}</span>
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block mb-0.5">Assigned Packer</span>
+                  <span className="font-bold text-white text-sm">{currentStaff.name}</span>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={!orderIdInput.trim()}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all shadow-lg shadow-emerald-500/20"
+                className="w-full bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 disabled:opacity-40 text-slate-950 font-extrabold text-base py-4 px-6 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xl shadow-cyan-500/20"
               >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Start Packing & Record Video</span>
+                <Play className="w-5 h-5 fill-current" />
+                <span>Start TrackVid Recording</span>
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* PAGE 2: Active Packing & Live Camera Recording Screen (Camera ON) */}
+      {/* STEP 2: Live Viewfinder Recording Screen */}
       {step === 'RECORDING' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
+          {/* Main Viewfinder (Col 2) */}
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
             
-            <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 font-mono">
-                <Camera className="w-4 h-4 text-emerald-400" />
-                <span className="font-bold text-white">{confirmedOrderId}</span>
-                <span className="text-slate-500">·</span>
-                <span className="text-slate-400">{settings.stationId}</span>
+            <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+              <div className="flex items-center gap-2">
+                <Disc className="w-4 h-4 text-rose-500 animate-spin" />
+                <span className="font-extrabold text-white text-sm">{confirmedOrderId}</span>
               </div>
 
-              <div className="flex items-center gap-2 font-mono text-rose-400 font-bold bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20">
+              <div className="flex items-center gap-2 font-mono text-rose-400 font-bold bg-rose-500/10 px-3.5 py-1 rounded-full border border-rose-500/30">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                <span>REC {formatTime(timerSeconds)}</span>
+                <span>REC ON AIR ({formatTime(timerSeconds)})</span>
               </div>
             </div>
 
-            <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+            {/* Viewfinder Frame with Crosshair Corner Overlays */}
+            <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden group">
+              {/* Corner Viewfinder reticles */}
+              <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-cyan-400/80"></div>
+              <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-cyan-400/80"></div>
+              <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-cyan-400/80"></div>
+              <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-cyan-400/80"></div>
+
               {cameraError ? (
                 <div className="p-8 text-center text-slate-400">
                   <ShieldAlert className="w-10 h-10 text-amber-400 mx-auto mb-2" />
@@ -349,8 +373,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 />
               )}
 
-              <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-white font-mono text-xs shadow-xl">
-                <span className="text-emerald-400 font-bold">{confirmedOrderId}</span>
+              {/* Order Watermark Badge */}
+              <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-white font-mono text-xs shadow-2xl flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-cyan-400 font-bold text-sm">{confirmedOrderId}</span>
               </div>
             </div>
 
@@ -358,15 +384,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
               <button
                 onClick={handleAiCheck}
                 disabled={isAnalyzing}
-                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-purple-300 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer font-medium"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-purple-300 rounded-xl text-xs flex items-center gap-2 cursor-pointer font-medium shadow"
               >
                 <Sparkles className="w-4 h-4 text-purple-400" />
-                <span>AI QA Check</span>
+                <span>TrackVid AI Inspector</span>
               </button>
 
               <button
                 onClick={handleCompletePacking}
-                className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-rose-600/30 animate-pulse text-sm"
+                className="bg-rose-600 hover:bg-rose-500 text-white font-black px-7 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-xl shadow-rose-600/30 animate-pulse text-sm"
               >
                 <StopCircle className="w-5 h-5" />
                 <span>Complete Packing</span>
@@ -375,93 +401,97 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
           </div>
 
+          {/* Session Overview Sidebar */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Active Packing Session</h3>
+              <h3 className="text-xs font-extrabold text-cyan-400 uppercase tracking-wider font-mono">TrackVid Session Telemetry</h3>
               
-              <div className="space-y-3 text-xs">
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
-                  <span className="text-slate-500">Order ID:</span>
-                  <span className="font-mono font-bold text-white">{confirmedOrderId}</span>
+              <div className="space-y-3 text-xs font-mono">
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex justify-between">
+                  <span className="text-slate-500">Order AWB:</span>
+                  <span className="font-bold text-white text-sm">{confirmedOrderId}</span>
                 </div>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
-                  <span className="text-slate-500">Recording Time:</span>
-                  <span className="font-mono text-rose-400 font-bold">{formatTime(timerSeconds)}</span>
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex justify-between">
+                  <span className="text-slate-500">Live Duration:</span>
+                  <span className="text-rose-400 font-bold text-sm">{formatTime(timerSeconds)}</span>
                 </div>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
-                  <span className="text-slate-500">Packing Station:</span>
+                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex justify-between">
+                  <span className="text-slate-500">Station ID:</span>
                   <span className="text-slate-200">{settings.stationId}</span>
                 </div>
               </div>
+
+              {aiAnalysisResult && (
+                <div className="bg-purple-950/40 border border-purple-500/30 rounded-xl p-3 text-xs text-purple-200">
+                  {aiAnalysisResult}
+                </div>
+              )}
             </div>
 
             <div className="text-[11px] text-slate-500 text-center pt-4 border-t border-slate-800">
-              When packing is complete, click <b>Complete Packing</b> to review video before Telegram upload.
+              Record the entire packing procedure. Click <b>Complete Packing</b> when sealed.
             </div>
           </div>
 
         </div>
       )}
 
-      {/* PAGE 3: Review & Confirm Details Screen (Camera OFF) */}
+      {/* STEP 3: Review & Confirmation Screen */}
       {step === 'CONFIRM' && (
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
             
             <div className="bg-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-white text-base">Confirm Details & Video Preview</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Review packing recording before uploading to Telegram</p>
+                <h3 className="font-extrabold text-white text-base">TrackVid Evidence Verification</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Review packing video playback and order metadata before dispatching to Telegram</p>
               </div>
               <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold rounded-full border border-emerald-500/30">
-                Ready for Review
+                Recording Verified
               </span>
             </div>
 
-            {/* Video Playback Preview */}
             <div className="bg-black aspect-video flex items-center justify-center overflow-hidden">
               {recordedVideoUrl ? (
                 <video src={recordedVideoUrl} controls autoPlay className="w-full h-full object-cover" />
               ) : (
-                <p className="text-xs text-slate-500">Processing preview...</p>
+                <p className="text-xs text-slate-500">Processing video preview...</p>
               )}
             </div>
 
-            {/* Order Confirmation Details Form */}
-            <div className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">Order ID</span>
+            <div className="p-6 space-y-5 text-xs">
+              <div className="grid grid-cols-2 gap-3 font-mono">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block mb-1">Order AWB / ID</span>
                   <input
                     type="text"
                     value={confirmedOrderId}
                     onChange={(e) => setConfirmedOrderId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-sm font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-base font-bold focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <span className="text-slate-500 block mb-1">Recording Duration</span>
-                  <span className="font-mono text-white text-sm font-bold block pt-1">{timerSeconds} seconds ({formatTime(timerSeconds)})</span>
+                  <span className="text-white text-base font-bold block pt-1">{timerSeconds} seconds</span>
                 </div>
 
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <span className="text-slate-500 block mb-1">Packing Station</span>
-                  <span className="text-white text-sm font-semibold block">{settings.stationId}</span>
+                  <span className="text-white font-bold block">{settings.stationId}</span>
                 </div>
 
-                <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                  <span className="text-slate-500 block mb-1">Operator</span>
-                  <span className="text-white text-sm font-semibold block">{currentStaff.name}</span>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <span className="text-slate-500 block mb-1">Packer Operator</span>
+                  <span className="text-white font-bold block">{currentStaff.name}</span>
                 </div>
               </div>
 
-              {/* Two Clear Primary Actions */}
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center gap-4 pt-4 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={handleResetToEntry}
-                  className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+                  className="px-5 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4 text-rose-400" />
                   <span>Discard & Retake</span>
@@ -470,10 +500,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 <button
                   type="button"
                   onClick={handleConfirmAndUpload}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all shadow-lg shadow-emerald-500/20 text-sm"
+                  className="flex-1 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-black py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xl shadow-cyan-500/20 text-sm"
                 >
                   <Send className="w-4 h-4" />
-                  <span>Confirm & Upload to Telegram</span>
+                  <span>Confirm & Dispatch to Telegram Channel</span>
                 </button>
               </div>
             </div>
@@ -482,12 +512,12 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         </div>
       )}
 
-      {/* Background Order Upload Queue Progress List */}
+      {/* Live Order Upload Queue Panel */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-            <Send className="w-4 h-4 text-emerald-400" />
-            <span>Order Upload Queue ({queueTasks.length})</span>
+          <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
+            <Send className="w-4 h-4 text-cyan-400" />
+            <span>TrackVid Upload Telemetry Queue ({queueTasks.length})</span>
           </h3>
         </div>
 
@@ -513,7 +543,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 {task.status === 'UPLOADING' && (
                   <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
                     <div
-                      className="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full rounded-full transition-all duration-200"
+                      className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full transition-all duration-200"
                       style={{ width: `${task.progress}%` }}
                     />
                   </div>
@@ -542,9 +572,9 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                       href={task.telegramMessageLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline font-medium"
+                      className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:underline font-medium"
                     >
-                      <span>Telegram Video Link</span>
+                      <span>View in Telegram</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>

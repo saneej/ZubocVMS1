@@ -1,6 +1,6 @@
 {
-  "name": "PackVision VMS",
-  "description": "E-Commerce Order Packing Video Management System with Webcam Recording and Telegram Integration",
+  "name": "TrackVid VMS",
+  "description": "TrackVid E-Commerce Packing Video Management System and Telegram Evidence Portal",
   "requestFramePermissions": [
     "camera",
     "microphone"
