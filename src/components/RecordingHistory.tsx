@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, RefreshCw, ExternalLink } from 'lucide-react';
+import { Download, RefreshCw, ExternalLink, History, FileText } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface RecordingHistoryProps {
@@ -23,86 +23,117 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `vms_history_${Date.now()}.csv`);
+    link.setAttribute('download', `zuboc_audit_history_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
       
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-white">Recording History Audit Log</h2>
-          <p className="text-xs text-zinc-400">Recorded packing evidence and Telegram upload references</p>
-        </div>
+      {/* Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800/80 p-8 shadow-2xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={exportCSV}
-            className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
-          <button
-            onClick={onRefresh}
-            className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
-          </button>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-mono font-bold tracking-wider">
+              <History className="w-3.5 h-3.5" />
+              <span>IMMUTABLE AUDIT TRAIL</span>
+            </div>
+            <h1 className="text-3xl font-black text-white tracking-tight">
+              Recording History & Telemetry
+            </h1>
+            <p className="text-sm text-slate-400 max-w-2xl">
+              Complete chronological audit ledger of all packing sessions, video digests, operator IDs, and Telegram channel dispatch delivery status.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={exportCSV}
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-cyan-400" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              onClick={onRefresh}
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700/80 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Sync Log</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-zinc-300 font-mono">
-            <thead className="bg-zinc-950 text-zinc-500 uppercase border-b border-zinc-800">
-              <tr>
-                <th className="px-5 py-3">Order ID</th>
-                <th className="px-5 py-3">Station</th>
-                <th className="px-5 py-3">Staff</th>
-                <th className="px-5 py-3">Duration</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Recorded At</th>
-                <th className="px-5 py-3 text-right">Telegram</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {orders.map(order => (
-                <tr key={order.orderId} className="hover:bg-zinc-800/40 transition-colors">
-                  <td className="px-5 py-3.5 font-bold text-white">{order.orderId}</td>
-                  <td className="px-5 py-3.5 text-zinc-400">{order.stationId}</td>
-                  <td className="px-5 py-3.5 text-zinc-400">{order.staffId}</td>
-                  <td className="px-5 py-3.5 text-zinc-400">{order.durationSeconds}s</td>
-                  <td className="px-5 py-3.5">
-                    <span className={order.uploadStatus === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'}>
-                      {order.uploadStatus}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-zinc-500">{new Date(order.createdAt).toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right font-sans">
-                    {order.telegramMessageLink ? (
-                      <a
-                        href={order.telegramMessageLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-400 hover:underline inline-flex items-center gap-1 text-xs"
-                      >
-                        <span>View</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="text-zinc-600">-</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Table Card */}
+      <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 bg-slate-950/80 border-b border-slate-800 font-mono text-xs font-bold text-slate-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-cyan-400" />
+            <span>FULL LEDGER ENTRIES ({orders.length})</span>
+          </div>
+          <span className="text-[11px] text-slate-500">Encrypted Storage</span>
         </div>
+
+        {orders.length === 0 ? (
+          <div className="p-16 text-center text-xs text-slate-500 font-mono">
+            No recording history entries found.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-slate-950/40 text-slate-400 uppercase font-semibold border-b border-slate-800 tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Order AWB / ID</th>
+                  <th className="px-6 py-4">Station ID</th>
+                  <th className="px-6 py-4">Operator</th>
+                  <th className="px-6 py-4">Duration</th>
+                  <th className="px-6 py-4">Telegram Dispatch</th>
+                  <th className="px-6 py-4">Timestamp</th>
+                  <th className="px-6 py-4 text-right">Evidence Link</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {orders.map(order => (
+                  <tr key={order.orderId} className="hover:bg-slate-800/40 transition-colors group">
+                    <td className="px-6 py-4 font-bold text-white text-sm">{order.orderId}</td>
+                    <td className="px-6 py-4 text-slate-300">{order.stationId}</td>
+                    <td className="px-6 py-4 text-slate-300">{order.staffId}</td>
+                    <td className="px-6 py-4 text-cyan-400 font-bold">{order.durationSeconds}s</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider inline-flex items-center gap-1.5 ${
+                        order.uploadStatus === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${order.uploadStatus === 'SUCCESS' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
+                        {order.uploadStatus}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-400 text-[11px]">{new Date(order.createdAt).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-sans">
+                      {order.telegramMessageLink ? (
+                        <a
+                          href={order.telegramMessageLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl text-xs font-bold transition-all group-hover:scale-105"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
     </div>

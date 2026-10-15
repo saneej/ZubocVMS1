@@ -186,8 +186,8 @@ export default function App() {
 
       <UploadQueueBanner />
 
-      <footer className="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        PackVision VMS — Enterprise Order Packing Evidence System
+      <footer className="bg-slate-900 border-t border-slate-800 py-6 text-center text-xs text-slate-500 font-mono">
+        Zuboc VMS — Enterprise Order Packing Evidence & Telegram Video Portal
       </footer>
 
     </div>
