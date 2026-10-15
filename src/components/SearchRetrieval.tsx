@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
 import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar } from 'lucide-react';
 import { OrderRecord } from '../types';
@@ -23,10 +23,33 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
   
-  // Edit modal state fields
+  // All editable order fields
+  const [editAwb, setEditAwb] = useState('');
+  const [editCourier, setEditCourier] = useState('');
+  const [editWeight, setEditWeight] = useState('');
+  const [editSku, setEditSku] = useState('');
+  const [editItemCount, setEditItemCount] = useState<string | number>('1');
+  const [editCustomer, setEditCustomer] = useState('');
+  const [editContactPerson, setEditContactPerson] = useState('');
+  const [editContactPhone, setEditContactPhone] = useState('');
+  const [editOrderReceivedDate, setEditOrderReceivedDate] = useState('');
+  const [editDispatchDate, setEditDispatchDate] = useState('');
+  const [editOrderAmount, setEditOrderAmount] = useState('');
+  const [editShippingAmount, setEditShippingAmount] = useState('');
+  const [editOrderTotal, setEditOrderTotal] = useState('');
   const [editDeliveredDate, setEditDeliveredDate] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
+
+  // Auto-calculate total when orderAmount or shippingAmount changes in edit modal
+  useEffect(() => {
+    const ord = parseFloat(editOrderAmount) || 0;
+    const shp = parseFloat(editShippingAmount) || 0;
+    if (ord > 0 || shp > 0) {
+      setEditOrderTotal((ord + shp).toFixed(2));
+    }
+  }, [editOrderAmount, editShippingAmount]);
 
   const filteredOrders = orders.filter(order => {
     const q = searchTerm.toLowerCase();
@@ -59,6 +82,19 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   const openEditModal = (order: OrderRecord) => {
     setEditingOrder(order);
+    setEditAwb(order.awbNumber || '');
+    setEditCourier(order.courier || '');
+    setEditWeight(order.weight || '');
+    setEditSku(order.productSku || '');
+    setEditItemCount(order.itemCount || '1');
+    setEditCustomer(order.customerName || '');
+    setEditContactPerson(order.contactPerson || '');
+    setEditContactPhone(order.contactPhone || '');
+    setEditOrderReceivedDate(order.orderReceivedDate || '');
+    setEditDispatchDate(order.dispatchDate || '');
+    setEditOrderAmount(order.orderAmount || '');
+    setEditShippingAmount(order.shippingAmount || '');
+    setEditOrderTotal(order.orderTotal || '');
     setEditDeliveredDate(order.deliveredDate || '');
     setEditNotes(order.notes || '');
   };
@@ -70,37 +106,67 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     const nowIso = new Date().toISOString();
     const newLogs = [...(editingOrder.auditLogs || [])];
 
-    if (editingOrder.deliveredDate !== editDeliveredDate) {
-      newLogs.push({
-        timestamp: nowIso,
-        staffId: currentStaffId,
-        action: 'UPDATE_DELIVERED_DATE',
-        details: `Delivered Date changed from "${editingOrder.deliveredDate || 'None'}" to "${editDeliveredDate || 'None'}"`,
-        type: 'CHANGE_LOG'
-      });
-    }
+    // Check changes for change logs
+    const checkChange = (fieldName: string, oldVal: any, newVal: any) => {
+      if (oldVal !== newVal) {
+        newLogs.push({
+          timestamp: nowIso,
+          staffId: currentStaffId,
+          action: `UPDATE_${fieldName.toUpperCase()}`,
+          details: `${fieldName} changed from "${oldVal || 'None'}" to "${newVal || 'None'}"`,
+          type: 'CHANGE_LOG'
+        });
+      }
+    };
 
-    if (editingOrder.notes !== editNotes) {
-      newLogs.push({
-        timestamp: nowIso,
-        staffId: currentStaffId,
-        action: 'UPDATE_NOTES',
-        details: `Notes updated`,
-        type: 'EDIT_LOG'
-      });
-    }
+    checkChange('AWB Number', editingOrder.awbNumber, editAwb.trim());
+    checkChange('Courier', editingOrder.courier, editCourier.trim());
+    checkChange('Weight', editingOrder.weight, editWeight.trim());
+    checkChange('SKU', editingOrder.productSku, editSku.trim());
+    checkChange('Quantity', editingOrder.itemCount, editItemCount);
+    checkChange('Customer', editingOrder.customerName, editCustomer.trim());
+    checkChange('Contact Person', editingOrder.contactPerson, editContactPerson.trim());
+    checkChange('Contact Phone', editingOrder.contactPhone, editContactPhone.trim());
+    checkChange('Received Date', editingOrder.orderReceivedDate, editOrderReceivedDate);
+    checkChange('Despatch Date', editingOrder.dispatchDate, editDispatchDate);
+    checkChange('Order Amount', editingOrder.orderAmount, editOrderAmount.trim());
+    checkChange('Shipping Amount', editingOrder.shippingAmount, editShippingAmount.trim());
+    checkChange('Total Amount', editingOrder.orderTotal, editOrderTotal.trim());
+    checkChange('Delivered Date', editingOrder.deliveredDate, editDeliveredDate);
+    checkChange('Notes', editingOrder.notes, editNotes.trim());
+
+    newLogs.push({
+      timestamp: nowIso,
+      staffId: currentStaffId,
+      action: 'USER_EDIT_ORDER',
+      details: `Order details edited and saved by staff ${currentStaffId}`,
+      type: 'EDIT_LOG'
+    });
 
     newLogs.push({
       timestamp: nowIso,
       staffId: currentStaffId,
       action: 'USER_ACTION',
-      details: `Order updated by staff ${currentStaffId}`,
+      details: `User action logged for order ${editingOrder.orderId}`,
       type: 'USER_LOG'
     });
 
     const updated: OrderRecord = {
       ...editingOrder,
-      deliveredDate: editDeliveredDate.trim() || undefined,
+      awbNumber: editAwb.trim() || undefined,
+      courier: editCourier.trim() || undefined,
+      weight: editWeight.trim() || undefined,
+      productSku: editSku.trim() || undefined,
+      itemCount: editItemCount,
+      customerName: editCustomer.trim() || undefined,
+      contactPerson: editContactPerson.trim() || undefined,
+      contactPhone: editContactPhone.trim() || undefined,
+      orderReceivedDate: editOrderReceivedDate || undefined,
+      dispatchDate: editDispatchDate || undefined,
+      orderAmount: editOrderAmount.trim() || undefined,
+      shippingAmount: editShippingAmount.trim() || undefined,
+      orderTotal: editOrderTotal.trim() || undefined,
+      deliveredDate: editDeliveredDate || undefined,
       notes: editNotes.trim() || undefined,
       auditLogs: newLogs,
       updatedAt: nowIso
@@ -111,7 +177,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   };
 
   const exportFilteredCSV = () => {
-    const headers = ['Order ID', 'AWB Number', 'Courier', 'Weight', 'Product SKU', 'Quantity', 'Customer', 'Received Date', 'Despatch Date', 'Order Amount', 'Shipping Amount', 'Total Amount', 'Delivered Date', 'Notes', 'Station', 'Operator', 'Upload Status', 'Timestamp (IST)'];
+    const headers = ['Order ID', 'AWB Number', 'Courier', 'Weight', 'Product SKU', 'Quantity', 'Customer', 'Contact Person', 'Contact Phone', 'Received Date', 'Despatch Date', 'Order Amount', 'Shipping Amount', 'Total Amount', 'Delivered Date', 'Notes', 'Station', 'Operator', 'Upload Status', 'Timestamp (IST)'];
     const rows = filteredOrders.map(o => [
       `"${o.orderId}"`,
       `"${o.awbNumber || ''}"`,
@@ -120,6 +186,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       `"${o.productSku || ''}"`,
       `"${o.itemCount || ''}"`,
       `"${o.customerName || ''}"`,
+      `"${o.contactPerson || ''}"`,
+      `"${o.contactPhone || ''}"`,
       `"${o.orderReceivedDate || ''}"`,
       `"${o.dispatchDate || ''}"`,
       `"${o.orderAmount || ''}"`,
@@ -328,17 +396,17 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         </div>
       </div>
 
-      {/* EDIT ORDER & AUDIT LOGS MODAL */}
+      {/* FULL EDIT ORDER & AUDIT LOGS MODAL */}
       {editingOrder && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
             {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-blue-400" />
                 <h3 className="text-sm font-mono font-bold uppercase tracking-wider">
-                  Order Edit & Audit Logs • {editingOrder.orderId}
+                  Edit All Order Details & Audit Logs • {editingOrder.orderId}
                 </h3>
               </div>
               <button
@@ -354,57 +422,173 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
               
               {/* Form Section */}
               <form onSubmit={handleSaveOrderEdit} id="edit-order-form" className="space-y-4 font-mono text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   
+                  {/* AWB */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">AWB / Tracking</label>
+                    <input
+                      type="text"
+                      value={editAwb}
+                      onChange={(e) => setEditAwb(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Courier */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Courier Partner</label>
+                    <input
+                      type="text"
+                      value={editCourier}
+                      onChange={(e) => setEditCourier(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Weight */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Weight</label>
+                    <input
+                      type="text"
+                      value={editWeight}
+                      onChange={(e) => setEditWeight(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* SKU */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Item / SKU</label>
+                    <input
+                      type="text"
+                      value={editSku}
+                      onChange={(e) => setEditSku(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Qty */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Quantity</label>
+                    <input
+                      type="text"
+                      value={editItemCount}
+                      onChange={(e) => setEditItemCount(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Customer */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Customer / City</label>
+                    <input
+                      type="text"
+                      value={editCustomer}
+                      onChange={(e) => setEditCustomer(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Contact Person */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Contact Person</label>
+                    <input
+                      type="text"
+                      value={editContactPerson}
+                      onChange={(e) => setEditContactPerson(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Contact Phone */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Contact Phone</label>
+                    <input
+                      type="text"
+                      value={editContactPhone}
+                      onChange={(e) => setEditContactPhone(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Received Date */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Order Received Date</label>
+                    <input
+                      type="date"
+                      value={editOrderReceivedDate}
+                      onChange={(e) => setEditOrderReceivedDate(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Despatch Date */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Despatch Date</label>
+                    <input
+                      type="date"
+                      value={editDispatchDate}
+                      onChange={(e) => setEditDispatchDate(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Order Amount */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Order Amount (₹)</label>
+                    <input
+                      type="text"
+                      value={editOrderAmount}
+                      onChange={(e) => setEditOrderAmount(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Shipping Amount */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Shipping Amount (₹)</label>
+                    <input
+                      type="text"
+                      value={editShippingAmount}
+                      onChange={(e) => setEditShippingAmount(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Total Amount */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Total Amount (₹)</label>
+                    <input
+                      type="text"
+                      value={editOrderTotal}
+                      onChange={(e) => setEditOrderTotal(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
                   {/* Delivered Date */}
-                  <div className="bg-emerald-50/60 border border-emerald-200 p-3 rounded-xl space-y-1">
-                    <label className="block text-[11px] font-bold text-emerald-800 uppercase flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Delivered Date (Editable Post-Delivery)</span>
-                    </label>
+                  <div className="bg-emerald-50/60 border border-emerald-200 p-2 rounded-lg">
+                    <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">Delivered Date</label>
                     <input
                       type="date"
                       value={editDeliveredDate}
                       onChange={(e) => setEditDeliveredDate(e.target.value)}
-                      className="w-full bg-white border border-emerald-300 focus:border-emerald-600 rounded-lg px-3 py-2 text-slate-900 font-bold focus:outline-none"
+                      className="w-full bg-white border border-emerald-300 focus:border-emerald-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
-                    <p className="text-[10px] text-emerald-600">Update this date once the package reaches the customer.</p>
                   </div>
 
                   {/* Notes */}
-                  <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-1">
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase">
-                      Order Notes / QC Remarks
-                    </label>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Notes / QC Remarks</label>
                     <input
                       type="text"
                       value={editNotes}
                       onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Add notes..."
-                      className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-3 py-2 text-slate-900 font-bold focus:outline-none"
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
-                    <p className="text-[10px] text-slate-500">Remarks visible in Telegram caption & dashboard.</p>
                   </div>
 
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">AWB:</span>
-                    <strong className="text-slate-800">{editingOrder.awbNumber || '—'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Courier:</span>
-                    <strong className="text-slate-800">{editingOrder.courier || '—'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Amount:</span>
-                    <strong className="text-slate-800">₹{editingOrder.orderTotal || editingOrder.orderAmount || '0'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Customer:</span>
-                    <strong className="text-slate-800">{editingOrder.customerName || '—'}</strong>
-                  </div>
                 </div>
               </form>
 
@@ -436,7 +620,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                 <div className="bg-slate-900 text-slate-200 font-mono text-xs rounded-2xl p-4 space-y-2 max-h-48 overflow-y-auto">
                   {(!editingOrder.auditLogs || editingOrder.auditLogs.filter(l => l.type === activeLogTab).length === 0) ? (
                     <div className="text-slate-500 text-center py-4">
-                      No {activeLogTab.toLowerCase().replace('_', ' ')}s recorded for this order yet. Edit and save to record logs.
+                      No {activeLogTab.toLowerCase().replace('_', ' ')}s recorded for this order yet. Edit and save changes to record logs.
                     </div>
                   ) : (
                     editingOrder.auditLogs
@@ -470,7 +654,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                 form="edit-order-form"
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-md"
               >
-                SAVE CHANGES & LOG
+                SAVE ALL CHANGES & LOG
               </button>
             </div>
 
