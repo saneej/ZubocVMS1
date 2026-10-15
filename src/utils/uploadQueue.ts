@@ -10,6 +10,8 @@ export interface UploadTask {
   durationSeconds: number;
   videoBlob: Blob;
   recordingDate: string;
+  width?: number;
+  height?: number;
   progress: number; // 0 to 100
   status: 'QUEUED' | 'UPLOADING' | 'SUCCESS' | 'FAILED';
   error?: string;
@@ -134,6 +136,16 @@ class UploadQueueManager {
       formData.append('chat_id', cleanChatId);
       formData.append('caption', caption);
       formData.append('parse_mode', 'HTML');
+      formData.append('supports_streaming', 'true');
+      
+      const width = task.width || 1920;
+      const height = task.height || 1080;
+      formData.append('width', width.toString());
+      formData.append('height', height.toString());
+      if (task.durationSeconds > 0) {
+        formData.append('duration', Math.round(task.durationSeconds).toString());
+      }
+
       formData.append('video', task.videoBlob, `${safeOrderId}.mp4`);
 
       const xhr = new XMLHttpRequest();
@@ -195,6 +207,8 @@ class UploadQueueManager {
       formData.append('stationId', task.stationId);
       formData.append('durationSeconds', task.durationSeconds.toString());
       formData.append('recordingDate', task.recordingDate);
+      formData.append('width', (task.width || 1920).toString());
+      formData.append('height', (task.height || 1080).toString());
       formData.append('video', task.videoBlob, `${task.orderId}.mp4`);
 
       xhr.upload.onprogress = (event) => {
@@ -261,6 +275,8 @@ class UploadQueueManager {
               stationId: task.stationId,
               durationSeconds: task.durationSeconds,
               recordingDate: task.recordingDate,
+              width: task.width || 1920,
+              height: task.height || 1080,
               videoBase64: base64data
             })
           });

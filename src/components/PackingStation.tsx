@@ -421,13 +421,20 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const handleFinalConfirmUpload = () => {
     if (!activeOrderId || !recordedBlob) return;
 
+    const videoTrack = mediaStreamRef.current?.getVideoTracks()[0];
+    const trackSettings = videoTrack?.getSettings();
+    const width = trackSettings?.width || videoRef.current?.videoWidth || 1920;
+    const height = trackSettings?.height || videoRef.current?.videoHeight || 1080;
+
     uploadQueueManager.addTask({
       orderId: activeOrderId,
       staffId: currentStaff.id,
       stationId: settings.stationId,
       durationSeconds: timerSeconds,
       videoBlob: recordedBlob,
-      recordingDate: new Date().toISOString()
+      recordingDate: new Date().toISOString(),
+      width,
+      height
     });
 
     onOrderCompleted({

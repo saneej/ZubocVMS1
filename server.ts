@@ -494,6 +494,15 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     formData.append('chat_id', chatId);
     formData.append('caption', caption);
     formData.append('parse_mode', 'HTML');
+    formData.append('supports_streaming', 'true');
+
+    const width = Number(req.body.width) || 1920;
+    const height = Number(req.body.height) || 1080;
+    formData.append('width', width.toString());
+    formData.append('height', height.toString());
+    if (durationSeconds > 0) {
+      formData.append('duration', Math.round(durationSeconds).toString());
+    }
     
     const videoBlob = new Blob([new Uint8Array(videoBuffer)], { type: 'video/mp4' });
     formData.append('video', videoBlob, `${safeOrderId}.mp4`);
