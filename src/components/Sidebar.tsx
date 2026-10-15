@@ -71,15 +71,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => { setActiveTab('station'); setIsMobileOpen(false); }}>
-              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-mono font-bold shadow-md shadow-blue-500/20">
-                <Video className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900 font-sans">ZUBOC</span>
-                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200/60 font-mono">
-                  VMS
-                </span>
-              </div>
+              <img 
+                src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=500" 
+                alt="Zuboc Logo" 
+                className="h-8 w-auto object-contain max-w-[160px]"
+              />
             </div>
 
             <button 

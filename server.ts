@@ -22,8 +22,8 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
   try {
     fs.writeFileSync(inputPath, inputBuffer);
 
-    // Fast transcode to baseline H.264 MP4 with yuv420p and faststart moov atom
-    const ffmpegCmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -movflags +faststart "${outputPath}" -y`;
+    // Fast transcode to baseline H.264 MP4 with yuv420p, even dimensions, aac audio, and faststart moov atom
+    const ffmpegCmd = `ffmpeg -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:a aac -b:a 128k -movflags +faststart "${outputPath}" -y`;
     await execPromise(ffmpegCmd, { timeout: 30000 });
 
     if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {

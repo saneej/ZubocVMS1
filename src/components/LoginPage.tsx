@@ -140,15 +140,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-md space-y-6">
         
         {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-500/25 mb-1">
-            <Video className="w-7 h-7" />
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight font-sans">ZUBOC</h1>
-            <span className="text-xs font-extrabold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-mono border border-blue-200">
-              VMS
-            </span>
+        <div className="text-center space-y-3">
+          <div className="flex justify-center mb-1">
+            <img 
+              src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=500" 
+              alt="Zuboc Logo" 
+              className="h-10 w-auto object-contain max-w-[200px]"
+            />
           </div>
           <p className="text-xs text-slate-500 font-medium">
             Warehouse Video Evidence & Packing Verification Portal
