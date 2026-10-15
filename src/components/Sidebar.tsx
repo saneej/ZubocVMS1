@@ -103,19 +103,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     w-full text-left px-3.5 py-2.5 rounded-xl font-medium text-xs transition-all
                     flex items-center justify-between cursor-pointer
                     ${isActive 
-                      ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/20' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                      ? 'bg-[#832f5e] text-white font-bold shadow-md shadow-[#832f5e]/20' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-stone-100/80'
                     }
                   `}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-stone-400'}`} />
                     <span>{item.label}</span>
                   </div>
 
                   {item.badge && (
                     <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                      isActive ? 'bg-white text-blue-700' : 'bg-blue-100 text-blue-700'
+                      isActive ? 'bg-white text-[#832f5e]' : 'bg-[#832f5e]/10 text-[#832f5e]'
                     }`}>
                       {item.badge}
                     </span>
@@ -127,15 +127,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bottom Section: Operator Account & Settings */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-2">
+        <div className="p-4 border-t border-stone-100 bg-stone-50/50 space-y-2">
           
           {/* Quick Settings */}
           <button
             onClick={onOpenSettings}
-            className="w-full px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium flex items-center justify-between transition-colors cursor-pointer shadow-2xs"
+            className="w-full px-3 py-2 rounded-xl bg-white hover:bg-stone-100 text-slate-700 border border-stone-200 text-xs font-medium flex items-center justify-between transition-colors cursor-pointer shadow-2xs"
           >
             <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-blue-600" />
+              <Settings className="w-4 h-4 text-[#832f5e]" />
               <span>Settings</span>
             </div>
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold font-mono ${

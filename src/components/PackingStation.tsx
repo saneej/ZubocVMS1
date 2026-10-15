@@ -23,7 +23,12 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  Box
+  Box,
+  CameraOff,
+  Info,
+  PackagePlus,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
@@ -33,6 +38,9 @@ interface PackingStationProps {
   settings: AppSettings;
   onOrderCompleted: (record: OrderRecord) => void;
   existingOrders: OrderRecord[];
+  onOpenPreEnter?: () => void;
+  selectedOrderForPacking?: OrderRecord | null;
+  onClearSelectedPackingOrder?: () => void;
 }
 
 type StationStep = 'READY' | 'RECORDING' | 'CONFIRM';
@@ -86,15 +94,18 @@ async function getCameraStream(deviceId?: string): Promise<MediaStream> {
     { video: true }
   ];
 
-  for (const constraint of constraintsToTry) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraint);
-      if (stream) return stream;
-    } catch {
-      // Try next fallback constraint
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    for (const constraint of constraintsToTry) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraint);
+        if (stream) return stream;
+      } catch {
+        // Try next fallback constraint
+      }
     }
   }
-  throw new Error('Webcam stream unavailable. Please check camera connection and permissions.');
+
+  throw new Error('Webcam stream unavailable. Please check camera connection and allow camera permissions in your browser.');
 }
 
 // Initialize MediaRecorder reliably across Chrome, Safari, Edge, Firefox
@@ -126,7 +137,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   currentStaff,
   settings,
   onOrderCompleted,
-  existingOrders
+  existingOrders,
+  onOpenPreEnter,
+  selectedOrderForPacking,
+  onClearSelectedPackingOrder
 }) => {
   const [step, setStep] = useState<StationStep>('READY');
   const [mode, setMode] = useState<EvidenceMode>('both'); // Default: Photo + Video
@@ -324,13 +338,12 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   }, []);
 
   // Handler: Take photo directly
-  const handleTakeSnapshot = () => {
+  const handleTakeSnapshot = useCallback(() => {
     setStationError(null);
-    const cleanId = orderIdInput.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
+    let cleanId = orderIdInput.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
     if (!cleanId && !activeOrderId) {
-      setStationError('Please type or scan an Order ID before taking photos.');
-      scanInputRef.current?.focus();
-      return;
+      cleanId = `ORD-SNAP-${Date.now().toString().slice(-5)}`;
+      setOrderIdInput(cleanId);
     }
 
     const currentId = activeOrderId || cleanId;
@@ -350,7 +363,55 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         setStep('CONFIRM');
       }
     }
-  };
+  }, [capturePhoto, orderIdInput, activeOrderId, mode, step]);
+
+  // Keyboard shortcut: Press 'Space', 'S', 'C', or 'P' key to capture image while recording or in live feed
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (e.key === ' ' || e.code === 'Space' || e.key === 'c' || e.key === 'C' || e.key === 's' || e.key === 'S' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        handleTakeSnapshot();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleTakeSnapshot]);
+
+  const handleSelectForPacking = useCallback((ord: OrderRecord) => {
+    setOrderIdInput(ord.orderId);
+    setActiveOrderId(ord.orderId);
+    setAwbInput(ord.awbNumber || '');
+    setCourierInput(ord.courier || '');
+    setWeightInput(ord.weight || '');
+    setSkuInput(ord.productSku || '');
+    setCustomerInput(ord.customerName || '');
+    setContactPersonInput(ord.contactPerson || '');
+    setContactPhoneInput(ord.contactPhone || '');
+    setOrderReceivedDateInput(ord.orderReceivedDate || '');
+    setDispatchDateInput(ord.dispatchDate || '');
+    setOrderAmountInput(ord.orderAmount || '');
+    setShippingAmountInput(ord.shippingAmount || '');
+    setOrderTotalInput(ord.orderTotal || '');
+    setDeliveredDateInput(ord.deliveredDate || '');
+    setItemCountInput(ord.itemCount ? String(ord.itemCount) : '1');
+    setNotesInput(ord.notes || '');
+    setShowPackageDetails(true);
+    playFeedbackTone('beep');
+    scanInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (selectedOrderForPacking) {
+      handleSelectForPacking(selectedOrderForPacking);
+      if (onClearSelectedPackingOrder) {
+        onClearSelectedPackingOrder();
+      }
+    }
+  }, [selectedOrderForPacking, handleSelectForPacking, onClearSelectedPackingOrder]);
 
   const handleRemovePhoto = (photoId: string) => {
     setCapturedPhotos(prev => prev.filter(p => p.id !== photoId));
@@ -609,14 +670,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }, 100);
   };
 
-  // Quick Auto-Generate Order ID
-  const handleGenerateOrderId = () => {
-    const randomDigits = Math.floor(100000 + Math.random() * 900000);
-    const newId = `ORD-${randomDigits}`;
-    setOrderIdInput(newId);
-    setStationError(null);
-  };
-
   // Format MM:SS
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -627,6 +680,35 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const todayCount = existingOrders.filter(o => 
     new Date(o.createdAt).toDateString() === new Date().toDateString()
   ).length;
+
+  const pendingPreOrders = existingOrders.filter(o => 
+    o.recordingStatus === 'PENDING' || (o.recordingStatus as string) === 'NOT_RECORDED'
+  );
+
+  const handleStartPackingPreOrder = (ord: OrderRecord) => {
+    setOrderIdInput(ord.orderId);
+    setActiveOrderId(ord.orderId);
+    if (ord.awbNumber) setAwbInput(ord.awbNumber);
+    if (ord.courier) setCourierInput(ord.courier);
+    if (ord.weight) setWeightInput(ord.weight);
+    if (ord.productSku) setSkuInput(ord.productSku);
+    if (ord.customerName) setCustomerInput(ord.customerName);
+    if (ord.contactPerson) setContactPersonInput(ord.contactPerson);
+    if (ord.contactPhone) setContactPhoneInput(ord.contactPhone);
+    if (ord.orderReceivedDate) setOrderReceivedDateInput(ord.orderReceivedDate);
+    if (ord.dispatchDate) setDispatchDateInput(ord.dispatchDate);
+    if (ord.orderAmount) setOrderAmountInput(ord.orderAmount);
+    if (ord.shippingAmount) setShippingAmountInput(ord.shippingAmount);
+    if (ord.orderTotal) setOrderTotalInput(ord.orderTotal);
+    if (ord.deliveredDate) setDeliveredDateInput(ord.deliveredDate);
+    if (ord.itemCount) setItemCountInput(String(ord.itemCount));
+    if (ord.notes) setNotesInput(ord.notes);
+    setShowPackageDetails(true);
+    setStationError(null);
+
+    scanInputRef.current?.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5 font-sans">
@@ -787,15 +869,30 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 <div className="absolute inset-0 bg-white/90 z-20 pointer-events-none transition-opacity duration-150 animate-fadeOut" />
               )}
 
-              {cameraError ? (
-                <div className="p-8 text-center text-slate-400 max-w-md z-10 font-mono">
-                  <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                  <p className="text-xs mb-3">{cameraError}</p>
+              {cameraError || !cameraActive ? (
+                <div className="p-6 text-center text-slate-200 max-w-lg z-10 font-sans bg-stone-900/95 rounded-2xl border border-stone-800 shadow-2xl m-4">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3 border border-amber-500/30">
+                    <CameraOff className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mb-1">Camera Connection & Permission</h3>
+                  <p className="text-xs text-stone-300 mb-3 leading-relaxed">
+                    {cameraError || 'Webcam stream is unavailable or blocked. Please verify camera hardware connection and grant camera permissions.'}
+                  </p>
+                  <div className="bg-stone-800/90 p-3 rounded-xl border border-stone-700/80 text-[11px] text-stone-300 max-w-md mx-auto mb-4 font-mono text-left space-y-1">
+                    <p className="font-bold text-amber-400 flex items-center gap-1">
+                      <Info className="w-3.5 h-3.5 shrink-0" /> Allow Camera Permission Instructions:
+                    </p>
+                    <p>1. Click the lock or camera icon in your browser URL bar</p>
+                    <p>2. Set "Camera" permission to <b>Allow</b></p>
+                    <p>3. Click "Retry Camera Connection" below</p>
+                  </div>
                   <button
+                    type="button"
                     onClick={() => initCamera()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+                    className="px-5 py-2.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg inline-flex items-center gap-2"
                   >
-                    Reconnect Camera
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Retry Camera Connection</span>
                   </button>
                 </div>
               ) : (
@@ -808,16 +905,27 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                     className="w-full h-full object-cover block"
                   />
 
+                  {/* Floating Button to Capture Image */}
+                  <button
+                    type="button"
+                    onClick={handleTakeSnapshot}
+                    className="absolute top-3 right-3 bg-[#832f5e] hover:bg-[#6c234b] text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg z-20 cursor-pointer transition-all active:scale-95 border border-white/20"
+                    title="Press 'C' or Spacebar to capture image"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                    <span>Capture Image</span>
+                  </button>
+
                   {/* Recording Badge Overlay with Persistent Timer, Progress Bar & Uploaded Chunks */}
                   {isRecording && (
-                    <div className="absolute top-3 left-3 right-3 flex flex-col gap-1.5 z-20 pointer-events-none">
+                    <div className="absolute top-3 left-3 right-40 flex flex-col gap-1.5 z-20 pointer-events-none">
                       <div className="bg-rose-600/90 text-white px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center justify-between shadow-lg backdrop-blur">
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-                          <span>REC SESSION: {formatTime(timerSeconds)} (10m+ Min Packing)</span>
+                          <span>REC SESSION: {formatTime(timerSeconds)}</span>
                         </div>
                         <div className="text-[11px] text-rose-100">
-                          Chunks Recorded: {chunksRef.current.length} • Uploaded: {queueTasks.filter(t => t.orderId === activeOrderId && t.status === 'SUCCESS').length}
+                          Chunks: {chunksRef.current.length}
                         </div>
                       </div>
                       {/* Persistent Progress Bar */}
@@ -837,7 +945,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
                   {/* Photo Snapshots Count Overlay */}
                   {capturedPhotos.length > 0 && (
-                    <div className="absolute bottom-3 right-3 bg-blue-600/90 text-white px-2.5 py-1 rounded-md text-[11px] font-mono font-bold flex items-center gap-1.5 shadow-md">
+                    <div className="absolute bottom-3 right-3 bg-[#832f5e]/90 text-white px-2.5 py-1 rounded-md text-[11px] font-mono font-bold flex items-center gap-1.5 shadow-md">
                       <ImageIcon className="w-3.5 h-3.5" />
                       <span>{capturedPhotos.length} {capturedPhotos.length === 1 ? 'PHOTO' : 'PHOTOS'}</span>
                     </div>
@@ -888,17 +996,21 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                         )}
                       </div>
 
-                      {/* Quick Auto-Generate ID Button */}
-                      <button
-                        type="button"
-                        onClick={handleGenerateOrderId}
-                        className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-mono font-bold border border-slate-200 cursor-pointer transition-colors"
-                        title="Auto-generate a random order ID for fast testing"
-                      >
-                        + GEN ID
-                      </button>
+                      {/* Pre-Enter Order Button on Home Page */}
+                      {onOpenPreEnter && (
+                        <button
+                          type="button"
+                          onClick={onOpenPreEnter}
+                          className="px-4 py-2.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl text-xs font-bold shadow-md cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
+                          title="Pre-enter order details before recording"
+                        >
+                          <PackagePlus className="w-4 h-4" />
+                          <span>Pre-Enter Order</span>
+                        </button>
+                      )}
                     </div>
                   </div>
+
 
                   {/* Package & Shipment Details Panel */}
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
@@ -1191,22 +1303,23 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
                     {/* PHOTO + VIDEO MODE BUTTONS */}
                     {mode === 'both' && (
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Standalone Button to Capture Image */}
                         <button
                           type="button"
                           onClick={handleTakeSnapshot}
-                          disabled={!orderIdInput.trim()}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold text-xs px-5 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm font-mono uppercase tracking-wider"
+                          className="bg-[#832f5e] hover:bg-[#6c234b] text-white font-bold text-xs px-5 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-md uppercase tracking-wider font-sans"
+                          title="Press 'C' or Spacebar on keyboard to capture image"
                         >
-                          <Camera className="w-4 h-4" />
-                          <span>SNAP PHOTO</span>
+                          <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                          <span>CAPTURE IMAGE</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={handleStartRecording}
                           disabled={!orderIdInput.trim()}
-                          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm font-mono uppercase tracking-wider"
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm font-sans uppercase tracking-wider"
                         >
                           <Play className="w-4 h-4 fill-current" />
                           <span>START VIDEO + PHOTOS</span>
@@ -1241,10 +1354,11 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                       <button
                         type="button"
                         onClick={handleTakeSnapshot}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                        className="bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer shadow-md transition-all active:scale-95 font-sans"
+                        title="Press 'Space', 'S', or 'C' key on keyboard to snap photo frame while recording"
                       >
-                        <Camera className="w-4 h-4" />
-                        <span>SNAP PHOTO ({capturedPhotos.length})</span>
+                        <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                        <span>SNAP PHOTO (Press 'Space' / 'S') [{capturedPhotos.length}]</span>
                       </button>
 
                       {/* Stop Recording */}
@@ -1352,21 +1466,21 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                         Package Details for Telegram Caption & Dashboard:
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs">
-                        {awbInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">🚚 AWB: <strong>{awbInput}</strong></span>}
-                        {courierInput && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">🏢 Courier: <strong>{courierInput}</strong></span>}
-                        {weightInput && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">⚖️ Weight: <strong>{weightInput}</strong></span>}
-                        {skuInput && <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200">🏷️ SKU: <strong>{skuInput}</strong></span>}
+                        {awbInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">AWB: <strong>{awbInput}</strong></span>}
+                        {courierInput && <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">Courier: <strong>{courierInput}</strong></span>}
+                        {weightInput && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">Weight: <strong>{weightInput}</strong></span>}
+                        {skuInput && <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-200">SKU: <strong>{skuInput}</strong></span>}
                         {itemCountInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Qty: <strong>{itemCountInput}</strong></span>}
-                        {customerInput && <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">👤 Customer: <strong>{customerInput}</strong></span>}
-                        {contactPersonInput && <span className="bg-cyan-50 text-cyan-800 px-2 py-0.5 rounded border border-cyan-200">📞 Contact: <strong>{contactPersonInput}</strong></span>}
-                        {contactPhoneInput && <span className="bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">📱 Phone: <strong>{contactPhoneInput}</strong></span>}
+                        {customerInput && <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">Customer: <strong>{customerInput}</strong></span>}
+                        {contactPersonInput && <span className="bg-cyan-50 text-cyan-800 px-2 py-0.5 rounded border border-cyan-200">Contact: <strong>{contactPersonInput}</strong></span>}
+                        {contactPhoneInput && <span className="bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">Phone: <strong>{contactPhoneInput}</strong></span>}
                         {orderReceivedDateInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Received: <strong>{orderReceivedDateInput}</strong></span>}
                         {dispatchDateInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Despatch: <strong>{dispatchDateInput}</strong></span>}
                         {orderAmountInput && <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">Amount: <strong>₹{orderAmountInput}</strong></span>}
                         {shippingAmountInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Shipping: <strong>₹{shippingAmountInput}</strong></span>}
                         {orderTotalInput && <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-200">Total: <strong>₹{orderTotalInput}</strong></span>}
                         {deliveredDateInput && <span className="bg-green-50 text-green-800 px-2 py-0.5 rounded border border-green-200">Delivered: <strong>{deliveredDateInput}</strong></span>}
-                        {notesInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">📝 Notes: <strong>{notesInput}</strong></span>}
+                        {notesInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Notes: <strong>{notesInput}</strong></span>}
                       </div>
                     </div>
                   )}
@@ -1401,15 +1515,79 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
         </div>
 
-        {/* Right Column: Telegram Upload Queue (1 col) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 font-mono">
-              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <Send className="w-4 h-4 text-blue-600" />
-                <span>TELEGRAM QUEUE ({queueTasks.length})</span>
-              </h3>
+        {/* Right Column: Pre-Entered Orders List & Telegram Queue (1 col) */}
+        <div className="space-y-4">
+          
+          {/* Pre-Entered Orders (Pending Packing) Section */}
+          <div className="bg-white border border-stone-200/90 rounded-2xl p-4 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <PackagePlus className="w-4 h-4 text-[#832f5e]" />
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider font-mono">
+                  Pre-Entered Orders ({pendingPreOrders.length})
+                </h3>
+              </div>
+              {onOpenPreEnter && (
+                <button
+                  type="button"
+                  onClick={onOpenPreEnter}
+                  className="px-2.5 py-1 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Add Order</span>
+                </button>
+              )}
             </div>
+
+            {pendingPreOrders.length === 0 ? (
+              <div className="p-6 text-center text-stone-400 text-xs font-sans">
+                No pre-entered orders pending. Click "Add Order" to pre-stage order details.
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                {pendingPreOrders.map((ord) => (
+                  <div 
+                    key={ord.orderId}
+                    className="p-3 rounded-xl border border-stone-200/90 bg-stone-50/60 hover:bg-white hover:border-[#832f5e]/40 transition-all flex items-center justify-between gap-2 shadow-2xs"
+                  >
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-900 text-xs truncate">{ord.orderId}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 text-[9px] font-bold font-mono border border-amber-200 shrink-0">
+                          PENDING
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-stone-600 truncate font-sans">
+                        {ord.customerName ? `Cust: ${ord.customerName}` : ''}
+                        {ord.courier ? ` • ${ord.courier}` : ''}
+                        {ord.productSku ? ` • SKU: ${ord.productSku}` : ''}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStartPackingPreOrder(ord)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold font-sans shadow-2xs transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                      title="Auto-fill details and start packing this order"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Start Packing</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Telegram Upload Queue */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 font-mono">
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <Send className="w-4 h-4 text-blue-600" />
+                  <span>TELEGRAM QUEUE ({queueTasks.length})</span>
+                </h3>
+              </div>
 
             {queueTasks.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs font-mono">
@@ -1461,9 +1639,9 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             )}
           </div>
         </div>
-
       </div>
 
     </div>
-  );
+  </div>
+);
 };

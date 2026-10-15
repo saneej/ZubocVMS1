@@ -5,7 +5,7 @@ export interface OrderRecord {
   recordingStartedAt: string;
   recordingCompletedAt?: string;
   durationSeconds: number;
-  recordingStatus: 'RECORDING' | 'COMPLETED' | 'FAILED';
+  recordingStatus: 'RECORDING' | 'COMPLETED' | 'FAILED' | 'PENDING';
   uploadStatus: 'PENDING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
   telegramChatId?: string;
   telegramMessageId?: string;

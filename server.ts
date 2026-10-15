@@ -249,8 +249,18 @@ function saveLocalBackup() {
   }
 }
 
+let firestoreQuotaExceeded = false;
+
+function cleanForFirestore(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  return JSON.parse(JSON.stringify(obj, (key, value) => {
+    if (value === undefined) return undefined;
+    return value;
+  }));
+}
+
 async function syncStaffsFromFirestore() {
-  if (!firestoreDb) return;
+  if (!firestoreDb || firestoreQuotaExceeded) return;
   try {
     const colRef = collection(firestoreDb, 'staffs');
     const snap = await getDocs(colRef);
@@ -262,16 +272,21 @@ async function syncStaffsFromFirestore() {
     } else {
       // Seed default staffs into Firestore
       for (const s of DEFAULT_STAFFS) {
-        await setDoc(doc(firestoreDb, 'staffs', s.id), s, { merge: true });
+        await setDoc(doc(firestoreDb, 'staffs', s.id), cleanForFirestore(s), { merge: true });
       }
     }
-  } catch (e) {
-    console.error('Error syncing staffs from Firestore:', e);
+  } catch (e: any) {
+    if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+      firestoreQuotaExceeded = true;
+      console.warn('Firestore quota exceeded. Running on local storage fallback mode.');
+    } else {
+      console.error('Error syncing staffs from Firestore:', e);
+    }
   }
 }
 
 async function syncSettingsFromFirestore() {
-  if (!firestoreDb) return;
+  if (!firestoreDb || firestoreQuotaExceeded) return;
   try {
     const docRef = doc(firestoreDb, 'settings', 'config');
     const snap = await getDoc(docRef);
@@ -282,8 +297,12 @@ async function syncSettingsFromFirestore() {
       if (data.stationId) settings.stationId = sanitizeString(data.stationId);
       if (data.autoUpload !== undefined) settings.autoUpload = data.autoUpload;
     }
-  } catch (e) {
-    console.error('Error syncing settings from Firestore:', e);
+  } catch (e: any) {
+    if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+      firestoreQuotaExceeded = true;
+    } else {
+      console.error('Error syncing settings from Firestore:', e);
+    }
   }
 }
 
@@ -360,13 +379,13 @@ apiRouter.post('/settings', async (req, res) => {
 
   if (firestoreDb) {
     try {
-      await setDoc(doc(firestoreDb, 'settings', 'config'), {
+      await setDoc(doc(firestoreDb, 'settings', 'config'), cleanForFirestore({
         telegramBotToken: settings.telegramBotToken,
         telegramChatId: settings.telegramChatId,
         autoUpload: settings.autoUpload,
         stationId: settings.stationId,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }), { merge: true });
     } catch (e) {
       console.error('Error saving settings to Firestore:', e);
     }
@@ -419,7 +438,7 @@ apiRouter.post('/staffs', async (req, res) => {
 
   if (firestoreDb) {
     try {
-      await setDoc(doc(firestoreDb, 'staffs', id), updatedStaff, { merge: true });
+      await setDoc(doc(firestoreDb, 'staffs', id), cleanForFirestore(updatedStaff), { merge: true });
     } catch (e) {
       console.error('Error saving staff to Firestore:', e);
     }
@@ -549,7 +568,7 @@ apiRouter.post('/auth/login', async (req, res) => {
 
 // Orders GET
 apiRouter.get('/orders', async (req, res) => {
-  if (firestoreDb) {
+  if (firestoreDb && !firestoreQuotaExceeded) {
     try {
       const colRef = collection(firestoreDb, 'orders');
       const snap = await getDocs(colRef);
@@ -566,8 +585,12 @@ apiRouter.get('/orders', async (req, res) => {
           fsOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         );
       }
-    } catch (e) {
-      console.error('Error fetching orders from Firestore:', e);
+    } catch (e: any) {
+      if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+        firestoreQuotaExceeded = true;
+      } else {
+        console.error('Error fetching orders from Firestore:', e);
+      }
     }
   }
 
@@ -631,18 +654,26 @@ apiRouter.post('/orders', async (req, res) => {
     recordingStartedAt: recordingStartedAt || existing?.recordingStartedAt || now,
     recordingCompletedAt: now,
     durationSeconds: Number(durationSeconds) || 0,
-    recordingStatus: recordingStatus || 'COMPLETED',
-    uploadStatus: uploadStatus || 'PENDING',
-    telegramChatId: existing?.telegramChatId,
-    telegramMessageId: existing?.telegramMessageId,
-    telegramFileId: existing?.telegramFileId,
-    telegramMessageLink: existing?.telegramMessageLink,
-    videoUrl: videoUrl || existing?.videoUrl,
+    recordingStatus: recordingStatus || existing?.recordingStatus || 'COMPLETED',
+    uploadStatus: uploadStatus || existing?.uploadStatus || 'PENDING',
+    telegramChatId: existing?.telegramChatId || '',
+    telegramMessageId: existing?.telegramMessageId || '',
+    telegramFileId: existing?.telegramFileId || '',
+    telegramMessageLink: existing?.telegramMessageLink || '',
+    videoUrl: videoUrl || existing?.videoUrl || '',
     awbNumber: awbNumber || existing?.awbNumber || '',
     courier: courier || existing?.courier || '',
     weight: weight || existing?.weight || '',
     productSku: productSku || existing?.productSku || '',
     customerName: customerName || existing?.customerName || '',
+    contactPerson: sanitizeString(req.body.contactPerson) || existing?.contactPerson || '',
+    contactPhone: sanitizeString(req.body.contactPhone) || existing?.contactPhone || '',
+    orderReceivedDate: req.body.orderReceivedDate || existing?.orderReceivedDate || '',
+    dispatchDate: req.body.dispatchDate || existing?.dispatchDate || '',
+    orderAmount: sanitizeString(req.body.orderAmount) || existing?.orderAmount || '',
+    shippingAmount: sanitizeString(req.body.shippingAmount) || existing?.shippingAmount || '',
+    orderTotal: sanitizeString(req.body.orderTotal) || existing?.orderTotal || '',
+    deliveredDate: req.body.deliveredDate || existing?.deliveredDate || '',
     itemCount: itemCount || existing?.itemCount || '',
     notes: notes || existing?.notes || '',
     createdAt: existing?.createdAt || now,
@@ -654,7 +685,7 @@ apiRouter.post('/orders', async (req, res) => {
 
   if (firestoreDb) {
     try {
-      await setDoc(doc(firestoreDb, 'orders', orderId), record, { merge: true });
+      await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
     } catch (e) {
       console.error('Error writing order record to Firestore:', e);
     }
@@ -764,7 +795,7 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       ordersStore[orderId] = record;
       saveLocalBackup();
       if (firestoreDb) {
-        await setDoc(doc(firestoreDb, 'orders', orderId), record, { merge: true });
+        await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
       }
       return res.status(400).json({
         error: 'Telegram Bot Token and Chat ID are not configured.',
@@ -775,25 +806,24 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     // Extract files from multer
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     let videoBuffer: Buffer | null = null;
-    let photoBuffer: Buffer | null = null;
-
+    let photoBuffers: Buffer[] = [];
     if (files?.video?.[0]?.buffer) {
       videoBuffer = files.video[0].buffer;
     } else if (videoBase64) {
       const base64Data = videoBase64.replace(/^data:.*;base64,/, '');
       videoBuffer = Buffer.from(base64Data, 'base64');
     }
-
-    if (files?.photo?.[0]?.buffer) {
-      photoBuffer = files.photo[0].buffer;
-    } else if (files?.photos?.[0]?.buffer) {
-      photoBuffer = files.photos[0].buffer;
-    } else if (photoBase64) {
-      const base64Data = photoBase64.replace(/^data:.*;base64,/, '');
-      photoBuffer = Buffer.from(base64Data, 'base64');
+    if (files?.photo) {
+      files.photo.forEach(f => { if (f.buffer) photoBuffers.push(f.buffer); });
     }
-
-    if (!videoBuffer && !photoBuffer) {
+    if (files?.photos) {
+      files.photos.forEach(f => { if (f.buffer) photoBuffers.push(f.buffer); });
+    }
+    if (photoBase64) {
+      const base64Data = photoBase64.replace(/^data:.*;base64,/, '');
+      photoBuffers.push(Buffer.from(base64Data, 'base64'));
+    }
+    if (!videoBuffer && photoBuffers.length === 0) {
       return res.status(400).json({ error: 'No video or photo payload received in request' });
     }
 
@@ -836,7 +866,7 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
         `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`,
         record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : '',
-        photoBuffer ? '<b>📷 Photos Attached:</b> Yes' : ''
+        photoBuffers[0] ? '<b>📷 Photos Attached:</b> Yes' : ''
       ].filter(Boolean);
 
       const caption = captionLines.join('\n');
@@ -867,8 +897,8 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       if (thumbBuffer && thumbBuffer.length > 0) {
         const thumbBlob = new Blob([new Uint8Array(thumbBuffer)], { type: 'image/jpeg' });
         formData.append('thumb', thumbBlob, `${safeOrderId}_thumb.jpg`);
-      } else if (photoBuffer && photoBuffer.length > 0) {
-        const thumbBlob = new Blob([new Uint8Array(photoBuffer)], { type: 'image/jpeg' });
+      } else if (photoBuffers[0] && photoBuffers[0].length > 0) {
+        const thumbBlob = new Blob([new Uint8Array(photoBuffers[0])], { type: 'image/jpeg' });
         formData.append('thumb', thumbBlob, `${safeOrderId}_thumb.jpg`);
       }
 
@@ -892,50 +922,49 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       fileId = tgResult.result?.video?.file_id || tgResult.result?.document?.file_id;
     }
 
-    // 2. Upload Photo if present
-    if (photoBuffer) {
-      const photoCaptionLines = [
-        videoBuffer 
-          ? `<b>📷 Photo Snapshot • Order ID: ${safeOrderId}</b>`
-          : `<b>📷 Photo Evidence • Order ID: ${safeOrderId}</b>`,
-        record.awbNumber ? `<b>AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
-        record.courier ? `<b>Courier:</b> ${escapeHtml(record.courier)}` : '',
-        record.weight ? `<b>Weight:</b> ${escapeHtml(record.weight)}` : '',
-        record.productSku ? `<b>Item:</b> ${escapeHtml(record.productSku)}` : '',
-        `<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
-        `<b>Captured:</b> ${escapeHtml(formattedDate)} (IST)`,
-        record.notes ? `<b>Notes:</b> ${escapeHtml(record.notes)}` : ''
-      ].filter(Boolean);
-      const photoCaption = photoCaptionLines.join('\n');
-
-      const photoFormData = new FormData();
-      photoFormData.append('chat_id', chatId);
-      photoFormData.append('caption', photoCaption);
-      photoFormData.append('parse_mode', 'HTML');
-
-      const photoBlob = new Blob([new Uint8Array(photoBuffer)], { type: 'image/jpeg' });
-      photoFormData.append('photo', photoBlob, `${safeOrderId}.jpg`);
-
-      const photoTgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-        method: 'POST',
-        body: photoFormData
-      });
-
-      const photoResponseText = await photoTgResponse.text();
-      let photoTgResult: any;
-      try {
-        photoTgResult = JSON.parse(photoResponseText);
-      } catch {
-        photoTgResult = null;
-      }
-
-      if (!videoBuffer && photoTgResult && photoTgResult.ok) {
-        messageId = photoTgResult.result?.message_id?.toString();
-        fileId = photoTgResult.result?.photo?.[photoTgResult.result.photo.length - 1]?.file_id;
-        tgResult = photoTgResult;
+    // 2. Upload Photos if present (threaded as replies under video message if video exists)
+    if (photoBuffers.length > 0) {
+      for (let i = 0; i < photoBuffers.length; i++) {
+        const pBuf = photoBuffers[i];
+        const photoCaptionLines = [
+          videoBuffer
+            ? `<b>📷 Photo Snapshot #${i + 1} • Order ID: ${safeOrderId}</b>`
+            : `<b>📷 Photo Evidence #${i + 1} • Order ID: ${safeOrderId}</b>`,
+          record.awbNumber ? `<b>AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
+          record.courier ? `<b>Courier:</b> ${escapeHtml(record.courier)}` : '',
+          record.weight ? `<b>Weight:</b> ${escapeHtml(record.weight)}` : '',
+          record.productSku ? `<b>Item:</b> ${escapeHtml(record.productSku)}` : '',
+          `<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
+          `<b>Captured:</b> ${escapeHtml(formattedDate)} (IST)`,
+          record.notes ? `<b>Notes:</b> ${escapeHtml(record.notes)}` : ''
+        ].filter(Boolean);
+        const photoCaption = photoCaptionLines.join('\n');
+        const photoFormData = new FormData();
+        photoFormData.append('chat_id', chatId);
+        photoFormData.append('caption', photoCaption);
+        photoFormData.append('parse_mode', 'HTML');
+        if (videoBuffer && messageId) {
+          photoFormData.append('reply_to_message_id', messageId);
+        }
+        const photoBlob = new Blob([new Uint8Array(pBuf)], { type: 'image/jpeg' });
+        photoFormData.append('photo', photoBlob, `${safeOrderId}_${i + 1}.jpg`);
+        try {
+          const photoTgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+            method: 'POST',
+            body: photoFormData
+          });
+          const photoResponseText = await photoTgResponse.text();
+          const photoTgResult = JSON.parse(photoResponseText);
+          if (!videoBuffer && i === 0 && photoTgResult && photoTgResult.ok) {
+            messageId = photoTgResult.result?.message_id?.toString();
+            fileId = photoTgResult.result?.photo?.[photoTgResult.result.photo.length - 1]?.file_id;
+            tgResult = photoTgResult;
+          }
+        } catch (e) {
+          console.error(`Failed to send photo #${i + 1} to Telegram:`, e);
+        }
       }
     }
-
     let cleanChannelId = chatId;
     let numericId = cleanChannelId;
     if (numericId.startsWith('-100')) {
@@ -964,7 +993,7 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     saveLocalBackup();
 
     if (firestoreDb) {
-      await setDoc(doc(firestoreDb, 'orders', orderId), record, { merge: true });
+      await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
     }
 
     res.json({ success: true, record, telegramResponse: tgResult });
@@ -976,11 +1005,102 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       ordersStore[orderId].updatedAt = new Date().toISOString();
       saveLocalBackup();
       if (firestoreDb) {
-        setDoc(doc(firestoreDb, 'orders', orderId), ordersStore[orderId], { merge: true }).catch(() => {});
+        setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(ordersStore[orderId]), { merge: true }).catch(() => {});
       }
     }
     res.status(500).json({ error: error.message || 'Failed to upload video to Telegram' });
   }
+});
+
+// Update order details and sync/edit Telegram caption or send threaded reply update
+apiRouter.post('/telegram/update-caption', async (req, res) => {
+  const orderId = sanitizeString(req.body.orderId);
+  if (!orderId) {
+    return res.status(400).json({ error: 'orderId is required' });
+  }
+  let record = ordersStore[orderId];
+  if (!record && firestoreDb) {
+    try {
+      const snap = await getDoc(doc(firestoreDb, 'orders', orderId));
+      if (snap.exists()) {
+        record = snap.data() as OrderRecord;
+      }
+    } catch (e) {}
+  }
+  if (!record) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+  Object.keys(req.body).forEach(key => {
+    if (['awbNumber', 'courier', 'weight', 'productSku', 'customerName', 'contactPerson', 'contactPhone', 'orderReceivedDate', 'dispatchDate', 'orderAmount', 'shippingAmount', 'orderTotal', 'deliveredDate', 'itemCount', 'notes'].includes(key)) {
+      (record as any)[key] = sanitizeString(req.body[key]);
+    }
+  });
+  record.updatedAt = new Date().toISOString();
+  ordersStore[orderId] = record;
+  saveLocalBackup();
+  if (firestoreDb) {
+    await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true }).catch(() => {});
+  }
+  const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+  const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
+  const botToken = cleanTelegramCredential(rawBotToken);
+  const chatId = cleanTelegramCredential(rawChatId);
+  if (botToken && chatId && record.telegramMessageId) {
+    const durMin = Math.floor((record.durationSeconds || 0) / 60);
+    const durSec = (record.durationSeconds || 0) % 60;
+    const durationStr = `${durMin}m ${durSec}s`;
+    const formattedDate = record.createdAt ? new Date(record.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('en-IN');
+    const safeOrderId = escapeHtml(record.orderId);
+    const captionLines = [
+      `<b>📦 Order ID: ${safeOrderId} (Updated)</b>`,
+      record.awbNumber ? `<b>🚚 AWB / Tracking:</b> ${escapeHtml(record.awbNumber)}` : '',
+      record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
+      record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
+      record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
+      record.itemCount ? `<b>🔢 Qty:</b> ${escapeHtml(String(record.itemCount))}` : '',
+      record.customerName ? `<b>👤 Customer / City:</b> ${escapeHtml(record.customerName)}` : '',
+      record.contactPerson ? `<b>📞 Contact Person:</b> ${escapeHtml(record.contactPerson)}` : '',
+      record.contactPhone ? `<b>📱 Contact Phone:</b> ${escapeHtml(record.contactPhone)}` : '',
+      record.orderReceivedDate ? `<b>📥 Received Date:</b> ${escapeHtml(record.orderReceivedDate)}` : '',
+      record.dispatchDate ? `<b>📤 Despatch Date:</b> ${escapeHtml(record.dispatchDate)}` : '',
+      record.orderAmount ? `<b>💰 Order Amount:</b> ₹${escapeHtml(record.orderAmount)}` : '',
+      record.shippingAmount ? `<b>📦 Shipping Amount:</b> ₹${escapeHtml(record.shippingAmount)}` : '',
+      record.orderTotal ? `<b>💵 Total Amount:</b> ₹${escapeHtml(record.orderTotal)}` : '',
+      record.deliveredDate ? `<b>✅ Delivered Date:</b> ${escapeHtml(record.deliveredDate)}` : '',
+      `<b>👷 Staff:</b> ${escapeHtml(record.staffId)}`,
+      `<b>📍 Station:</b> ${escapeHtml(record.stationId)}`,
+      `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
+      `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`,
+      record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : '',
+      '<b>✏️ Status:</b> Order details edited & synced by Management'
+    ].filter(Boolean);
+    const newCaption = captionLines.join('\n');
+    try {
+      await fetch(`https://api.telegram.org/bot${botToken}/editMessageCaption`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: record.telegramChatId || chatId,
+          message_id: Number(record.telegramMessageId),
+          caption: newCaption,
+          parse_mode: 'HTML'
+        })
+      });
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: record.telegramChatId || chatId,
+          reply_to_message_id: Number(record.telegramMessageId),
+          text: `✏️ <b>Order Details Edited & Synced</b>\n\n<b>Customer:</b> ${escapeHtml(record.customerName || 'N/A')}\n<b>AWB:</b> ${escapeHtml(record.awbNumber || 'N/A')}\n<b>SKU:</b> ${escapeHtml(record.productSku || 'N/A')}\n<b>Notes:</b> ${escapeHtml(record.notes || 'N/A')}`,
+          parse_mode: 'HTML'
+        })
+      });
+    } catch (e) {
+      console.error('Failed to update Telegram message caption:', e);
+    }
+  }
+  res.json({ success: true, record });
 });
 
 // Telegram Webhook
@@ -1119,11 +1239,11 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
     saveLocalBackup();
 
     if (firestoreDb) {
-      setDoc(doc(firestoreDb, 'settings', 'config'), {
+      setDoc(doc(firestoreDb, 'settings', 'config'), cleanForFirestore({
         telegramBotToken: settings.telegramBotToken,
         telegramChatId: settings.telegramChatId,
         updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(() => {});
+      }), { merge: true }).catch(() => {});
     }
 
     res.json({ success: true, botUsername, message: `Bot ${botUsername} verified and test message sent successfully!`, telegramResponse: data });

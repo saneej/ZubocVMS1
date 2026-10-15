@@ -1,6 +1,7 @@
+import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface SearchRetrievalProps {
@@ -8,6 +9,7 @@ interface SearchRetrievalProps {
   onRefreshOrders: () => void;
   onDeleteOrder: (orderId: string) => void;
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
+  onStartPacking?: (order: OrderRecord) => void;
   currentStaffId?: string;
 }
 
@@ -16,12 +18,76 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   onRefreshOrders, 
   onDeleteOrder, 
   onUpdateOrder,
+  onStartPacking,
   currentStaffId = 'Staff-01'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED' | 'PENDING'>('ALL');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
+
+  const [isPreEnterOpen, setIsPreEnterOpen] = useState(false);
+  const [newOrderId, setNewOrderId] = useState("");
+  const [newCustomer, setNewCustomer] = useState("");
+  const [newAwb, setNewAwb] = useState("");
+  const [newCourier, setNewCourier] = useState("Delhivery");
+  const [newSku, setNewSku] = useState("");
+  const [newWeight, setNewWeight] = useState("");
+  const [newItemCount, setNewItemCount] = useState("1");
+  const [newOrderTotal, setNewOrderTotal] = useState("");
+  const [newNotes, setNewNotes] = useState("");
+
+  const handlePreEnterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrderId.trim()) {
+      alert("Please enter an Order ID");
+      return;
+    }
+    const orderRecord: OrderRecord = {
+      orderId: newOrderId.trim().toUpperCase(),
+      staffId: currentStaffId,
+      stationId: "Order-Department",
+      recordingStartedAt: new Date().toISOString(),
+      durationSeconds: 0,
+      recordingStatus: "PENDING",
+      uploadStatus: "PENDING",
+      awbNumber: newAwb,
+      courier: newCourier,
+      weight: newWeight,
+      productSku: newSku,
+      customerName: newCustomer,
+      itemCount: newItemCount,
+      orderTotal: newOrderTotal,
+      notes: newNotes,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      const res = await safeFetchJson("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderRecord)
+      });
+      if (res && res.success) {
+        onRefreshOrders();
+        setIsPreEnterOpen(false);
+        setNewOrderId("");
+        setNewCustomer("");
+        setNewAwb("");
+        setNewSku("");
+        setNewWeight("");
+        setNewItemCount("1");
+        setNewOrderTotal("");
+        setNewNotes("");
+      } else {
+        alert("Failed to save pre-entered order");
+      }
+    } catch (err) {
+      console.error("Error pre-entering order:", err);
+      alert("Error pre-entering order");
+    }
+  };
+
   
   // All editable order fields
   const [editAwb, setEditAwb] = useState('');
@@ -173,6 +239,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     };
 
     onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
     setEditingOrder(null);
   };
 
@@ -246,6 +317,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           ))}
 
           <button
+            onClick={() => setIsPreEnterOpen(true)}
+            className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+          >
+            <PackagePlus className="w-3.5 h-3.5" />
+            <span>Pre-Enter Order</span>
+          </button>
+          <button
             onClick={exportFilteredCSV}
             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5"
           >
@@ -284,7 +362,19 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                 filteredOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
-                      <div className="font-mono font-bold text-slate-900 text-xs">{order.orderId}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-mono font-bold text-slate-900 text-xs">{order.orderId}</div>
+                        {onStartPacking && (
+                          <button
+                            onClick={() => onStartPacking(order)}
+                            className="px-2 py-0.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Start packing this order"
+                          >
+                            <PackagePlus className="w-3 h-3" />
+                            <span>Start Packing</span>
+                          </button>
+                        )}
+                      </div>
                       {order.awbNumber ? (
                         <div className="font-mono text-[11px] text-blue-600 font-medium">AWB: {order.awbNumber}</div>
                       ) : (

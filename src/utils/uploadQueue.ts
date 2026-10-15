@@ -121,6 +121,9 @@ class UploadQueueManager {
       }
     } finally {
       this.activeUploads--;
+      nextTask.videoBlob = null;
+      nextTask.photoBlobs = [];
+      nextTask.photoDataUrls = [];
       this.notify();
       this.processQueue();
     }

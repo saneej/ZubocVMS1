@@ -6,6 +6,7 @@ import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SettingsModal } from './components/SettingsModal';
+import { PreEnterOrderModal } from './components/PreEnterOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { OrderRecord, StaffMember, AppSettings } from './types';
@@ -85,6 +86,8 @@ export default function App() {
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPreEnterOpen, setIsPreEnterOpen] = useState(false);
+  const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -238,6 +241,7 @@ export default function App() {
           setIsMobileOpen={setIsMobileOpen}
           onRefreshOrders={fetchOrdersAPI}
           onLogout={handleLogout}
+          onOpenPreEnter={() => setIsPreEnterOpen(true)}
         />
 
         {/* Dynamic Page Views */}
@@ -248,6 +252,9 @@ export default function App() {
               settings={settings}
               onOrderCompleted={handleOrderCompleted}
               existingOrders={orders}
+              onOpenPreEnter={() => setIsPreEnterOpen(true)}
+              selectedOrderForPacking={selectedOrderForPacking}
+              onClearSelectedPackingOrder={() => setSelectedOrderForPacking(null)}
             />
           )}
 
@@ -257,6 +264,10 @@ export default function App() {
               onRefreshOrders={fetchOrdersAPI}
               onDeleteOrder={handleDeleteOrder}
               onUpdateOrder={handleUpdateOrder}
+              onStartPacking={(ord) => {
+                setSelectedOrderForPacking(ord);
+                setActiveTab('station');
+              }}
               currentStaffId={currentStaff?.id}
             />
           )}
@@ -303,6 +314,18 @@ export default function App() {
           setCurrentStaff(st);
           localStorage.setItem('zuboc_auth_user', JSON.stringify(st));
         }}
+      />
+
+      <PreEnterOrderModal
+        isOpen={isPreEnterOpen}
+        onClose={() => setIsPreEnterOpen(false)}
+        onSuccess={(rec) => {
+          handleOrderCompleted(rec);
+          setSelectedOrderForPacking(rec);
+          setActiveTab('station');
+          fetchOrdersAPI();
+        }}
+        currentStaffId={currentStaff?.id}
       />
 
     </div>
