@@ -1,8 +1,53 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, StopCircle, Play, CheckCircle2, Barcode, Send, ExternalLink, RefreshCw, AlertCircle, RotateCcw, PackageCheck, ShieldCheck, Check, Volume2, Mic, Maximize2, Zap, Layers, Sparkles, AlertTriangle } from 'lucide-react';
+import { MultiFormatReader, RGBLuminanceSource, BinaryBitmap, HybridBinarizer } from '@zxing/library';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
 import { safeFetchJson } from '../utils/api';
+
+function playBeepSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  } catch {
+    // ignore sound errors
+  }
+}
+
+function decodeBarcodeFromVideo(video: HTMLVideoElement): string | null {
+  try {
+    if (!video || video.readyState < 2) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const luminanceSource = new RGBLuminanceSource(
+      new Uint8ClampedArray(imageData.data.buffer),
+      canvas.width,
+      canvas.height
+    );
+    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+    const reader = new MultiFormatReader();
+    const result = reader.decode(binaryBitmap);
+    return result ? result.getText() : null;
+  } catch {
+    return null;
+  }
+}
 
 interface PackingStationProps {
   currentStaff: StaffMember;
@@ -81,7 +126,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const [queueTasks, setQueueTasks] = useState<UploadTask[]>([]);
   
-  // Upload Speed Preset: 'turbo' (1.2 Mbps, ~3-4MB file, instant 1-2s upload) | 'fast' (2.2 Mbps) | 'hd' (4.5 Mbps)
   const [uploadPreset, setUploadPreset] = useState<'turbo' | 'fast' | 'hd'>(() => {
     return (localStorage.getItem('zuboc_upload_preset') as any) || 'turbo';
   });
@@ -97,6 +141,92 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const chunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [autoRecordOnScan, setAutoRecordOnScan] = useState<boolean>(true);
+  const [scannerActive, setScannerActive] = useState<boolean>(true);
+  const [scannedNotification, setScannedNotification] = useState<{ text: string; time: string } | null>(null);
+
+  const scanVideoRef = useRef<HTMLVideoElement | null>(null);
+  const lastScannedCodeRef = useRef<string>('');
+  const isScanningFrameRef = useRef<boolean>(false);
+
+  // Auto-start camera immediately on component mount
+  useEffect(() => {
+    initCamera().catch(err => console.warn('Initial camera warm-up:', err));
+  }, []);
+
+  // Handle scanned barcode detection
+  const handleBarcodeDetected = (rawCode: string) => {
+    const cleanCode = rawCode.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
+    if (!cleanCode || cleanCode === lastScannedCodeRef.current) return;
+
+    lastScannedCodeRef.current = cleanCode;
+    playBeepSound();
+
+    setScannedNotification({
+      text: cleanCode,
+      time: new Date().toLocaleTimeString()
+    });
+    setOrderIdInput(cleanCode);
+
+    if (autoRecordOnScan) {
+      setTimeout(() => {
+        handleConfirmOrderAndStartRecording(undefined, cleanCode);
+      }, 350);
+    }
+  };
+
+  // Real-time camera barcode frame scanner loop
+  useEffect(() => {
+    if (step !== 'SCAN' || !cameraActive || !scannerActive) return;
+
+    let intervalId: any = null;
+
+    const performScan = async () => {
+      if (isScanningFrameRef.current) return;
+      const targetVideo = scanVideoRef.current || videoRef.current;
+      if (!targetVideo || targetVideo.readyState < 2) return;
+
+      isScanningFrameRef.current = true;
+      try {
+        // 1. Try Native BarcodeDetector (GPU hardware accelerated in Chrome/Edge/Android)
+        if ('BarcodeDetector' in window) {
+          try {
+            const detector = new (window as any).BarcodeDetector({
+              formats: ['code_128', 'code_39', 'qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'pdf417']
+            });
+            const barcodes = await detector.detect(targetVideo);
+            if (barcodes && barcodes.length > 0) {
+              const text = barcodes[0].rawValue;
+              if (text) {
+                handleBarcodeDetected(text);
+                isScanningFrameRef.current = false;
+                return;
+              }
+            }
+          } catch {
+            // fallback to ZXing
+          }
+        }
+
+        // 2. ZXing fallback scanner via Canvas frame decoding
+        const scannedText = decodeBarcodeFromVideo(targetVideo);
+        if (scannedText) {
+          handleBarcodeDetected(scannedText);
+        }
+      } catch {
+        // frame decode exception ignored
+      } finally {
+        isScanningFrameRef.current = false;
+      }
+    };
+
+    intervalId = setInterval(performScan, 300);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [step, cameraActive, scannerActive, autoRecordOnScan]);
 
   useEffect(() => {
     localStorage.setItem('zuboc_upload_preset', uploadPreset);
@@ -209,9 +339,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   };
 
   // Step 2 -> Step 3
-  const handleConfirmOrderAndStartRecording = async (e?: React.FormEvent) => {
+  const handleConfirmOrderAndStartRecording = async (e?: React.FormEvent, overrideOrderId?: string) => {
     if (e) e.preventDefault();
-    const cleanId = orderIdInput.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
+    const targetId = overrideOrderId || orderIdInput;
+    const cleanId = targetId.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
     if (!cleanId) return;
 
     setActiveOrderId(cleanId);
@@ -364,288 +495,249 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fadeIn font-sans">
       
-      {/* Top Station Status Banner */}
-      <div className="bg-[#0e111a] border border-[#1f2738] rounded-2xl p-5 shadow-2xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-center text-emerald-400 font-mono font-bold shadow-inner">
-            <PackageCheck className="w-6 h-6 text-emerald-400" />
+      {/* Top Station Header Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-center text-blue-600 font-bold">
+            <PackageCheck className="w-5 h-5 text-blue-600" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-extrabold text-white font-mono tracking-tight">PACKING TERMINAL</h1>
-              <span className="px-2.5 py-0.5 rounded bg-[#181f2f] text-cyan-400 font-mono text-xs font-bold border border-[#27334a]">
+              <h1 className="text-base font-extrabold text-slate-900 tracking-tight font-sans">Packing Workstation</h1>
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-mono font-bold border border-slate-200">
                 {settings.stationId || 'Packing-01'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-mono">
-              OPERATOR: <strong className="text-slate-200">{currentStaff.name}</strong> ({currentStaff.id})
+            <p className="text-xs text-slate-500 font-medium">
+              Operator: <strong className="text-slate-800">{currentStaff.name}</strong>
             </p>
           </div>
         </div>
 
-        {/* Workflow Step Tracker */}
-        <div className="hidden md:flex items-center gap-2 font-mono text-xs bg-[#090b10] px-4 py-2 rounded-xl border border-[#1a2130]">
-          <span className={`px-2 py-0.5 rounded font-bold ${step === 'SCAN' ? 'bg-emerald-500 text-slate-950' : 'text-slate-500'}`}>01 SCAN</span>
-          <span className="text-slate-700">→</span>
-          <span className={`px-2 py-0.5 rounded font-bold ${step === 'RECORDING' ? 'bg-rose-500 text-white animate-pulse' : 'text-slate-500'}`}>02 RECORD</span>
-          <span className="text-slate-700">→</span>
-          <span className={`px-2 py-0.5 rounded font-bold ${step === 'CONFIRM' ? 'bg-cyan-500 text-slate-950' : 'text-slate-500'}`}>03 DISPATCH</span>
-        </div>
-
-        {/* Quick Action Controls */}
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <button
-            onClick={handleTestTelegram}
-            disabled={testSending}
-            className="px-3.5 py-2 bg-[#161c2b] hover:bg-[#1f273b] disabled:opacity-50 text-slate-200 font-semibold rounded-xl border border-[#263249] flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Send className={`w-3.5 h-3.5 text-cyan-400 ${testSending ? 'animate-bounce' : ''}`} />
-            <span>{testSending ? 'Pinging...' : 'PING BOT GATEWAY'}</span>
-          </button>
-
-          <div className="px-3.5 py-2 bg-[#08090d] border border-[#1d2536] rounded-xl text-slate-400">
-            <span>PACKED TODAY: <strong className="text-emerald-400 font-bold text-sm">{todayCount}</strong></span>
-          </div>
-        </div>
-      </div>
-
-      {/* Upload Speed Optimization Preset Mode */}
-      <div className="bg-[#0b0e17] border border-[#1b2333] rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
-        <div className="flex items-center gap-3">
-          <Zap className="w-4 h-4 text-amber-400 shrink-0" />
-          <div>
-            <span className="text-white font-bold uppercase tracking-wider">FULL HD 1080P SPEED PRESETS: </span>
-            <span className="text-slate-400 hidden sm:inline">Pristine 1080p clarity with high-efficiency VP9 / H.264 compression</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 bg-[#05070c] p-1 rounded-xl border border-[#171f2e]">
+        {/* Minimal Speed Presets */}
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-mono">
           <button
             type="button"
             onClick={() => setUploadPreset('turbo')}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               uploadPreset === 'turbo'
-                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Zap className="w-3.5 h-3.5" />
-            <span>⚡ 1080P TURBO (1.8 Mbps · Fast Upload)</span>
+            ⚡ 1080P TURBO
           </button>
-
           <button
             type="button"
             onClick={() => setUploadPreset('fast')}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               uploadPreset === 'fast'
-                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🚀 1080P BALANCED (2.8 Mbps)</span>
+            🚀 1080P BALANCED
           </button>
-
           <button
             type="button"
             onClick={() => setUploadPreset('hd')}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               uploadPreset === 'hd'
-                ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <span>🎥 1080P ULTRA CLEAR (4.8 Mbps)</span>
+            🎥 1080P ULTRA
           </button>
         </div>
-      </div>
 
-      {/* Test Result Banner */}
-      {testResult && (
-        <div className={`p-4 rounded-xl border flex items-center justify-between text-xs font-mono animate-fadeIn ${
-          testResult.success 
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
-            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-        }`}>
-          <div className="flex items-center gap-2">
-            {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
-            <span>{testResult.message}</span>
+        <div className="flex items-center gap-3 text-xs font-mono">
+          <div className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-bold">
+            PACKED TODAY: <strong className="text-emerald-700 text-sm ml-1">{todayCount}</strong>
           </div>
-          <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
         </div>
-      )}
+      </div>
 
       {/* WORKSTATION GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Main Workstation Viewport & Scanning Console (2 Cols) */}
+        {/* Main Workstation Area (2 Cols) */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* STEP 1: SCAN ORDER AWB BARCODE */}
+          {/* STEP 1: SCAN BARCODE WITH LIVE CAMERA */}
           {step === 'SCAN' && (
-            <div className="bg-[#0e111a] border border-[#1f2738] rounded-2xl p-6 shadow-2xl space-y-5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
               
               {lastCompletedOrder && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-300 font-mono">
-                  <div className="flex items-center gap-2.5 font-bold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Order <strong className="text-white">{lastCompletedOrder}</strong> recorded and queued for Telegram delivery!</span>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between text-xs text-emerald-800 font-mono">
+                  <div className="flex items-center gap-2 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Order <strong className="text-slate-900">{lastCompletedOrder}</strong> recorded & dispatched!</span>
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-b border-[#1b2232] pb-3">
-                <h2 className="text-xs font-extrabold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                  <Barcode className="w-5 h-5 text-emerald-400" />
-                  <span>STEP 01: SCAN BARCODE / ENTER ORDER ID</span>
-                </h2>
-                <span className="text-[11px] font-mono text-slate-500">Fast Scanner Listening...</span>
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <h2 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider font-mono">
+                    LIVE OVERHEAD CAMERA & BARCODE SCANNER
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAutoRecordOnScan(!autoRecordOnScan)}
+                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                    autoRecordOnScan
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  AUTO-RECORD: {autoRecordOnScan ? 'ON' : 'OFF'}
+                </button>
               </div>
 
-              <form onSubmit={handleConfirmOrderAndStartRecording} className="space-y-4">
-                <div className="relative">
-                  <div className="absolute left-4 top-4 text-emerald-400 font-mono text-lg font-extrabold flex items-center gap-1">
-                    <Barcode className="w-6 h-6" />
-                  </div>
-                  <input
-                    ref={scanInputRef}
-                    type="text"
-                    value={orderIdInput}
-                    onChange={(e) => setOrderIdInput(e.target.value)}
-                    placeholder="Scan AWB Barcode or Type Order ID (e.g. ORD-98214)..."
-                    autoFocus
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    className="w-full bg-[#06080c] border-2 border-[#222c3f] focus:border-emerald-500 rounded-xl pl-14 pr-4 py-4 text-white font-mono text-xl font-bold focus:outline-none focus:ring-4 focus:ring-emerald-500/10 shadow-inner transition-all"
-                  />
-                  {orderIdInput && (
-                    <button
-                      type="button"
-                      onClick={() => setOrderIdInput('')}
-                      className="absolute right-4 top-4 text-xs font-mono bg-[#1a2233] text-slate-400 hover:text-white px-2 py-1 rounded"
-                    >
-                      CLEAR
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between pt-2 gap-4">
-                  <div className="text-xs font-mono text-slate-500 flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Press <kbd className="px-2 py-0.5 bg-[#182030] text-slate-200 rounded border border-[#2a3854]">ENTER</kbd> to trigger overhead camera recording</span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={!orderIdInput.trim()}
-                    className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-xs px-8 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-wider font-mono"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>START CAMERA & RECORD</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* STEP 2: LIVE HUD OVERHEAD CAMERA RECORDING */}
-          {step === 'RECORDING' && (
-            <div className="bg-[#0e111a] border border-[#1f2738] rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-              
-              {/* HUD Header */}
-              <div className="bg-[#06080d] px-5 py-3 border-b border-[#1a2130] flex items-center justify-between text-xs font-mono">
-                <div className="flex items-center gap-3 text-white font-bold">
-                  <Camera className="w-4 h-4 text-emerald-400" />
-                  <span>PACKING ORDER: <strong className="text-emerald-400">{activeOrderId}</strong></span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-slate-400 hidden sm:inline-block">1080p WebCam @ 30fps</span>
-                  <div className="flex items-center gap-2 font-mono text-rose-400 font-bold bg-rose-500/10 px-3.5 py-1 rounded-full border border-rose-500/30">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 led-rose animate-ping"></span>
-                    <span>REC {formatTime(timerSeconds)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Viewport Box with HUD Reticles */}
-              <div className="relative bg-[#020305] aspect-video flex items-center justify-center overflow-hidden border-b border-[#1a2130]">
+              {/* Live Camera Box */}
+              <div className="relative bg-slate-950 rounded-xl overflow-hidden aspect-video flex items-center justify-center shadow-inner">
                 
-                {/* HUD Camera Corners */}
-                <div className="hud-corner-tl"></div>
-                <div className="hud-corner-tr"></div>
-                <div className="hud-corner-bl"></div>
-                <div className="hud-corner-br"></div>
-
-                {/* Package Alignment Guideline Box */}
-                <div className="absolute inset-12 border border-dashed border-emerald-500/30 rounded-xl pointer-events-none flex items-center justify-center">
-                  <span className="text-[10px] font-mono text-emerald-500/50 uppercase tracking-widest bg-[#06080d]/80 px-3 py-1 rounded border border-emerald-500/20">
-                    PLACE BOX HERE UNDER OVERHEAD CAMERA
-                  </span>
+                {/* Scanner Frame */}
+                <div className="absolute inset-10 sm:inset-16 border-2 border-dashed border-emerald-400/60 rounded-xl pointer-events-none flex flex-col items-center justify-between p-3 z-10">
+                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-sm animate-pulse" />
+                  <div className="text-[10px] font-mono font-bold text-white bg-slate-900/90 backdrop-blur px-3 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1.5">
+                    <Barcode className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>HOLD AWB BARCODE UNDER CAMERA TO SCAN</span>
+                  </div>
+                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-sm animate-pulse" />
                 </div>
+
+                {scannedNotification && (
+                  <div className="absolute top-4 bg-emerald-600 text-white font-mono font-bold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 z-20">
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    <span>BARCODE SCANNED: {scannedNotification.text}</span>
+                  </div>
+                )}
 
                 {cameraError ? (
-                  <div className="p-8 text-center text-slate-400 max-w-md">
-                    <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-                    <p className="text-xs font-mono mb-4">{cameraError}</p>
-                    <button onClick={initCamera} className="px-5 py-2.5 bg-[#182133] hover:bg-[#222e47] text-white rounded-xl text-xs font-mono font-bold cursor-pointer">
-                      Retry Overhead Camera
+                  <div className="p-8 text-center text-slate-400 max-w-md z-10 font-mono">
+                    <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                    <p className="text-xs mb-3">{cameraError}</p>
+                    <button onClick={initCamera} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold cursor-pointer">
+                      Retry Camera
                     </button>
                   </div>
                 ) : (
                   <video
-                    ref={setVideoRef}
+                    ref={(el) => {
+                      scanVideoRef.current = el;
+                      setVideoRef(el);
+                    }}
                     autoPlay
                     playsInline
                     muted
                     className="w-full h-full object-cover block"
                   />
                 )}
+              </div>
 
-                {/* Active HUD Telemetry Banner */}
-                <div className="absolute top-4 left-4 bg-[#080b12]/90 backdrop-blur-md px-3.5 py-1.5 rounded-lg border border-white/10 text-white font-mono text-xs shadow-2xl flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                  <span className="text-emerald-400 font-bold">{activeOrderId}</span>
-                  <span className="text-slate-500">|</span>
-                  <span className="text-slate-300">{formatTime(timerSeconds)}</span>
+              {/* Order ID Form */}
+              <form onSubmit={handleConfirmOrderAndStartRecording} className="space-y-3">
+                <div className="relative">
+                  <Barcode className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    ref={scanInputRef}
+                    type="text"
+                    value={orderIdInput}
+                    onChange={(e) => setOrderIdInput(e.target.value)}
+                    placeholder="Scan AWB Barcode or type Order ID..."
+                    autoFocus
+                    className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl pl-11 pr-20 py-3 text-slate-900 font-mono text-base font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20 transition-all"
+                  />
+                  {orderIdInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrderIdInput('');
+                        lastScannedCodeRef.current = '';
+                        setScannedNotification(null);
+                      }}
+                      className="absolute right-3 top-2.5 text-xs font-mono bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold cursor-pointer"
+                    >
+                      CLEAR
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end">
+                  <button
+                    type="submit"
+                    disabled={!orderIdInput.trim()}
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm font-mono uppercase tracking-wider"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>START RECORDING</span>
+                  </button>
+                </div>
+              </form>
+
+            </div>
+          )}
+
+          {/* STEP 2: RECORDING */}
+          {step === 'RECORDING' && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+              
+              <div className="bg-slate-900 px-5 py-3 flex items-center justify-between text-xs font-mono text-white">
+                <div className="flex items-center gap-2 font-bold">
+                  <Camera className="w-4 h-4 text-emerald-400" />
+                  <span>ORDER: <strong className="text-emerald-400">{activeOrderId}</strong></span>
+                </div>
+
+                <div className="flex items-center gap-2 font-bold bg-rose-600 text-white px-3 py-1 rounded-full text-xs">
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <span>REC {formatTime(timerSeconds)}</span>
                 </div>
               </div>
 
-              {/* Control Bar */}
-              <div className="p-4 bg-[#06080d] flex items-center justify-between font-mono">
-                <div className="text-xs text-slate-400 flex items-center gap-2">
-                  <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Audio/Video capture active · Press <kbd className="px-1.5 py-0.5 bg-[#161d2b] text-slate-200 rounded border border-[#27344e]">SPACE</kbd> to stop</span>
-                </div>
+              <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                <video
+                  ref={setVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover block"
+                />
+              </div>
+
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between font-mono">
+                <span className="text-xs text-slate-500">Press <kbd className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded">SPACE</kbd> to stop</span>
                 
                 <button
                   onClick={handleStopRecording}
-                  className="bg-rose-600 hover:bg-rose-500 text-white font-black text-xs px-8 py-3.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-lg shadow-rose-600/30 uppercase tracking-wider font-mono"
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm font-mono uppercase tracking-wider"
                 >
-                  <StopCircle className="w-5 h-5" />
-                  <span>STOP & REVIEW PACKING</span>
+                  <StopCircle className="w-4 h-4" />
+                  <span>STOP & REVIEW</span>
                 </button>
               </div>
 
             </div>
           )}
 
-          {/* STEP 3: DISPATCH & VERIFICATION CONFIRMATION */}
+          {/* STEP 3: DISPATCH */}
           {step === 'CONFIRM' && (
-            <div className="bg-[#0e111a] border border-[#1f2738] rounded-2xl p-6 shadow-2xl space-y-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5 font-mono text-xs">
               
-              <div className="flex items-center justify-between pb-3 border-b border-[#1b2232]">
-                <h2 className="text-xs font-extrabold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  <span>STEP 03: VERIFY EVIDENCE & DISPATCH TO TELEGRAM</span>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h2 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>VERIFY EVIDENCE & DISPATCH</span>
                 </h2>
-                <span className="text-xs font-mono text-slate-400">Press <kbd className="px-2 py-0.5 bg-[#182030] text-slate-200 rounded">ENTER</kbd> to Dispatch</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Recorded Video Review Player */}
-                <div className="bg-black rounded-xl overflow-hidden border border-[#1a2233] aspect-video w-full flex items-center justify-center relative">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-black rounded-xl overflow-hidden aspect-video w-full flex items-center justify-center relative border border-slate-200">
                   {recordedVideoUrl ? (
                     <video
                       ref={reviewVideoRef}
@@ -656,60 +748,49 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                       className="w-full h-full object-contain bg-black rounded-xl"
                     />
                   ) : (
-                    <span className="text-xs text-slate-500 font-mono">Video recording preview unavailable</span>
+                    <span className="text-xs text-slate-400">Preview unavailable</span>
                   )}
                 </div>
 
-                {/* Evidence Metadata Fields */}
-                <div className="bg-[#06080d] border border-[#1a2130] rounded-xl p-5 space-y-4 text-xs font-mono">
-                  <div className="space-y-1.5">
-                    <label className="text-slate-400 block font-semibold text-[11px] uppercase tracking-wider">VERIFIED ORDER ID</label>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                  <div>
+                    <label className="text-slate-500 block font-bold text-[10px] uppercase">ORDER ID</label>
                     <input
                       type="text"
                       value={activeOrderId}
                       onChange={(e) => setActiveOrderId(e.target.value)}
-                      className="w-full bg-[#0d111a] border border-[#222c3f] rounded-lg px-3 py-2 text-white font-bold text-base focus:border-emerald-500 focus:outline-none"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 font-bold text-sm focus:border-blue-600 focus:outline-none"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="grid grid-cols-2 gap-2 text-slate-600">
                     <div>
-                      <span className="text-slate-500 block text-[10px] uppercase">CLIP DURATION</span>
-                      <span className="text-white font-bold text-sm">{formatTime(timerSeconds)} ({timerSeconds}s)</span>
+                      <span className="block text-[10px] text-slate-400">DURATION</span>
+                      <strong className="text-slate-900">{formatTime(timerSeconds)}</strong>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[10px] uppercase">PACKING STATION</span>
-                      <span className="text-white font-bold text-sm">{settings.stationId || 'Packing-01'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px] uppercase">OPERATOR</span>
-                      <span className="text-white font-bold text-sm">{currentStaff.name}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px] uppercase">TARGET CHANNEL</span>
-                      <span className="text-emerald-400 font-bold text-xs truncate block">{settings.telegramChatId || 'Telegram Channel'}</span>
+                      <span className="block text-[10px] text-slate-400">OPERATOR</span>
+                      <strong className="text-slate-900">{currentStaff.name}</strong>
                     </div>
                   </div>
                 </div>
-
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-3 font-mono">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   onClick={handleReRecord}
-                  className="px-5 py-3 bg-[#161c2b] hover:bg-[#1f273b] text-slate-300 font-bold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer border border-[#222c3e]"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer border border-slate-200 transition-colors"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>DISCARD & RE-RECORD</span>
+                  <span>DISCARD</span>
                 </button>
 
                 <button
                   onClick={handleFinalConfirmUpload}
-                  className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 transition-all uppercase tracking-wider"
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer shadow-sm transition-all uppercase tracking-wider"
                 >
                   <Send className="w-4 h-4" />
-                  <span>DISPATCH TO TELEGRAM GATEWAY</span>
+                  <span>DISPATCH TO TELEGRAM</span>
                 </button>
               </div>
 
@@ -718,73 +799,59 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
         </div>
 
-        {/* Right Panel: Live Telegram Queue & Pipeline Status */}
-        <div className="bg-[#0e111a] border border-[#1f2738] rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+        {/* Right Panel: Telegram Queue */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#1c2333]">
-              <h3 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2 font-mono">
-                <Send className="w-4 h-4 text-emerald-400" />
-                <span>TELEGRAM DISPATCH QUEUE ({queueTasks.length})</span>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 font-mono">
+              <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Send className="w-4 h-4 text-blue-600" />
+                <span>TELEGRAM QUEUE ({queueTasks.length})</span>
               </h3>
             </div>
 
             {queueTasks.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs font-mono">
-                No videos in active dispatch pipeline.
+              <div className="p-8 text-center text-slate-400 text-xs font-mono">
+                Queue empty
               </div>
             ) : (
-              <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[440px] overflow-y-auto pr-1">
                 {queueTasks.map((task) => (
-                  <div key={task.id} className="bg-[#06080d] p-3.5 rounded-xl border border-[#1a2130] space-y-2 text-xs font-mono">
+                  <div key={task.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5 text-xs font-mono">
                     <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-white text-sm">{task.orderId}</span>
+                      <span className="font-bold text-slate-900">{task.orderId}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        task.status === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                        task.status === 'FAILED' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                        'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        task.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' :
+                        task.status === 'FAILED' ? 'bg-rose-100 text-rose-800' :
+                        'bg-amber-100 text-amber-800'
                       }`}>
                         {task.status === 'UPLOADING' ? `${task.progress}%` : task.status}
                       </span>
                     </div>
 
                     {task.status === 'UPLOADING' && (
-                      <div className="w-full bg-[#121722] h-2 rounded-full overflow-hidden border border-[#21293a]">
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
                         <div
-                          className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-200"
+                          className="bg-blue-600 h-full rounded-full transition-all duration-200"
                           style={{ width: `${task.progress}%` }}
                         />
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Length: {task.durationSeconds}s</span>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                      <span>{task.durationSeconds}s</span>
                       <span>{new Date(task.recordingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
 
-                    {task.status === 'FAILED' && (
-                      <div className="pt-1 flex items-center justify-between text-rose-400 text-[11px]">
-                        <span className="truncate max-w-[140px]">{task.error || 'Upload error'}</span>
-                        <button
-                          onClick={() => uploadQueueManager.retryTask(task.id)}
-                          className="px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold rounded border border-rose-500/30 cursor-pointer"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    )}
-
                     {task.status === 'SUCCESS' && task.telegramMessageLink && (
-                      <div className="pt-1 border-t border-[#121824] flex justify-end">
-                        <a
-                          href={task.telegramMessageLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline font-semibold"
-                        >
-                          <span>Open in Telegram</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
+                      <a
+                        href={task.telegramMessageLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline font-bold pt-0.5"
+                      >
+                        <span>View in Telegram</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
                     )}
                   </div>
                 ))}
@@ -792,9 +859,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#1c2333] text-[10px] text-slate-500 text-center font-mono">
-            AUTOMATED DISPATCH PIPELINE ACTIVE
-          </div>
         </div>
 
       </div>

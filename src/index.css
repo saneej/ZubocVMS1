@@ -8,55 +8,27 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: #08090c;
-    color: #e2e8f0;
+    background-color: #f8fafc;
+    color: #0f172a;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
   }
 }
 
-/* Custom Scrollbars for Industrial UI Density */
+/* Custom Clean Light Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0d0f14;
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f2430;
+  background: #cbd5e1;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #333b4f;
-}
-
-/* Tech Grid Texture */
-.bg-tech-grid {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-.bg-dot-matrix {
-  background-image: radial-gradient(#272e3f 1px, transparent 1px);
-  background-size: 12px 12px;
-}
-
-/* Subtle Glass Panel without generic blur slop */
-.titanium-panel {
-  background: linear-gradient(180deg, rgba(21, 25, 34, 0.95) 0%, rgba(13, 16, 22, 0.98) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.titanium-card {
-  background: #0f1219;
-  border: 1px solid #1c2230;
-  transition: border-color 0.15s ease, transform 0.15s ease;
-}
-
-.titanium-card:hover {
-  border-color: #2e384e;
+  background: #94a3b8;
 }
 
 /* Camera HUD Overlay Elements */
@@ -98,33 +70,6 @@
   height: 16px;
   border-bottom: 2px solid #10b981;
   border-right: 2px solid #10b981;
-}
-
-/* Scanline Animation for Live Stream */
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(1000%); }
-}
-
-.animate-scanline {
-  animation: scanline 8s linear infinite;
-}
-
-/* LED Indicator Glows */
-.led-emerald {
-  box-shadow: 0 0 8px #10b981;
-}
-
-.led-amber {
-  box-shadow: 0 0 8px #f59e0b;
-}
-
-.led-rose {
-  box-shadow: 0 0 8px #f43f5e;
-}
-
-.led-cyan {
-  box-shadow: 0 0 8px #06b6d4;
 }
 
 /* Custom Keyframe Animations */

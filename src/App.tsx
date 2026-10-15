@@ -5,7 +5,6 @@ import { PackingStation } from './components/PackingStation';
 import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
-import { DiagnosePage } from './components/DiagnosePage';
 import { SettingsModal } from './components/SettingsModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { OrderRecord, StaffMember, AppSettings } from './types';
@@ -51,7 +50,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'diagnose'>('station');
+  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin'>('station');
   const [currentStaff, setCurrentStaff] = useState<StaffMember>({
     id: 'Staff-01',
     name: 'Alex Packer',
@@ -139,17 +138,17 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#080B11] flex flex-col items-center justify-center text-white font-mono">
-        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING ZUBOC VMS CONTROL ROOM...</p>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-800 font-sans">
+        <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-slate-500 font-bold text-xs uppercase tracking-wider font-mono">LOADING ZUBOC VMS...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white bg-tech-grid">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
       
-      {/* Deep Navy Persistent Sidebar */}
+      {/* Persistent Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -161,8 +160,8 @@ export default function App() {
         setIsMobileOpen={setIsMobileOpen}
       />
 
-      {/* Main Content Area (Offset by sidebar width on desktop) */}
-      <div className="lg:pl-72 flex-1 flex flex-col min-h-screen">
+      {/* Main Content Area */}
+      <div className="lg:pl-64 flex-1 flex flex-col min-h-screen">
         
         {/* Top Header */}
         <TopHeader
@@ -208,25 +207,16 @@ export default function App() {
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
           )}
-
-          {activeTab === 'diagnose' && (
-            <DiagnosePage
-              settings={settings}
-              orders={orders}
-              onRefreshOrders={fetchOrdersAPI}
-              onSaveSettings={(newSet) => setSettings(newSet)}
-            />
-          )}
         </main>
 
         <UploadQueueBanner />
 
-        <footer className="bg-[#06080E] border-t border-[#151D2F] py-3 text-center text-[11px] text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
-          <div>ZUBOC VMS — ENTERPRISE LOGISTICS EVIDENCE GATEWAY</div>
-          <div className="flex items-center gap-2 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 led-emerald"></span>
+        <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
+          <div>ZUBOC VMS — Enterprise Physical Logistics Portal</div>
+          <div className="flex items-center gap-2 text-slate-600">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>SYSTEM OPERATIONAL</span>
-            <span className="text-slate-600">|</span>
+            <span className="text-slate-300">|</span>
             <span>STATION: {settings.stationId || 'Packing-01'}</span>
           </div>
         </footer>
