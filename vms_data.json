@@ -1,0 +1,9 @@
+{
+  "orders": {},
+  "settings": {
+    "telegramBotToken": "8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE",
+    "telegramChatId": "-1003940299676",
+    "autoUpload": true,
+    "stationId": "Packing-01"
+  }
+}

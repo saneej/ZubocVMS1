@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "OrderRecord": {
+      "title": "Order Record",
+      "description": "Video management recording record for packed e-commerce orders",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Barcode or Order ID", "maxLength": 128 },
+        "staffId": { "type": "string", "description": "Staff ID who packed the order", "maxLength": 128 },
+        "stationId": { "type": "string", "description": "Packing station ID", "maxLength": 128 },
+        "recordingStartedAt": { "type": "string", "description": "ISO timestamp when recording started" },
+        "recordingCompletedAt": { "type": "string", "description": "ISO timestamp when recording completed" },
+        "durationSeconds": { "type": "number", "description": "Video duration in seconds" },
+        "recordingStatus": { "type": "string", "enum": ["RECORDING", "COMPLETED", "FAILED"] },
+        "uploadStatus": { "type": "string", "enum": ["PENDING", "SUCCESS", "FAILED", "SKIPPED"] },
+        "telegramChatId": { "type": "string", "description": "Telegram group chat ID" },
+        "telegramMessageId": { "type": "string", "description": "Telegram message ID" },
+        "telegramFileId": { "type": "string", "description": "Telegram video file ID" },
+        "telegramMessageLink": { "type": "string", "description": "Direct link to Telegram message" },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["orderId", "staffId", "stationId", "recordingStatus", "uploadStatus"]
+    },
+    "AppSettings": {
+      "title": "App Settings",
+      "description": "Configuration for Telegram integration and packing station defaults",
+      "type": "object",
+      "properties": {
+        "telegramBotToken": { "type": "string", "maxLength": 256 },
+        "telegramChatId": { "type": "string", "maxLength": 128 },
+        "autoUpload": { "type": "boolean" },
+        "stationId": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": "OrderRecord",
+      "description": "Collection of order packing video metadata and Telegram video references"
+    },
+    "/settings/config": {
+      "schema": "AppSettings",
+      "description": "Global application configuration document"
+    }
+  }
+}
