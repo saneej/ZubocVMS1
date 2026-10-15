@@ -73,7 +73,7 @@ function playFeedbackTone(type: 'beep' | 'success' | 'snap') {
   }
 }
 
-// Request camera stream without brittle hard constraints, with canvas simulator fallback
+// Request camera stream without brittle hard constraints
 async function getCameraStream(deviceId?: string): Promise<MediaStream> {
   const constraintsToTry: MediaStreamConstraints[] = [
     ...(deviceId ? [
@@ -86,49 +86,14 @@ async function getCameraStream(deviceId?: string): Promise<MediaStream> {
     { video: true }
   ];
 
-  if (navigator.mediaDevices?.getUserMedia) {
-    for (const constraint of constraintsToTry) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraint);
-        if (stream) return stream;
-      } catch {
-        // Try next fallback constraint
-      }
+  for (const constraint of constraintsToTry) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraint);
+      if (stream) return stream;
+    } catch {
+      // Try next fallback constraint
     }
   }
-
-  // Fallback: Create simulated canvas video stream so packing station is never blocked
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1280;
-    canvas.height = 720;
-    const ctx = canvas.getContext('2d');
-    if (ctx && (canvas as any).captureStream) {
-      let angle = 0;
-      setInterval(() => {
-        try {
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = '#3b82f6';
-          ctx.font = 'bold 36px monospace';
-          ctx.fillText('Zuboc VMS Camera Simulator', 60, 100);
-          ctx.fillStyle = '#94a3b8';
-          ctx.font = '20px monospace';
-          ctx.fillText(`Active Station • ${new Date().toLocaleTimeString()}`, 60, 150);
-          
-          ctx.save();
-          ctx.translate(640, 360);
-          ctx.rotate(angle);
-          ctx.fillStyle = '#10b981';
-          ctx.fillRect(-50, -50, 100, 100);
-          ctx.restore();
-          angle += 0.04;
-        } catch {}
-      }, 33);
-      return (canvas as any).captureStream(30);
-    }
-  } catch {}
-
   throw new Error('Webcam stream unavailable. Please check camera connection and permissions.');
 }
 
@@ -303,6 +268,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, [isRecording]);
+
+  // Auto-calculate order total when order amount or shipping amount changes
+  useEffect(() => {
+    const ord = parseFloat(orderAmountInput) || 0;
+    const shp = parseFloat(shippingAmountInput) || 0;
+    if (ord > 0 || shp > 0) {
+      setOrderTotalInput((ord + shp).toFixed(2));
+    }
+  }, [orderAmountInput, shippingAmountInput]);
 
   // Persistent Video binding ref callback
   const handleVideoMount = (el: HTMLVideoElement | null) => {
@@ -1070,6 +1044,87 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                             />
                           </div>
 
+                          {/* Order Received Date */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Order Received Date
+                            </label>
+                            <input
+                              type="date"
+                              value={orderReceivedDateInput}
+                              onChange={(e) => setOrderReceivedDateInput(e.target.value)}
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Despatch Date */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Despatch Date
+                            </label>
+                            <input
+                              type="date"
+                              value={dispatchDateInput}
+                              onChange={(e) => setDispatchDateInput(e.target.value)}
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Order Amount */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Order Amount (₹)
+                            </label>
+                            <input
+                              type="text"
+                              value={orderAmountInput}
+                              onChange={(e) => setOrderAmountInput(e.target.value)}
+                              placeholder="e.g. 1499.00"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Shipping Amount */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Shipping Amount (₹)
+                            </label>
+                            <input
+                              type="text"
+                              value={shippingAmountInput}
+                              onChange={(e) => setShippingAmountInput(e.target.value)}
+                              placeholder="e.g. 99.00"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Total Amount */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Total Amount (₹)
+                            </label>
+                            <input
+                              type="text"
+                              value={orderTotalInput}
+                              onChange={(e) => setOrderTotalInput(e.target.value)}
+                              placeholder="Auto or manual total"
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
+                          {/* Delivered Date */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                              Delivered Date (Editable)
+                            </label>
+                            <input
+                              type="date"
+                              value={deliveredDateInput}
+                              onChange={(e) => setDeliveredDateInput(e.target.value)}
+                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                            />
+                          </div>
+
                           {/* Notes / QC Remarks */}
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
@@ -1258,7 +1313,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                   </div>
 
                   {/* Package Metadata Summary Badge */}
-                  {(awbInput || courierInput || weightInput || skuInput || customerInput || contactPersonInput || contactPhoneInput || notesInput) && (
+                  {(awbInput || courierInput || weightInput || skuInput || customerInput || contactPersonInput || contactPhoneInput || orderReceivedDateInput || dispatchDateInput || orderAmountInput || shippingAmountInput || orderTotalInput || deliveredDateInput || notesInput) && (
                     <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5 font-mono text-xs">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Package Details for Telegram Caption & Dashboard:
@@ -1272,6 +1327,12 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                         {customerInput && <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">👤 Customer: <strong>{customerInput}</strong></span>}
                         {contactPersonInput && <span className="bg-cyan-50 text-cyan-800 px-2 py-0.5 rounded border border-cyan-200">📞 Contact: <strong>{contactPersonInput}</strong></span>}
                         {contactPhoneInput && <span className="bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200">📱 Phone: <strong>{contactPhoneInput}</strong></span>}
+                        {orderReceivedDateInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Received: <strong>{orderReceivedDateInput}</strong></span>}
+                        {dispatchDateInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Despatch: <strong>{dispatchDateInput}</strong></span>}
+                        {orderAmountInput && <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">Amount: <strong>₹{orderAmountInput}</strong></span>}
+                        {shippingAmountInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">Shipping: <strong>₹{shippingAmountInput}</strong></span>}
+                        {orderTotalInput && <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-200">Total: <strong>₹{orderTotalInput}</strong></span>}
+                        {deliveredDateInput && <span className="bg-green-50 text-green-800 px-2 py-0.5 rounded border border-green-200">Delivered: <strong>{deliveredDateInput}</strong></span>}
                         {notesInput && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">📝 Notes: <strong>{notesInput}</strong></span>}
                       </div>
                     </div>

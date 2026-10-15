@@ -31,6 +31,7 @@ export interface OrderRecord {
   deliveredDate?: string;
   itemCount?: string | number;
   notes?: string;
+  auditLogs?: { timestamp: string; staffId: string; action: string; details: string; type: 'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG' }[];
   createdAt: string;
   updatedAt: string;
 }

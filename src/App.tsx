@@ -166,6 +166,21 @@ export default function App() {
     setOrders(prev => [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)]);
   };
 
+  const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
+    try {
+      const res = await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedOrder)
+      });
+      if (res) {
+        setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
+      }
+    } catch (err) {
+      console.error('Error updating order:', err);
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
     try {
       const res = await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
@@ -241,6 +256,8 @@ export default function App() {
               orders={orders}
               onRefreshOrders={fetchOrdersAPI}
               onDeleteOrder={handleDeleteOrder}
+              onUpdateOrder={handleUpdateOrder}
+              currentStaffId={currentStaff?.id}
             />
           )}
 

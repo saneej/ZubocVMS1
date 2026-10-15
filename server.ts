@@ -166,8 +166,15 @@ interface OrderRecord {
   customerName?: string;
   contactPerson?: string;
   contactPhone?: string;
+  orderReceivedDate?: string;
+  dispatchDate?: string;
+  orderAmount?: string;
+  shippingAmount?: string;
+  orderTotal?: string;
+  deliveredDate?: string;
   itemCount?: string | number;
   notes?: string;
+  auditLogs?: { timestamp: string; staffId: string; action: string; details: string; type: 'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG' }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -818,6 +825,12 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         record.customerName ? `<b>👤 Customer / City:</b> ${escapeHtml(record.customerName)}` : '',
         record.contactPerson ? `<b>📞 Contact Person:</b> ${escapeHtml(record.contactPerson)}` : '',
         record.contactPhone ? `<b>📱 Contact Phone:</b> ${escapeHtml(record.contactPhone)}` : '',
+        record.orderReceivedDate ? `<b>📥 Received Date:</b> ${escapeHtml(record.orderReceivedDate)}` : '',
+        record.dispatchDate ? `<b>📤 Despatch Date:</b> ${escapeHtml(record.dispatchDate)}` : '',
+        record.orderAmount ? `<b>💰 Order Amount:</b> ₹${escapeHtml(record.orderAmount)}` : '',
+        record.shippingAmount ? `<b>📦 Shipping Amount:</b> ₹${escapeHtml(record.shippingAmount)}` : '',
+        record.orderTotal ? `<b>💵 Total Amount:</b> ₹${escapeHtml(record.orderTotal)}` : '',
+        record.deliveredDate ? `<b>✅ Delivered Date:</b> ${escapeHtml(record.deliveredDate)}` : '',
         `<b>👷 Staff:</b> ${safeStaffId}`,
         `<b>📍 Station:</b> ${safeStationId}`,
         `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
