@@ -92,12 +92,12 @@ async function getCameraStream(deviceId?: string): Promise<MediaStream> {
 // Initialize MediaRecorder reliably across Chrome, Safari, Edge, Firefox
 function createMediaRecorder(stream: MediaStream): MediaRecorder {
   const candidateMimes = [
+    'video/mp4;codecs=avc1',
+    'video/mp4',
+    'video/webm;codecs=h264',
     'video/webm;codecs=vp8',
     'video/webm;codecs=vp9',
-    'video/webm;codecs=h264',
-    'video/webm',
-    'video/mp4;codecs=avc1',
-    'video/mp4'
+    'video/webm'
   ];
 
   for (const mime of candidateMimes) {
@@ -376,8 +376,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
       recorder.onstop = () => {
         if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-        const mime = recorder?.mimeType || 'video/webm';
-        const blob = new Blob(chunksRef.current, { type: mime });
+        const mime = recorder?.mimeType || 'video/mp4';
+        const blob = new Blob(chunksRef.current, { type: mime.includes('webm') ? 'video/mp4' : mime });
         setRecordedBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
@@ -424,7 +424,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     // Safety watchdog: ensure onstop finishes within 1s
     stopTimeoutRef.current = setTimeout(() => {
       if (chunksRef.current.length > 0) {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
         setRecordedBlob(blob);
         setRecordedVideoUrl(URL.createObjectURL(blob));
       }

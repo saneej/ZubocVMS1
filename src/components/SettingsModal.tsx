@@ -21,6 +21,7 @@ import { AppSettings, StaffMember } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { db } from '../firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { cleanForFirestore } from '../utils/firestoreHelper';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -184,13 +185,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       if (db) {
         try {
-          await setDoc(doc(db, 'settings', 'config'), {
+          await setDoc(doc(db, 'settings', 'config'), cleanForFirestore({
             telegramBotToken: localStorage.getItem('zuboc_telegram_token') || sanitizedToken,
             telegramChatId: sanitizedChatId,
             stationId: sanitizedStationId,
             autoUpload: true,
             updatedAt: new Date().toISOString()
-          }, { merge: true });
+          }), { merge: true });
         } catch {}
       }
 

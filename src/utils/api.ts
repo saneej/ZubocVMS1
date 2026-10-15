@@ -1,6 +1,7 @@
 // Safe API helper with automatic client-side fallback when backend Express API is unreachable or returns 404/500
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { cleanForFirestore } from './firestoreHelper';
 
 export function getApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : '/' + path;
@@ -145,7 +146,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
 
       if (db) {
         try {
-          await setDoc(doc(db, 'settings', 'config'), { ...updated, updatedAt: new Date().toISOString() }, { merge: true });
+          await setDoc(doc(db, 'settings', 'config'), cleanForFirestore({ ...updated, updatedAt: new Date().toISOString() }), { merge: true });
         } catch {}
       }
       return { success: true, settings: { ...updated, telegramBotTokenMasked: '***' } };
@@ -203,7 +204,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       localStorage.setItem('zuboc_orders_store', JSON.stringify(orders));
       if (db) {
         try {
-          await setDoc(doc(db, 'orders', orderId), record, { merge: true });
+          await setDoc(doc(db, 'orders', orderId), cleanForFirestore(record), { merge: true });
         } catch {}
       }
       return { success: true, record };
@@ -375,7 +376,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
 
     if (db) {
       try {
-        await setDoc(doc(db, 'orders', orderId), record, { merge: true });
+        await setDoc(doc(db, 'orders', orderId), cleanForFirestore(record), { merge: true });
       } catch {}
     }
 
@@ -409,7 +410,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
           localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
         } else {
           for (const k of Object.keys(staffs)) {
-            await setDoc(doc(db, 'staffs', k), staffs[k], { merge: true });
+            await setDoc(doc(db, 'staffs', k), cleanForFirestore(staffs[k]), { merge: true });
           }
         }
       } catch {}
@@ -467,7 +468,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
       if (db) {
         try {
-          await setDoc(doc(db, 'staffs', staffKey), { password: newPassword }, { merge: true });
+          await setDoc(doc(db, 'staffs', staffKey), cleanForFirestore({ password: newPassword }), { merge: true });
         } catch {}
       }
       return { success: true, message: `Password for ${staffs[staffKey].name} has been reset successfully!` };
@@ -512,7 +513,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
       if (db) {
         try {
-          await setDoc(doc(db, 'staffs', id), updatedStaff, { merge: true });
+          await setDoc(doc(db, 'staffs', id), cleanForFirestore(updatedStaff), { merge: true });
         } catch {}
       }
 

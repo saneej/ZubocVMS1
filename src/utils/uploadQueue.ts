@@ -1,6 +1,7 @@
 import { getApiUrl, safeFetchJson } from './api';
 import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { cleanForFirestore } from './firestoreHelper';
 
 export interface UploadTask {
   id: string;
@@ -146,10 +147,8 @@ class UploadQueueManager {
         formData.append('caption', caption);
         formData.append('parse_mode', 'HTML');
         
-        const isMp4 = task.videoBlob?.type?.includes('mp4');
-        if (isMp4) {
-          formData.append('supports_streaming', 'true');
-        }
+        const isMp4 = true;
+        formData.append('supports_streaming', 'true');
         
         if (task.width && task.height && task.width > 0 && task.height > 0) {
           formData.append('width', task.width.toString());
@@ -159,8 +158,9 @@ class UploadQueueManager {
           formData.append('duration', Math.round(task.durationSeconds).toString());
         }
 
-        const ext = isMp4 ? 'mp4' : 'webm';
-        formData.append('video', task.videoBlob!, `${safeOrderId}.${ext}`);
+        const ext = 'mp4';
+        const videoBlobToUpload = new Blob([task.videoBlob!], { type: 'video/mp4' });
+        formData.append('video', videoBlobToUpload, `${safeOrderId}.${ext}`);
 
         if (task.photoBlobs && task.photoBlobs.length > 0) {
           formData.append('thumb', task.photoBlobs[0], `${safeOrderId}_thumb.jpg`);
@@ -441,7 +441,7 @@ class UploadQueueManager {
     // 2. Update Firestore database
     if (db) {
       try {
-        await setDoc(doc(db, 'orders', task.orderId), updatedRecord, { merge: true });
+        await setDoc(doc(db, 'orders', task.orderId), cleanForFirestore(updatedRecord), { merge: true });
       } catch (e) {
         console.warn('Firestore order save warning:', e);
       }
