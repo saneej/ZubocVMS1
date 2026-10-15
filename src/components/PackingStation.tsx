@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, StopCircle, Play, CheckCircle2, Barcode, Send, ExternalLink, RefreshCw, AlertCircle, RotateCcw, PackageCheck, ShieldCheck, Check, Volume2, Mic, Maximize2, Zap, Layers, Sparkles, AlertTriangle } from 'lucide-react';
-import { MultiFormatReader, RGBLuminanceSource, BinaryBitmap, HybridBinarizer } from '@zxing/library';
+import { Camera, StopCircle, Play, CheckCircle2, Barcode, Send, ExternalLink, RefreshCw, AlertCircle, RotateCcw, PackageCheck, ShieldCheck, Check, Volume2, Mic, Maximize2, Zap, Layers, Sparkles, AlertTriangle, Scan, Upload, Video } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
 import { safeFetchJson } from '../utils/api';
+import { scanBarcodeFromVideo, scanBarcodeFromImageFile, BarcodeScanResult } from '../utils/barcodeScanner';
 
 function playBeepSound() {
   try {
@@ -13,39 +13,15 @@ function playBeepSound() {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, ctx.currentTime);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.frequency.setValueAtTime(1400, ctx.currentTime);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 0.15);
+    osc.stop(ctx.currentTime + 0.18);
   } catch {
     // ignore sound errors
-  }
-}
-
-function decodeBarcodeFromVideo(video: HTMLVideoElement): string | null {
-  try {
-    if (!video || video.readyState < 2) return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const luminanceSource = new RGBLuminanceSource(
-      new Uint8ClampedArray(imageData.data.buffer),
-      canvas.width,
-      canvas.height
-    );
-    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
-    const reader = new MultiFormatReader();
-    const result = reader.decode(binaryBitmap);
-    return result ? result.getText() : null;
-  } catch {
-    return null;
   }
 }
 
@@ -58,41 +34,38 @@ interface PackingStationProps {
 
 type StationStep = 'READY' | 'SCAN' | 'RECORDING' | 'CONFIRM';
 
-function getSupportedMimeType(): string {
-  if (typeof MediaRecorder === 'undefined') return '';
-  const types = [
-    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+function getSupportedMimeTypes(): string[] {
+  if (typeof MediaRecorder === 'undefined') return [];
+  const candidateTypes = [
     'video/mp4;codecs=avc1',
     'video/mp4',
-    'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp9',
-    'video/webm;codecs=av1,opus',
-    'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp8',
-    'video/webm'
+    'video/webm;codecs=h264',
+    'video/webm',
+    'video/quicktime'
   ];
-  for (const type of types) {
+  return candidateTypes.filter(type => {
     try {
-      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
-        return type;
-      }
+      return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type);
     } catch {
-      // ignore mime syntax exceptions
+      return false;
     }
-  }
-  return '';
+  });
 }
 
-async function getCameraStream(): Promise<MediaStream> {
+async function getCameraStream(deviceId?: string): Promise<MediaStream> {
   const constraintsToTry = [
-    // Prioritize Full HD 1080p (1920x1080) with explicit 16:9 widescreen aspect ratio for maximum clarity
+    // 1. Specific deviceId if selected by operator
+    ...(deviceId ? [
+      { video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 } } },
+      { video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+      { video: { deviceId: { exact: deviceId } } }
+    ] : []),
+    // 2. High-res widescreen (ideal constraints only, NO hard min requirements that crash standard webcams)
     { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 }, frameRate: { ideal: 30 }, facingMode: { ideal: 'environment' } } },
-    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 }, frameRate: { ideal: 30 } } },
-    { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.7777777778 } } },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 }, facingMode: { ideal: 'environment' } } },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 } } },
-    { video: { aspectRatio: { ideal: 1.7777777778 }, facingMode: 'environment' } },
-    { video: { aspectRatio: { ideal: 1.7777777778 } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 }, frameRate: { ideal: 30 } } },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 } } },
     { video: { facingMode: 'environment' } },
     { video: true }
   ];
@@ -102,10 +75,10 @@ async function getCameraStream(): Promise<MediaStream> {
       const stream = await navigator.mediaDevices.getUserMedia(constraint);
       if (stream) return stream;
     } catch {
-      // try fallback
+      // try next constraint
     }
   }
-  throw new Error('Overhead webcam stream unavailable. Please check camera connection and browser permissions.');
+  throw new Error('Webcam stream unavailable. Please verify camera permissions and connection.');
 }
 
 export const PackingStation: React.FC<PackingStationProps> = ({
@@ -121,6 +94,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [isStartingRecording, setIsStartingRecording] = useState(false);
+
+  const [availableCameras, setAvailableCameras] = useState<{ deviceId: string; label: string }[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>(() => {
+    return localStorage.getItem('zuboc_selected_camera') || '';
+  });
 
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
@@ -141,92 +121,115 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const chunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [autoRecordOnScan, setAutoRecordOnScan] = useState<boolean>(true);
   const [scannerActive, setScannerActive] = useState<boolean>(true);
-  const [scannedNotification, setScannedNotification] = useState<{ text: string; time: string } | null>(null);
+  const [scannedNotification, setScannedNotification] = useState<{ text: string; time: string; engine?: string } | null>(null);
+  const [scanHeartbeat, setScanHeartbeat] = useState<boolean>(false);
 
   const scanVideoRef = useRef<HTMLVideoElement | null>(null);
   const lastScannedCodeRef = useRef<string>('');
   const isScanningFrameRef = useRef<boolean>(false);
 
+  // Enumerate cameras so user can switch between built-in and overhead cameras
+  const refreshCameras = async () => {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices
+        .filter(d => d.kind === 'videoinput')
+        .map((d, i) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Camera ${i + 1}`
+        }));
+      setAvailableCameras(videoInputs);
+    } catch {
+      // ignore enumeration errors
+    }
+  };
+
   // Auto-start camera immediately on component mount
   useEffect(() => {
-    initCamera().catch(err => console.warn('Initial camera warm-up:', err));
+    initCamera(selectedCameraId).catch(err => console.warn('Initial camera warm-up:', err));
   }, []);
 
   // Handle scanned barcode detection
-  const handleBarcodeDetected = (rawCode: string) => {
+  const handleBarcodeDetected = (rawCode: string, engine?: string) => {
     const cleanCode = rawCode.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
     if (!cleanCode || cleanCode === lastScannedCodeRef.current) return;
 
     lastScannedCodeRef.current = cleanCode;
     playBeepSound();
 
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(100); } catch {}
+    }
+
     setScannedNotification({
       text: cleanCode,
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString(),
+      engine: engine ? engine.toUpperCase() : 'DETECTED'
     });
     setOrderIdInput(cleanCode);
 
     if (autoRecordOnScan) {
       setTimeout(() => {
         handleConfirmOrderAndStartRecording(undefined, cleanCode);
-      }, 350);
+      }, 400);
     }
   };
 
-  // Real-time camera barcode frame scanner loop
+  // Real-time camera barcode frame scanner loop using multi-tier pipeline
   useEffect(() => {
     if (step !== 'SCAN' || !cameraActive || !scannerActive) return;
 
-    let intervalId: any = null;
-
-    const performScan = async () => {
-      if (isScanningFrameRef.current) return;
+    let isScanning = false;
+    const intervalId = setInterval(async () => {
+      if (isScanning || isScanningFrameRef.current) return;
       const targetVideo = scanVideoRef.current || videoRef.current;
-      if (!targetVideo || targetVideo.readyState < 2) return;
+      if (!targetVideo || targetVideo.readyState < 2 || targetVideo.videoWidth < 10) return;
 
+      isScanning = true;
       isScanningFrameRef.current = true;
-      try {
-        // 1. Try Native BarcodeDetector (GPU hardware accelerated in Chrome/Edge/Android)
-        if ('BarcodeDetector' in window) {
-          try {
-            const detector = new (window as any).BarcodeDetector({
-              formats: ['code_128', 'code_39', 'qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'pdf417']
-            });
-            const barcodes = await detector.detect(targetVideo);
-            if (barcodes && barcodes.length > 0) {
-              const text = barcodes[0].rawValue;
-              if (text) {
-                handleBarcodeDetected(text);
-                isScanningFrameRef.current = false;
-                return;
-              }
-            }
-          } catch {
-            // fallback to ZXing
-          }
-        }
+      setScanHeartbeat(prev => !prev);
 
-        // 2. ZXing fallback scanner via Canvas frame decoding
-        const scannedText = decodeBarcodeFromVideo(targetVideo);
-        if (scannedText) {
-          handleBarcodeDetected(scannedText);
+      try {
+        const result = await scanBarcodeFromVideo(targetVideo);
+        if (result && result.code) {
+          handleBarcodeDetected(result.code, result.engine);
         }
-      } catch {
-        // frame decode exception ignored
+      } catch (err) {
+        console.warn('Scan frame warning:', err);
       } finally {
+        isScanning = false;
         isScanningFrameRef.current = false;
       }
-    };
-
-    intervalId = setInterval(performScan, 300);
+    }, 180);
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      clearInterval(intervalId);
+      isScanningFrameRef.current = false;
     };
   }, [step, cameraActive, scannerActive, autoRecordOnScan]);
+
+  // Handle file photo barcode scan
+  const handleFileUploadScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const res = await scanBarcodeFromImageFile(file);
+      if (res && res.code) {
+        handleBarcodeDetected(res.code, res.engine);
+      } else {
+        alert('No barcode detected in uploaded image. Please try a clearer photo or use the camera.');
+      }
+    } catch (err) {
+      alert('Failed to process image file.');
+    } finally {
+      if (e.target) e.target.value = '';
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('zuboc_upload_preset', uploadPreset);
@@ -256,19 +259,32 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     };
   }, [isRecording]);
 
-  const initCamera = async () => {
+  const initCamera = async (deviceId?: string) => {
     try {
       setCameraError(null);
-      const stream = await getCameraStream();
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      const stream = await getCameraStream(deviceId || selectedCameraId);
       mediaStreamRef.current = stream;
       setCameraActive(true);
+      if (deviceId) {
+        setSelectedCameraId(deviceId);
+        localStorage.setItem('zuboc_selected_camera', deviceId);
+      }
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(e => console.warn('Camera preview play warning:', e));
       }
+      if (scanVideoRef.current && scanVideoRef.current !== videoRef.current) {
+        scanVideoRef.current.srcObject = stream;
+        scanVideoRef.current.play().catch(e => console.warn('Scan camera preview play warning:', e));
+      }
+      refreshCameras();
     } catch (err: any) {
       console.error('Camera initialization error:', err);
-      setCameraError('Webcam stream error: Please ensure USB overhead camera is connected.');
+      setCameraError('Webcam stream error: Please ensure USB overhead camera is connected and browser permissions are granted.');
       setCameraActive(false);
     }
   };
@@ -284,6 +300,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   // Ref callback to immediately bind camera stream when <video> mounts in DOM
   const setVideoRef = (el: HTMLVideoElement | null) => {
     videoRef.current = el;
+    scanVideoRef.current = el;
     if (el && mediaStreamRef.current) {
       if (el.srcObject !== mediaStreamRef.current) {
         el.srcObject = mediaStreamRef.current;
@@ -341,48 +358,69 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   // Step 2 -> Step 3
   const handleConfirmOrderAndStartRecording = async (e?: React.FormEvent, overrideOrderId?: string) => {
     if (e) e.preventDefault();
+    setRecordingError(null);
+
     const targetId = overrideOrderId || orderIdInput;
     const cleanId = targetId.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
-    if (!cleanId) return;
+    if (!cleanId) {
+      setRecordingError('Please enter or scan an Order ID / AWB before starting recording.');
+      scanInputRef.current?.focus();
+      return;
+    }
 
+    setIsStartingRecording(true);
     setActiveOrderId(cleanId);
     setTimerSeconds(0);
     chunksRef.current = [];
     setRecordedVideoUrl(null);
     setRecordedBlob(null);
 
-    if (!mediaStreamRef.current) {
-      await initCamera();
-    } else if (videoRef.current) {
-      videoRef.current.srcObject = mediaStreamRef.current;
-    }
-
     try {
-      const selectedMime = getSupportedMimeType();
+      // 1. Ensure camera stream is active and healthy
+      let stream = mediaStreamRef.current;
+      const isStreamHealthy = stream && stream.active && stream.getVideoTracks().some(t => t.readyState === 'live');
+      
+      if (!isStreamHealthy) {
+        stream = await getCameraStream(selectedCameraId);
+        mediaStreamRef.current = stream;
+        setCameraActive(true);
+      }
+
+      if (!stream) {
+        throw new Error('Camera stream could not be acquired. Please check camera connection.');
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(err => console.warn('Preview play warning:', err));
+      }
+
+      // 2. Select compatible video codec
+      const supportedMimes = getSupportedMimeTypes();
       const targetBitrate = getTargetBitrate();
 
-      const candidateMimes = [
-        selectedMime,
-        'video/mp4',
-        'video/webm',
-        ''
-      ].filter((m, idx, arr) => m !== undefined && arr.indexOf(m) === idx);
-
       let recorder: MediaRecorder | null = null;
-      for (const mime of candidateMimes) {
-        try {
-          const options: MediaRecorderOptions = { videoBitsPerSecond: targetBitrate };
-          if (mime) options.mimeType = mime;
 
-          recorder = new MediaRecorder(mediaStreamRef.current!, options);
+      // Try with targetBitrate and supported MIME
+      for (const mime of supportedMimes) {
+        try {
+          recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: targetBitrate });
           if (recorder) break;
         } catch {
-          // try next mime without options
+          try {
+            recorder = new MediaRecorder(stream, { mimeType: mime });
+            if (recorder) break;
+          } catch {}
         }
       }
 
+      // If specific MIME failed, try raw browser default
       if (!recorder) {
-        recorder = new MediaRecorder(mediaStreamRef.current!);
+        try {
+          recorder = new MediaRecorder(stream, { videoBitsPerSecond: targetBitrate });
+        } catch {
+          recorder = new MediaRecorder(stream);
+        }
       }
 
       mediaRecorderRef.current = recorder;
@@ -393,29 +431,50 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         }
       };
 
+      recorder.onerror = (event: any) => {
+        console.error('MediaRecorder error event:', event);
+        setRecordingError('Recording device error encountered.');
+      };
+
       recorder.onstop = () => {
-        const actualMime = recorder.mimeType || selectedMime || 'video/mp4';
+        const actualMime = recorder?.mimeType || supportedMimes[0] || 'video/mp4';
         const blob = new Blob(chunksRef.current, { type: actualMime });
         setRecordedBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
-        stopCameraStream();
+        // Keep camera stream alive so next order doesn't suffer startup delay!
         setStep('CONFIRM');
       };
 
-      recorder.start(1000);
+      // 3. Start recording
+      try {
+        recorder.start(1000);
+      } catch {
+        // Fallback without timeslice if browser doesn't support timeslice with this mime
+        recorder.start();
+      }
+
       setIsRecording(true);
+      setRecordingError(null);
       setStep('RECORDING');
     } catch (err: any) {
-      alert('Failed to start webcam recording: ' + (err.message || String(err)));
+      console.error('Failed to start recording:', err);
+      setRecordingError('Failed to start camera recording: ' + (err.message || String(err)));
+      setStep('SCAN');
+    } finally {
+      setIsStartingRecording(false);
     }
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {
+        console.warn('Error stopping MediaRecorder:', err);
+      }
     }
+    setIsRecording(false);
   };
 
   const handleFinalConfirmUpload = () => {
@@ -585,7 +644,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
               )}
 
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-3 gap-2">
                 <div className="flex items-center gap-2">
                   <Camera className="w-4 h-4 text-blue-600" />
                   <h2 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider font-mono">
@@ -593,36 +652,65 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                   </h2>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setAutoRecordOnScan(!autoRecordOnScan)}
-                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold font-mono transition-all cursor-pointer ${
-                    autoRecordOnScan
-                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                      : 'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}
-                >
-                  AUTO-RECORD: {autoRecordOnScan ? 'ON' : 'OFF'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {availableCameras.length > 1 && (
+                    <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                      <Video className="w-3.5 h-3.5 text-slate-500" />
+                      <select
+                        value={selectedCameraId}
+                        onChange={(e) => initCamera(e.target.value)}
+                        className="bg-transparent text-[11px] font-mono text-slate-700 outline-none cursor-pointer max-w-[140px] truncate"
+                      >
+                        {availableCameras.map(cam => (
+                          <option key={cam.deviceId} value={cam.deviceId}>{cam.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setAutoRecordOnScan(!autoRecordOnScan)}
+                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold font-mono transition-all cursor-pointer ${
+                      autoRecordOnScan
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    AUTO-RECORD: {autoRecordOnScan ? 'ON' : 'OFF'}
+                  </button>
+                </div>
               </div>
 
               {/* Live Camera Box */}
-              <div className="relative bg-slate-950 rounded-xl overflow-hidden aspect-video flex items-center justify-center shadow-inner">
+              <div className="relative bg-slate-950 rounded-xl overflow-hidden aspect-video flex items-center justify-center shadow-inner group">
                 
-                {/* Scanner Frame */}
-                <div className="absolute inset-10 sm:inset-16 border-2 border-dashed border-emerald-400/60 rounded-xl pointer-events-none flex flex-col items-center justify-between p-3 z-10">
+                {/* Status Indicator */}
+                <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[10px] font-mono font-bold text-slate-200">
+                  <span className={`w-2 h-2 rounded-full ${scanHeartbeat ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-emerald-500'}`} />
+                  <span>SEEKING BARCODE / QR</span>
+                </div>
+
+                {/* Scanner Frame / Reticle */}
+                <div className="absolute inset-x-8 sm:inset-x-20 inset-y-8 sm:inset-y-12 border-2 border-dashed border-emerald-400/60 rounded-xl pointer-events-none flex flex-col items-center justify-between p-3 z-10 bg-emerald-500/[0.02]">
                   <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-sm animate-pulse" />
-                  <div className="text-[10px] font-mono font-bold text-white bg-slate-900/90 backdrop-blur px-3 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1.5">
+                  <div className="text-[10px] font-mono font-bold text-white bg-slate-900/90 backdrop-blur px-3 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1.5 shadow-md">
                     <Barcode className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>HOLD AWB BARCODE UNDER CAMERA TO SCAN</span>
+                    <span>HOLD AWB BARCODE UNDER CAMERA</span>
                   </div>
                   <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-sm animate-pulse" />
                 </div>
 
+                {/* Scanned Flash Overlay */}
                 {scannedNotification && (
-                  <div className="absolute top-4 bg-emerald-600 text-white font-mono font-bold text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 z-20">
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>BARCODE SCANNED: {scannedNotification.text}</span>
+                  <div className="absolute inset-0 bg-emerald-500/15 border-4 border-emerald-500 z-30 flex flex-col items-center justify-center pointer-events-none transition-all">
+                    <div className="bg-emerald-600 text-white font-mono font-bold text-sm px-5 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5">
+                      <CheckCircle2 className="w-5 h-5 text-white" />
+                      <span>SCANNED: {scannedNotification.text} {scannedNotification.engine ? `(${scannedNotification.engine})` : ''}</span>
+                    </div>
+                    <p className="text-white text-xs font-mono font-bold bg-slate-900/90 px-3 py-1 rounded-md mt-2 border border-emerald-400/40 shadow-lg">
+                      {autoRecordOnScan ? '⚡ Starting Recording...' : 'Order ID Applied'}
+                    </p>
                   </div>
                 )}
 
@@ -630,7 +718,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                   <div className="p-8 text-center text-slate-400 max-w-md z-10 font-mono">
                     <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
                     <p className="text-xs mb-3">{cameraError}</p>
-                    <button onClick={initCamera} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold cursor-pointer">
+                    <button onClick={() => initCamera()} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold cursor-pointer">
                       Retry Camera
                     </button>
                   </div>
@@ -648,6 +736,69 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 )}
               </div>
 
+              {/* Quick Sample Test Buttons & Photo Upload */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px] font-mono">
+                <div className="flex flex-wrap items-center gap-1.5 text-slate-500">
+                  <span className="font-bold text-slate-400">QUICK TEST:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleBarcodeDetected('AWB-DELHIVERY-9981', 'SAMPLE')}
+                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 cursor-pointer transition-colors"
+                  >
+                    AWB-DELHIVERY-9981
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBarcodeDetected('BLUEDART-48201', 'SAMPLE')}
+                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 cursor-pointer transition-colors"
+                  >
+                    BLUEDART-48201
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBarcodeDetected('EKART-55102', 'SAMPLE')}
+                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 cursor-pointer transition-colors"
+                  >
+                    EKART-55102
+                  </button>
+                </div>
+
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUploadScan}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-bold cursor-pointer hover:underline"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>UPLOAD BARCODE PHOTO</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Alert if Recording Fails */}
+              {recordingError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl text-xs font-mono flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{recordingError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRecordingError(null)}
+                    className="text-rose-600 hover:text-rose-900 font-bold ml-3 cursor-pointer"
+                  >
+                    DISMISS
+                  </button>
+                </div>
+              )}
+
               {/* Order ID Form */}
               <form onSubmit={handleConfirmOrderAndStartRecording} className="space-y-3">
                 <div className="relative">
@@ -657,7 +808,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                     type="text"
                     value={orderIdInput}
                     onChange={(e) => setOrderIdInput(e.target.value)}
-                    placeholder="Scan AWB Barcode or type Order ID..."
+                    placeholder="Scan AWB Barcode with camera or type Order ID..."
                     autoFocus
                     className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl pl-11 pr-20 py-3 text-slate-900 font-mono text-base font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20 transition-all"
                   />
@@ -668,6 +819,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                         setOrderIdInput('');
                         lastScannedCodeRef.current = '';
                         setScannedNotification(null);
+                        setRecordingError(null);
                       }}
                       className="absolute right-3 top-2.5 text-xs font-mono bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-1 rounded font-bold cursor-pointer"
                     >
@@ -679,11 +831,11 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                 <div className="flex items-center justify-end">
                   <button
                     type="submit"
-                    disabled={!orderIdInput.trim()}
+                    disabled={!orderIdInput.trim() || isStartingRecording}
                     className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm font-mono uppercase tracking-wider"
                   >
                     <Play className="w-4 h-4 fill-current" />
-                    <span>START RECORDING</span>
+                    <span>{isStartingRecording ? 'STARTING...' : 'START RECORDING'}</span>
                   </button>
                 </div>
               </form>
