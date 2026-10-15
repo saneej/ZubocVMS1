@@ -261,6 +261,11 @@ class UploadQueueManager {
           photoForm.append('chat_id', cleanChatId);
           photoForm.append('caption', photoCaption);
           photoForm.append('parse_mode', 'HTML');
+          if (primaryMessageId) {
+            photoForm.append('reply_to_message_id', primaryMessageId);
+            photoForm.append('allow_sending_without_reply', 'true');
+            photoForm.append('reply_parameters', JSON.stringify({ message_id: Number(primaryMessageId), allow_sending_without_reply: true }));
+          }
           photoForm.append('photo', photoBlob, `${safeOrderId}_photo_${i + 1}.jpg`);
 
           const xhr = new XMLHttpRequest();

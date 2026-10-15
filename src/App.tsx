@@ -268,6 +268,7 @@ export default function App() {
                 setSelectedOrderForPacking(ord);
                 setActiveTab('station');
               }}
+              onOpenPreEnter={() => setIsPreEnterOpen(true)}
               currentStaffId={currentStaff?.id}
             />
           )}

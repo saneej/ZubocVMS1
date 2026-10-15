@@ -391,6 +391,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     setCustomerInput(ord.customerName || '');
     setContactPersonInput(ord.contactPerson || '');
     setContactPhoneInput(ord.contactPhone || '');
+    setFulfillFromInput(ord.fulfillFrom || 'Customized Order');
     setOrderReceivedDateInput(ord.orderReceivedDate || '');
     setDispatchDateInput(ord.dispatchDate || '');
     setOrderAmountInput(ord.orderAmount || '');
@@ -400,9 +401,39 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     setItemCountInput(ord.itemCount ? String(ord.itemCount) : '1');
     setNotesInput(ord.notes || '');
     setShowPackageDetails(true);
+    setStationError(null);
     playFeedbackTone('beep');
     scanInputRef.current?.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  // Auto-fill pre-entered order details if scanned or typed Order ID/AWB matches
+  useEffect(() => {
+    const q = orderIdInput.trim().toLowerCase();
+    if (!q) return;
+    const match = existingOrders.find(
+      o => o.orderId.toLowerCase() === q || (o.awbNumber && o.awbNumber.toLowerCase() === q)
+    );
+    if (match) {
+      if (match.awbNumber) setAwbInput(match.awbNumber);
+      if (match.courier) setCourierInput(match.courier);
+      if (match.weight) setWeightInput(match.weight);
+      if (match.productSku) setSkuInput(match.productSku);
+      if (match.customerName) setCustomerInput(match.customerName);
+      if (match.contactPerson) setContactPersonInput(match.contactPerson);
+      if (match.contactPhone) setContactPhoneInput(match.contactPhone);
+      if (match.fulfillFrom) setFulfillFromInput(match.fulfillFrom);
+      if (match.orderReceivedDate) setOrderReceivedDateInput(match.orderReceivedDate);
+      if (match.dispatchDate) setDispatchDateInput(match.dispatchDate);
+      if (match.orderAmount) setOrderAmountInput(match.orderAmount);
+      if (match.shippingAmount) setShippingAmountInput(match.shippingAmount);
+      if (match.orderTotal) setOrderTotalInput(match.orderTotal);
+      if (match.deliveredDate) setDeliveredDateInput(match.deliveredDate);
+      if (match.itemCount) setItemCountInput(String(match.itemCount));
+      if (match.notes) setNotesInput(match.notes);
+      setShowPackageDetails(true);
+    }
+  }, [orderIdInput, existingOrders]);
 
   useEffect(() => {
     if (selectedOrderForPacking) {
@@ -686,28 +717,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   );
 
   const handleStartPackingPreOrder = (ord: OrderRecord) => {
-    setOrderIdInput(ord.orderId);
-    setActiveOrderId(ord.orderId);
-    if (ord.awbNumber) setAwbInput(ord.awbNumber);
-    if (ord.courier) setCourierInput(ord.courier);
-    if (ord.weight) setWeightInput(ord.weight);
-    if (ord.productSku) setSkuInput(ord.productSku);
-    if (ord.customerName) setCustomerInput(ord.customerName);
-    if (ord.contactPerson) setContactPersonInput(ord.contactPerson);
-    if (ord.contactPhone) setContactPhoneInput(ord.contactPhone);
-    if (ord.orderReceivedDate) setOrderReceivedDateInput(ord.orderReceivedDate);
-    if (ord.dispatchDate) setDispatchDateInput(ord.dispatchDate);
-    if (ord.orderAmount) setOrderAmountInput(ord.orderAmount);
-    if (ord.shippingAmount) setShippingAmountInput(ord.shippingAmount);
-    if (ord.orderTotal) setOrderTotalInput(ord.orderTotal);
-    if (ord.deliveredDate) setDeliveredDateInput(ord.deliveredDate);
-    if (ord.itemCount) setItemCountInput(String(ord.itemCount));
-    if (ord.notes) setNotesInput(ord.notes);
-    setShowPackageDetails(true);
-    setStationError(null);
-
-    scanInputRef.current?.focus();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    handleSelectForPacking(ord);
   };
 
   return (

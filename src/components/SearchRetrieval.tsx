@@ -10,6 +10,7 @@ interface SearchRetrievalProps {
   onDeleteOrder: (orderId: string) => void;
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
   onStartPacking?: (order: OrderRecord) => void;
+  onOpenPreEnter?: () => void;
   currentStaffId?: string;
 }
 
@@ -19,6 +20,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   onDeleteOrder, 
   onUpdateOrder,
   onStartPacking,
+  onOpenPreEnter,
   currentStaffId = 'Staff-01'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -317,7 +319,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           ))}
 
           <button
-            onClick={() => setIsPreEnterOpen(true)}
+            onClick={() => onOpenPreEnter ? onOpenPreEnter() : setIsPreEnterOpen(true)}
             className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
             <PackagePlus className="w-3.5 h-3.5" />

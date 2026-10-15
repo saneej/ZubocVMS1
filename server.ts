@@ -943,8 +943,10 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         photoFormData.append('chat_id', chatId);
         photoFormData.append('caption', photoCaption);
         photoFormData.append('parse_mode', 'HTML');
-        if (videoBuffer && messageId) {
+        if (messageId) {
           photoFormData.append('reply_to_message_id', messageId);
+          photoFormData.append('allow_sending_without_reply', 'true');
+          photoFormData.append('reply_parameters', JSON.stringify({ message_id: Number(messageId), allow_sending_without_reply: true }));
         }
         const photoBlob = new Blob([new Uint8Array(pBuf)], { type: 'image/jpeg' });
         photoFormData.append('photo', photoBlob, `${safeOrderId}_${i + 1}.jpg`);
