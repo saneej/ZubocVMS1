@@ -70,7 +70,7 @@ class UploadQueueManager {
     this.notify();
 
     try {
-      // Primary: Binary FormData XHR with live percentage
+      // Primary: Binary FormData XHR
       await this.uploadTaskBinaryXHR(nextTask);
       nextTask.status = 'SUCCESS';
       nextTask.progress = 100;
@@ -98,12 +98,14 @@ class UploadQueueManager {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
 
+      const ext = task.videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
+
       formData.append('orderId', task.orderId);
       formData.append('staffId', task.staffId);
       formData.append('stationId', task.stationId);
       formData.append('durationSeconds', task.durationSeconds.toString());
       formData.append('recordingDate', task.recordingDate);
-      formData.append('video', task.videoBlob, `${task.orderId}.webm`);
+      formData.append('video', task.videoBlob, `${task.orderId}.${ext}`);
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

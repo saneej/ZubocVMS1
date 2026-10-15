@@ -1,13 +1,31 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, StopCircle, Play, Check, Barcode, ShieldAlert, Sparkles, Send, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
+import { Camera, StopCircle, Play, Check, Barcode, ShieldAlert, Sparkles, Send, RefreshCw, ExternalLink } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
+import { getApiUrl } from '../utils/api';
 
 interface PackingStationProps {
   currentStaff: StaffMember;
   settings: AppSettings;
   onOrderCompleted: (record: OrderRecord) => void;
   existingOrders: OrderRecord[];
+}
+
+function getSupportedMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') return '';
+  const types = [
+    'video/mp4;codecs=avc1,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9,opus',
+    'video/webm'
+  ];
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return '';
 }
 
 export const PackingStation: React.FC<PackingStationProps> = ({
@@ -97,10 +115,11 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     chunksRef.current = [];
 
     try {
-      const options = { mimeType: 'video/webm;codecs=vp9,opus' } as MediaRecorderOptions;
+      const selectedMime = getSupportedMimeType();
+      const options = selectedMime ? { mimeType: selectedMime } : undefined;
       let recorder: MediaRecorder;
       try {
-        recorder = new MediaRecorder(mediaStreamRef.current, options);
+        recorder = options ? new MediaRecorder(mediaStreamRef.current, options) : new MediaRecorder(mediaStreamRef.current);
       } catch {
         recorder = new MediaRecorder(mediaStreamRef.current);
       }
@@ -114,12 +133,12 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const actualMime = recorder.mimeType || selectedMime || 'video/mp4';
+        const blob = new Blob(chunksRef.current, { type: actualMime });
         setRecordedVideoBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
 
-        // Instantly queue background parallel upload to Telegram
         uploadQueueManager.addTask({
           orderId: cleanId,
           staffId: currentStaff.id,
@@ -129,7 +148,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
           recordingDate: new Date().toISOString()
         });
 
-        // Register initial local record
         onOrderCompleted({
           orderId: cleanId,
           staffId: currentStaff.id,
@@ -146,7 +164,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       recorder.start(1000);
       setRecordingState('RECORDING');
     } catch (err: any) {
-      alert('Failed to start recording: ' + err.message);
+      alert('Failed to start recording: ' + (err.message || String(err)));
     }
   };
 
@@ -186,7 +204,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         }
       }
 
-      const res = await fetch('/api/ai/verify-packing', {
+      const url = getApiUrl('/api/ai/verify-packing');
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: activeOrderId || orderIdInput, imageBase64 })
@@ -264,10 +283,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         </form>
       </div>
 
-      {/* Main Grid: Camera Feed + Order Upload Progress Tracker */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Camera Viewport (Col-Span 2) */}
+        {/* Camera Viewport */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
           
           <div className="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
@@ -350,7 +369,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
         </div>
 
-        {/* Live Order Upload Progress Monitor (Col-Span 1) */}
+        {/* Live Order Upload Progress Monitor */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
@@ -382,7 +401,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                       </span>
                     </div>
 
-                    {/* Progress Bar */}
                     {task.status === 'UPLOADING' && (
                       <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
                         <div
