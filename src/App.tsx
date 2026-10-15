@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { TopHeader } from './components/TopHeader';
 import { PackingStation } from './components/PackingStation';
 import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
@@ -66,6 +67,7 @@ export default function App() {
   });
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchOrdersAPI = async () => {
@@ -137,68 +139,99 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#08090c] flex flex-col items-center justify-center text-white font-mono">
-        <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING PACKVISION VMS CONTROL ROOM...</p>
+      <div className="min-h-screen bg-[#080B11] flex flex-col items-center justify-center text-white font-mono">
+        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING BRIGADEZ VMS CONTROL ROOM...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#08090c] text-slate-100 flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950 bg-tech-grid">
+    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white bg-tech-grid">
       
-      <Navbar
+      {/* Deep Navy Persistent Sidebar */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         currentStaff={currentStaff}
         setCurrentStaff={setCurrentStaff}
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
       />
 
-      <main className="flex-1 pb-12">
-        {activeTab === 'station' && (
-          <PackingStation
-            currentStaff={currentStaff}
-            settings={settings}
-            onOrderCompleted={handleOrderCompleted}
-            existingOrders={orders}
-          />
-        )}
+      {/* Main Content Area (Offset by sidebar width on desktop) */}
+      <div className="lg:pl-72 flex-1 flex flex-col min-h-screen">
+        
+        {/* Top Header */}
+        <TopHeader
+          activeTab={activeTab}
+          currentStaff={currentStaff}
+          settings={settings}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          setIsMobileOpen={setIsMobileOpen}
+          onRefreshOrders={fetchOrdersAPI}
+        />
 
-        {activeTab === 'search' && (
-          <SearchRetrieval
-            orders={orders}
-            onRefreshOrders={fetchOrdersAPI}
-            onDeleteOrder={handleDeleteOrder}
-          />
-        )}
+        {/* Dynamic Page Views */}
+        <main className="flex-1 pb-16">
+          {activeTab === 'station' && (
+            <PackingStation
+              currentStaff={currentStaff}
+              settings={settings}
+              onOrderCompleted={handleOrderCompleted}
+              existingOrders={orders}
+            />
+          )}
 
-        {activeTab === 'history' && (
-          <RecordingHistory
-            orders={orders}
-            onRefresh={fetchOrdersAPI}
-            onDeleteOrder={handleDeleteOrder}
-          />
-        )}
+          {activeTab === 'search' && (
+            <SearchRetrieval
+              orders={orders}
+              onRefreshOrders={fetchOrdersAPI}
+              onDeleteOrder={handleDeleteOrder}
+            />
+          )}
 
-        {activeTab === 'admin' && (
-          <AdminDashboard
-            orders={orders}
-            settings={settings}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
-        )}
+          {activeTab === 'history' && (
+            <RecordingHistory
+              orders={orders}
+              onRefresh={fetchOrdersAPI}
+              onDeleteOrder={handleDeleteOrder}
+            />
+          )}
 
-        {activeTab === 'diagnose' && (
-          <DiagnosePage
-            settings={settings}
-            orders={orders}
-            onRefreshOrders={fetchOrdersAPI}
-            onSaveSettings={(newSet) => setSettings(newSet)}
-          />
-        )}
-      </main>
+          {activeTab === 'admin' && (
+            <AdminDashboard
+              orders={orders}
+              settings={settings}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+          )}
+
+          {activeTab === 'diagnose' && (
+            <DiagnosePage
+              settings={settings}
+              orders={orders}
+              onRefreshOrders={fetchOrdersAPI}
+              onSaveSettings={(newSet) => setSettings(newSet)}
+            />
+          )}
+        </main>
+
+        <UploadQueueBanner />
+
+        <footer className="bg-[#06080E] border-t border-[#151D2F] py-3.5 text-center text-[11px] text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
+          <div>BRIGADEZ VMS — ENTERPRISE LOGISTICS EVIDENCE GATEWAY</div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 led-emerald"></span>
+            <span>SYSTEM OPERATIONAL</span>
+            <span className="text-slate-600">|</span>
+            <span>STATION: {settings.stationId || 'Packing-01'}</span>
+          </div>
+        </footer>
+
+      </div>
 
       <SettingsModal
         isOpen={isSettingsOpen}
@@ -206,16 +239,6 @@ export default function App() {
         settings={settings}
         onSaveSettings={(newSet) => setSettings(newSet)}
       />
-
-      <UploadQueueBanner />
-
-      <footer className="bg-[#050608] border-t border-[#181f2f] py-4 text-center text-[11px] text-slate-500 font-mono flex items-center justify-between px-6">
-        <div>PACKVISION VMS — PHYSICAL LOGISTICS & EVIDENCE GATEWAY</div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 led-emerald"></span>
-          <span>SECURE TELEMETRY ACTIVE</span>
-        </div>
-      </footer>
 
     </div>
   );
