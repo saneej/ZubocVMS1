@@ -70,6 +70,11 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const [queueTasks, setQueueTasks] = useState<UploadTask[]>([]);
   
+  // Upload Speed Preset: 'turbo' (1.2 Mbps, ~3-4MB file, instant 1-2s upload) | 'fast' (2.2 Mbps) | 'hd' (4.5 Mbps)
+  const [uploadPreset, setUploadPreset] = useState<'turbo' | 'fast' | 'hd'>(() => {
+    return (localStorage.getItem('zuboc_upload_preset') as any) || 'turbo';
+  });
+
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [lastCompletedOrder, setLastCompletedOrder] = useState<string | null>(null);
@@ -81,6 +86,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const chunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('zuboc_upload_preset', uploadPreset);
+  }, [uploadPreset]);
 
   useEffect(() => {
     const unsubscribe = uploadQueueManager.subscribe((tasks) => {
@@ -149,6 +158,16 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [step, activeOrderId, recordedBlob, isRecording]);
 
+  // Calculate target bitrate based on selected Speed Preset
+  const getTargetBitrate = () => {
+    switch (uploadPreset) {
+      case 'turbo': return 1200000; // 1.2 Mbps (~4MB for 30s) -> 1-2s upload!
+      case 'fast':  return 2200000; // 2.2 Mbps (~8MB for 30s) -> 2-4s upload
+      case 'hd':    return 4500000; // 4.5 Mbps (~16MB for 30s) -> 5-10s upload
+      default:      return 1200000;
+    }
+  };
+
   // Step 2 -> Step 3
   const handleConfirmOrderAndStartRecording = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -169,6 +188,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
     try {
       const selectedMime = getSupportedMimeType();
+      const targetBitrate = getTargetBitrate();
+
       const candidateMimes = [
         selectedMime,
         'video/mp4',
@@ -179,11 +200,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       let recorder: MediaRecorder | null = null;
       for (const mime of candidateMimes) {
         try {
-          const options = mime ? { mimeType: mime } : undefined;
-          recorder = options ? new MediaRecorder(mediaStreamRef.current!, options) : new MediaRecorder(mediaStreamRef.current!);
+          const options: MediaRecorderOptions = { videoBitsPerSecond: targetBitrate };
+          if (mime) options.mimeType = mime;
+
+          recorder = new MediaRecorder(mediaStreamRef.current!, options);
           if (recorder) break;
         } catch {
-          // try next mime
+          // try next mime without options
         }
       }
 
@@ -343,6 +366,56 @@ export const PackingStation: React.FC<PackingStationProps> = ({
           <div className="px-3.5 py-2 bg-[#08090d] border border-[#1d2536] rounded-xl text-slate-400">
             <span>PACKED TODAY: <strong className="text-emerald-400 font-bold text-sm">{todayCount}</strong></span>
           </div>
+        </div>
+      </div>
+
+      {/* Upload Speed Optimization Preset Mode */}
+      <div className="bg-[#0b0e17] border border-[#1b2333] rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+        <div className="flex items-center gap-3">
+          <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+          <div>
+            <span className="text-white font-bold uppercase tracking-wider">UPLOAD SPEED PRESET: </span>
+            <span className="text-slate-400 hidden sm:inline">Optimizes video compression for instant Telegram dispatch</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-[#05070c] p-1 rounded-xl border border-[#171f2e]">
+          <button
+            type="button"
+            onClick={() => setUploadPreset('turbo')}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              uploadPreset === 'turbo'
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>⚡ ULTRA TURBO (1.2 Mbps · ~1-2s Upload)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setUploadPreset('fast')}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              uploadPreset === 'fast'
+                ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>🚀 FAST (2.2 Mbps)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setUploadPreset('hd')}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              uploadPreset === 'hd'
+                ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>🎥 FULL HD (4.5 Mbps)</span>
+          </button>
         </div>
       </div>
 

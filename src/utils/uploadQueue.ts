@@ -22,7 +22,7 @@ class UploadQueueManager {
   private tasks: UploadTask[] = [];
   private listeners: QueueListener[] = [];
   private activeUploads = 0;
-  private maxParallelUploads = 3;
+  private maxParallelUploads = 4;
 
   public subscribe(listener: QueueListener) {
     this.listeners.push(listener);
