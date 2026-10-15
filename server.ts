@@ -639,8 +639,11 @@ apiRouter.post('/telegram/webhook', async (req, res) => {
 
 // Telegram Test Connection
 apiRouter.post('/telegram/test-connection', async (req, res) => {
-  const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
-  const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
+  const bodyToken = req.body?.telegramBotToken ? cleanTelegramCredential(req.body.telegramBotToken) : '';
+  const bodyChatId = req.body?.telegramChatId ? cleanTelegramCredential(req.body.telegramChatId) : '';
+
+  const rawBotToken = bodyToken || settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+  const rawChatId = bodyChatId || settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
   const botToken = cleanTelegramCredential(rawBotToken);
   const chatId = cleanTelegramCredential(rawChatId);
 
@@ -649,7 +652,15 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
   }
 
   try {
-    const text = `🟢 <b>Zuboc VMS Connected Successfully!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour Zuboc VMS packing station is online and connected to this Telegram channel. Recorded order packing evidence will be delivered here automatically.`;
+    // First verify bot info via getMe
+    const meRes = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+    const meData = await meRes.json() as any;
+    if (!meData.ok) {
+      throw new Error(meData.description || 'Invalid Telegram Bot Token');
+    }
+    const botUsername = meData.result?.username ? `@${meData.result.username}` : 'Bot';
+
+    const text = `🟢 <b>Zuboc VMS (${escapeHtml(botUsername)}) Connected!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour Zuboc VMS packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`;
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -664,13 +675,30 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
     const data = await response.json() as any;
 
     if (!data.ok) {
-      throw new Error(data.description || 'Failed to send message to Telegram');
+      throw new Error(data.description || 'Failed to send message to Telegram chat ID');
     }
 
-    res.json({ success: true, message: 'Test message sent to Telegram channel!', telegramResponse: data });
+    // Save if valid
+    if (bodyToken && !bodyToken.includes('...')) {
+      settings.telegramBotToken = bodyToken;
+    }
+    if (bodyChatId) {
+      settings.telegramChatId = bodyChatId;
+    }
+    saveLocalBackup();
+
+    if (firestoreDb) {
+      setDoc(doc(firestoreDb, 'settings', 'config'), {
+        telegramBotToken: settings.telegramBotToken,
+        telegramChatId: settings.telegramChatId,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
+
+    res.json({ success: true, botUsername, message: `Bot ${botUsername} verified and test message sent successfully!`, telegramResponse: data });
   } catch (err: any) {
     console.error('Test connection error:', err);
-    res.status(500).json({ error: err.message || 'Failed to send test message' });
+    res.status(500).json({ error: err.message || 'Failed to verify Telegram credentials' });
   }
 });
 
