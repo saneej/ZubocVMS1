@@ -94,17 +94,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setActiveTab('station')}
             className="flex items-center gap-3 cursor-pointer group shrink-0 select-none"
           >
-            <div className="w-10 h-10 rounded-lg bg-[#141923] border border-[#263044] group-hover:border-emerald-500/50 flex items-center justify-center text-emerald-400 transition-all shadow-inner">
-              <Video className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/40 group-hover:border-emerald-400 flex items-center justify-center text-emerald-400 transition-all shadow-lg shadow-emerald-500/10">
+              <Video className="w-5 h-5 group-hover:scale-110 transition-transform text-emerald-400" />
             </div>
             <div>
               <div className="font-extrabold text-base tracking-wider text-white flex items-center gap-2 font-mono">
-                <span>ZUBOC</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-emerald-400 font-black">PACKVISION</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold tracking-widest">
                   VMS v2.4
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">
+              <p className="text-[10px] font-mono text-emerald-400/80 uppercase tracking-widest font-semibold">
                 LOGISTICS VIDEO EVIDENCE VAULT
               </p>
             </div>

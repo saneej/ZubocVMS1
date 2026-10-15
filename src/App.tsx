@@ -139,7 +139,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#08090c] flex flex-col items-center justify-center text-white font-mono">
         <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING ZUBOC VMS CONTROL ROOM...</p>
+        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">INITIALIZING PACKVISION VMS CONTROL ROOM...</p>
       </div>
     );
   }
@@ -210,7 +210,7 @@ export default function App() {
       <UploadQueueBanner />
 
       <footer className="bg-[#050608] border-t border-[#181f2f] py-4 text-center text-[11px] text-slate-500 font-mono flex items-center justify-between px-6">
-        <div>ZUBOC VMS — PHYSICAL LOGISTICS & EVIDENCE GATEWAY</div>
+        <div>PACKVISION VMS — PHYSICAL LOGISTICS & EVIDENCE GATEWAY</div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 led-emerald"></span>
           <span>SECURE TELEMETRY ACTIVE</span>
