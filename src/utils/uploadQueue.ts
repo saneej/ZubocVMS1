@@ -1,7 +1,7 @@
 import { getApiUrl, safeFetchJson } from './api';
 import { formatISTShort } from './time';
 import { db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { cleanForFirestore } from './firestoreHelper';
 
 export interface UploadTask {
