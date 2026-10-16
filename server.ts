@@ -726,8 +726,14 @@ apiRouter.post('/orders', async (req, res) => {
     createdAt: existing?.createdAt || now
   };
 
+  const fulfillmentChanged = existing && existing.fulfillmentStatus !== record.fulfillmentStatus;
+
   ordersStore[orderId] = record;
   saveLocalBackup();
+
+  if (fulfillmentChanged) {
+      await sendTelegramUpdate(record);
+  }
 
   if (firestoreDb) {
     try {
