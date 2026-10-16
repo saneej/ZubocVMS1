@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet } from 'lucide-react';
+import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet, Zap } from 'lucide-react';
 import { OrderRecord, AppSettings } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';

@@ -45,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems = [
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
-    { id: 'search', label: 'Search Recordings', icon: Search },
+    { id: 'search', label: 'Orders', icon: Search },
     { id: 'history', label: 'Recording History', icon: History },
     { id: 'admin', label: 'Admin Dashboard', icon: Activity },
   ];

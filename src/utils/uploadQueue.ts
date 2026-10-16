@@ -37,6 +37,7 @@ export interface UploadTask {
   progress: number; // 0 to 100
   status: 'QUEUED' | 'UPLOADING' | 'SUCCESS' | 'FAILED';
   error?: string;
+  retryCount?: number;
   telegramMessageLink?: string;
 }
 
@@ -92,41 +93,59 @@ class UploadQueueManager {
     if (!nextTask) return;
 
     nextTask.status = 'UPLOADING';
+    nextTask.retryCount = nextTask.retryCount || 0;
     this.activeUploads++;
     this.notify();
 
+    const attemptUpload = async (task: UploadTask): Promise<void> => {
+      try {
+        // Primary Method 1: Server Binary Upload with automatic FFmpeg H.264 transcoding + Thumbnail
+        await this.uploadTaskBinaryXHR(task);
+      } catch (err: any) {
+        console.warn(`Server binary upload failed for ${task.orderId}, trying Base64 JSON fallback...`, err);
+        try {
+          // Fallback Method 2: Base64 JSON Upload via Server
+          await this.uploadTaskBase64Json(task);
+        } catch (fallbackErr: any) {
+          console.warn(`Server JSON upload failed for ${task.orderId}, trying Direct Client-to-Telegram upload...`, fallbackErr);
+          // Fallback Method 3: Direct Client-to-Telegram API upload
+          await this.uploadTaskDirectTelegram(task);
+        }
+      }
+    };
+
     try {
-      // Primary Method 1: Server Binary Upload with automatic FFmpeg H.264 transcoding + Thumbnail
-      await this.uploadTaskBinaryXHR(nextTask);
+      await attemptUpload(nextTask);
       nextTask.status = 'SUCCESS';
       nextTask.progress = 100;
+      nextTask.error = undefined;
     } catch (err: any) {
-      console.warn(`Server binary upload failed for ${nextTask.orderId}, trying Base64 JSON fallback...`, err);
-      try {
-        // Fallback Method 2: Base64 JSON Upload via Server
-        await this.uploadTaskBase64Json(nextTask);
-        nextTask.status = 'SUCCESS';
-        nextTask.progress = 100;
-      } catch (fallbackErr: any) {
-        console.warn(`Server JSON upload failed for ${nextTask.orderId}, trying Direct Client-to-Telegram upload...`, fallbackErr);
-        try {
-          // Fallback Method 3: Direct Client-to-Telegram API upload (supports video & photo blobs)
-          await this.uploadTaskDirectTelegram(nextTask);
-          nextTask.status = 'SUCCESS';
-          nextTask.progress = 100;
-        } catch (directErr: any) {
-          console.error(`All upload protocols failed for ${nextTask.orderId}:`, directErr);
-          nextTask.status = 'FAILED';
-          nextTask.error = directErr.message || fallbackErr.message || err.message || 'Upload failed';
-        }
+      console.error(`Upload attempt ${nextTask.retryCount + 1} failed for ${nextTask.orderId}:`, err);
+      
+      if (nextTask.retryCount < 3) {
+        nextTask.retryCount++;
+        nextTask.status = 'QUEUED';
+        nextTask.error = `Retry ${nextTask.retryCount}: ${err.message || 'Unknown error'}`;
+        
+        // Wait before retry (exponential backoff)
+        const backoffMs = Math.pow(2, nextTask.retryCount) * 2000;
+        setTimeout(() => this.processQueue(), backoffMs);
+      } else {
+        nextTask.status = 'FAILED';
+        nextTask.error = `Final Failure: ${err.message || 'All protocols and retries failed'}`;
       }
     } finally {
       this.activeUploads--;
-      nextTask.videoBlob = null;
-      nextTask.photoBlobs = [];
-      nextTask.photoDataUrls = [];
+      if (nextTask.status === 'SUCCESS' || nextTask.status === 'FAILED') {
+        nextTask.videoBlob = null;
+        nextTask.photoBlobs = [];
+        nextTask.photoDataUrls = [];
+      }
       this.notify();
-      this.processQueue();
+      // Only call processQueue immediately if we didn't schedule a retry
+      if (nextTask.status !== 'QUEUED') {
+        this.processQueue();
+      }
     }
   }
 

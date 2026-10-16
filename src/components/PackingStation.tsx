@@ -28,7 +28,8 @@ import {
   Info,
   PackagePlus,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Search
 } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
@@ -166,6 +167,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const [itemCountInput, setItemCountInput] = useState('1');
   const [notesInput, setNotesInput] = useState('');
   const [showPackageDetails, setShowPackageDetails] = useState(true);
+  const [preOrderSearch, setPreOrderSearch] = useState('');
 
   // Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -331,25 +333,25 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     try {
       const targetId = customId || activeOrderId || orderIdInput.trim() || 'PACKING';
       const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
-      const watermarkText = `Order ID: ${targetId} | ${istDate}`;
+      const watermarkText = `ID: ${targetId} | ${istDate}`;
 
-      const fontSize = Math.max(14, Math.floor(height * 0.025));
+      const fontSize = Math.max(12, Math.floor(height * 0.015));
       ctx.save();
-      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.font = `${fontSize}px font-mono, sans-serif`;
       
       const metrics = ctx.measureText(watermarkText);
-      const margin = Math.max(15, Math.floor(width * 0.02));
+      const margin = Math.max(10, Math.floor(width * 0.01));
       const x = width - metrics.width - margin;
       const y = height - margin;
 
-      // Subtle shadow for readability without a bulky box
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
+      // Extremely subtle shadow for minimal look
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
 
-      // Render Text (Clean White)
-      ctx.fillStyle = '#FFFFFF';
+      // Render Text (Slightly transparent white)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.textBaseline = 'bottom';
       ctx.fillText(watermarkText, x, y);
       
@@ -536,33 +538,37 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       const canvas = watermarkCanvasRef.current || document.createElement('canvas');
       watermarkCanvasRef.current = canvas;
       
-      const width = video.videoWidth || 1280;
-      const height = video.videoHeight || 720;
+      // Use high-quality dimensions from video or fallback to 1080p
+      const width = video.videoWidth || 1920;
+      const height = video.videoHeight || 1080;
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext('2d', { alpha: false });
+      const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
       if (!ctx) throw new Error('Canvas context not available.');
 
       const targetId = cleanId;
       const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
-      const watermarkText = `Order ID: ${targetId} | ${istDate}`;
-      const fontSize = Math.max(14, Math.floor(height * 0.025));
-      const margin = Math.max(15, Math.floor(width * 0.02));
+      const watermarkText = `ID: ${targetId} | ${istDate}`;
+      const fontSize = Math.max(12, Math.floor(height * 0.015));
+      const margin = Math.max(10, Math.floor(width * 0.01));
 
       const drawFrame = () => {
-        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+          if (requestRef.current) cancelAnimationFrame(requestRef.current);
+          return;
+        }
         
-        // Draw video frame
+        // Draw video frame to canvas
         ctx.drawImage(video, 0, 0, width, height);
 
-        // Draw Watermark
+        // Draw Minimal Watermark
         ctx.save();
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 4;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
+        ctx.font = `${fontSize}px font-mono, monospace`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
         ctx.textBaseline = 'bottom';
         const metrics = ctx.measureText(watermarkText);
         ctx.fillText(watermarkText, width - metrics.width - margin, height - margin);
@@ -571,12 +577,28 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         requestRef.current = requestAnimationFrame(drawFrame);
       };
 
+      // Ensure video is actually playing and has dimensions before starting
+      if (video.readyState < 2) {
+        await new Promise((resolve) => {
+          const check = () => {
+            if (video.readyState >= 2) resolve(null);
+            else setTimeout(check, 100);
+          };
+          check();
+        });
+      }
+
       // Start the loop
-      setIsRecording(true); // Set early to allow drawFrame to run
       requestRef.current = requestAnimationFrame(drawFrame);
 
       // Capture Stream from Canvas (30fps)
-      const canvasStream = canvas.captureStream(30);
+      // Note: We use the canvas stream which now contains the watermark
+      const canvasStream = (canvas as any).captureStream(30);
+      
+      // Merge audio from original stream if available
+      if (stream.getAudioTracks().length > 0) {
+        canvasStream.addTrack(stream.getAudioTracks()[0]);
+      }
       
       // Create robust MediaRecorder
       const recorder = createMediaRecorder(canvasStream);
@@ -598,22 +620,19 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
       recorder.onstop = () => {
         if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
         const mime = recorder?.mimeType || 'video/mp4';
         const blob = new Blob(chunksRef.current, { type: mime.includes('webm') ? 'video/mp4' : mime });
         setRecordedBlob(blob);
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
         setIsRecording(false);
-        if (requestRef.current) cancelAnimationFrame(requestRef.current);
         setStep('CONFIRM');
       };
 
       // Start recording with 1-second timeslice chunks
-      try {
-        recorder.start(1000);
-      } catch {
-        recorder.start();
-      }
+      setIsRecording(true); 
+      recorder.start(1000);
 
       setStep('RECORDING');
       playFeedbackTone('beep');
@@ -809,9 +828,18 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     new Date(o.createdAt).toDateString() === new Date().toDateString()
   ).length;
 
-  const pendingPreOrders = existingOrders.filter(o => 
-    o.recordingStatus === 'PENDING' || (o.recordingStatus as string) === 'NOT_RECORDED'
-  );
+  const pendingPreOrders = existingOrders.filter(o => {
+    const isPending = o.recordingStatus === 'PENDING' || (o.recordingStatus as string) === 'NOT_RECORDED';
+    if (!isPending) return false;
+    if (!preOrderSearch.trim()) return true;
+    const q = preOrderSearch.toLowerCase();
+    return (
+      o.orderId.toLowerCase().includes(q) ||
+      (o.awbNumber && o.awbNumber.toLowerCase().includes(q)) ||
+      (o.customerName && o.customerName.toLowerCase().includes(q)) ||
+      (o.productSku && o.productSku.toLowerCase().includes(q))
+    );
+  });
 
   const handleStartPackingPreOrder = (ord: OrderRecord) => {
     handleSelectForPacking(ord);
@@ -1643,12 +1671,22 @@ export const PackingStation: React.FC<PackingStationProps> = ({
           
           {/* Pre-Entered Orders (Pending Packing) Section */}
           <div className="bg-white border border-stone-200/90 rounded-2xl p-4 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-stone-100">
               <div className="flex items-center gap-2">
                 <PackagePlus className="w-4 h-4 text-[#832f5e]" />
                 <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider font-mono">
                   Pre-Entered Orders ({pendingPreOrders.length})
                 </h3>
+              </div>
+              <div className="relative w-full sm:w-48">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+                <input
+                  type="text"
+                  value={preOrderSearch}
+                  onChange={(e) => setPreOrderSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-[#832f5e] rounded-lg pl-7 pr-2 py-1 text-[10px] text-slate-800 focus:outline-none"
+                />
               </div>
               {onOpenPreEnter && (
                 <button

@@ -29,18 +29,18 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
     const escapedTime = istTime.replace(/:/g, '\\:');
 
     // Minimal and Neat Style: Single line, bottom-right, white with black shadow
-    const watermarkText = `Order ID\\: ${cleanOrderId} | ${escapedTime}`;
-    const filter = `scale='min(1280,iw)':-2:flags=lanczos,drawtext=text='${watermarkText}':x=w-tw-20:y=h-th-20:fontcolor=white:fontsize=16:shadowcolor=black@0.7:shadowx=2:shadowy=2`;
+    const watermarkText = `ID\\: ${cleanOrderId} | ${escapedTime}`;
+    const filter = `scale='min(1280,iw)':-2,drawtext=text='${watermarkText}':x=w-tw-15:y=h-th-15:fontcolor=white@0.8:fontsize=14:shadowcolor=black@0.4:shadowx=1:shadowy=1`;
 
     try {
-      // Primary attempt with watermark
-      const cmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 28 -maxrate 1000k -bufsize 2000k -pix_fmt yuv420p -vf "${filter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
-      await execPromise(cmd, { timeout: 300000 });
+      // Primary attempt with watermark - ULTRAFAST preset for high throughput
+      const cmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 30 -maxrate 1200k -bufsize 2400k -pix_fmt yuv420p -vf "${filter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+      await execPromise(cmd, { timeout: 600000 }); // Increase timeout to 10 mins for large files
     } catch (e: any) {
       console.warn('Watermarked transcoding failed, falling back to clean transcode:', e?.message);
       // Absolute fallback: No watermark
-      const fallbackCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
-      await execPromise(fallbackCmd, { timeout: 300000 });
+      const fallbackCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 32 -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+      await execPromise(fallbackCmd, { timeout: 600000 });
     }
 
     if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
@@ -902,127 +902,122 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       console.warn('Header message creation error in server:', e);
     }
 
-    // 1. Upload Video if present
+    const uploadTasks: Promise<any>[] = [];
+
+    // Task Wrapper for robust retries
+    const robustUpload = async (method: string, formData: FormData) => {
+      let lastErr;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, { method: 'POST', body: formData });
+          const data = await res.json();
+          if (data.ok) return data;
+          lastErr = new Error(data.description || `${method} failed`);
+        } catch (e: any) {
+          lastErr = e;
+        }
+        if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
+      }
+      throw lastErr;
+    };
+
+    // 1. Prepare Video Upload Task
     if (videoBuffer) {
-      const durMin = Math.floor((durationSeconds || record.durationSeconds || 0) / 60);
-      const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
-      const durationStr = `${durMin}m ${durSec}s`;
+      uploadTasks.push((async () => {
+        const captionLines = [
+          `<b>🎥 Packing Video • Order ID: ${safeOrderId}</b>`,
+          record.awbNumber ? `<b>🚚 AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
+          record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
+          record.deliveryMethod ? `<b>🚀 Delivery Method:</b> ${escapeHtml(record.deliveryMethod)}` : '',
+          record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
+          record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
+          `<b>👷 Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
+          `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`
+        ].filter(Boolean);
 
-      const captionLines = [
-        `<b>🎥 Packing Video • Order ID: ${safeOrderId}</b>`,
-        record.awbNumber ? `<b>🚚 AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
-        record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
-        record.deliveryMethod ? `<b>🚀 Delivery Method:</b> ${escapeHtml(record.deliveryMethod)}` : '',
-        record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
-        record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
-        `<b>👷 Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
-        `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST) • <b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`
-      ].filter(Boolean);
+        const caption = captionLines.join('\n');
+        const { mp4Buffer, thumbBuffer } = await transcodeToTelegramMp4(videoBuffer, safeOrderId);
 
-      const caption = captionLines.join('\n');
+        const formData = new FormData();
+        formData.append('chat_id', chatId);
+        formData.append('caption', caption);
+        formData.append('parse_mode', 'HTML');
+        if (messageId) {
+          formData.append('reply_to_message_id', messageId);
+          formData.append('allow_sending_without_reply', 'true');
+          formData.append('reply_parameters', JSON.stringify({ message_id: Number(messageId), allow_sending_without_reply: true }));
+        }
+        formData.append('supports_streaming', 'true');
 
-      // Transcode video using FFmpeg to faststart H.264 baseline MP4 + generate thumbnail
-      const { mp4Buffer, thumbBuffer } = await transcodeToTelegramMp4(videoBuffer, safeOrderId);
+        const width = Number(req.body.width);
+        const height = Number(req.body.height);
+        if (width > 0 && height > 0) {
+          formData.append('width', width.toString());
+          formData.append('height', height.toString());
+        }
+        if (durationSeconds > 0) {
+          formData.append('duration', Math.round(durationSeconds).toString());
+        }
+        
+        formData.append('video', new Blob([new Uint8Array(mp4Buffer)], { type: 'video/mp4' }), `${safeOrderId}.mp4`);
 
-      const formData = new FormData();
-      formData.append('chat_id', chatId);
-      formData.append('caption', caption);
-      formData.append('parse_mode', 'HTML');
-      if (messageId) {
-        formData.append('reply_to_message_id', messageId);
-        formData.append('allow_sending_without_reply', 'true');
-        formData.append('reply_parameters', JSON.stringify({ message_id: Number(messageId), allow_sending_without_reply: true }));
-      }
-      formData.append('supports_streaming', 'true');
+        if (thumbBuffer && thumbBuffer.length > 0) {
+          formData.append('thumb', new Blob([new Uint8Array(thumbBuffer)], { type: 'image/jpeg' }), `${safeOrderId}_thumb.jpg`);
+        } else if (photoBuffers[0]) {
+          formData.append('thumb', new Blob([new Uint8Array(photoBuffers[0])], { type: 'image/jpeg' }), `${safeOrderId}_thumb.jpg`);
+        }
 
-      const width = Number(req.body.width);
-      const height = Number(req.body.height);
-      if (width > 0 && height > 0) {
-        formData.append('width', width.toString());
-        formData.append('height', height.toString());
-      }
-      if (durationSeconds > 0) {
-        formData.append('duration', Math.round(durationSeconds).toString());
-      }
-      
-      const videoBlob = new Blob([new Uint8Array(mp4Buffer)], { type: 'video/mp4' });
-      formData.append('video', videoBlob, `${safeOrderId}.mp4`);
-
-      // Add thumbnail if generated or if photo attached
-      if (thumbBuffer && thumbBuffer.length > 0) {
-        const thumbBlob = new Blob([new Uint8Array(thumbBuffer)], { type: 'image/jpeg' });
-        formData.append('thumb', thumbBlob, `${safeOrderId}_thumb.jpg`);
-      } else if (photoBuffers[0] && photoBuffers[0].length > 0) {
-        const thumbBlob = new Blob([new Uint8Array(photoBuffers[0])], { type: 'image/jpeg' });
-        formData.append('thumb', thumbBlob, `${safeOrderId}_thumb.jpg`);
-      }
-
-      const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
-        method: 'POST',
-        body: formData
-      });
-
-      const responseText = await tgResponse.text();
-      try {
-        tgResult = JSON.parse(responseText);
-      } catch {
-        throw new Error(`Telegram API non-JSON response: ${responseText.substring(0, 150)}`);
-      }
-
-      if (!tgResult.ok) {
-        throw new Error(tgResult.description || 'Telegram Video upload error');
-      }
-
-      if (!messageId) {
-        messageId = tgResult.result?.message_id?.toString();
-      }
-      fileId = tgResult.result?.video?.file_id || tgResult.result?.document?.file_id;
+        return robustUpload('sendVideo', formData);
+      })());
     }
 
-    // 2. Upload Photos if present (threaded as replies under video/header message)
-    if (photoBuffers.length > 0) {
-      for (let i = 0; i < photoBuffers.length; i++) {
-        const pBuf = photoBuffers[i];
+    // 2. Prepare Photo Upload Tasks
+    photoBuffers.forEach((pBuf, i) => {
+      uploadTasks.push((async () => {
         const photoCaptionLines = [
           videoBuffer
             ? `<b>📷 Photo Snapshot #${i + 1} • Order ID: ${safeOrderId}</b>`
             : `<b>📷 Photo Evidence #${i + 1} • Order ID: ${safeOrderId}</b>`,
           record.awbNumber ? `<b>AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
           record.courier ? `<b>Courier:</b> ${escapeHtml(record.courier)}` : '',
-          record.deliveryMethod ? `<b>Delivery:</b> ${escapeHtml(record.deliveryMethod)}` : '',
-          record.weight ? `<b>Weight:</b> ${escapeHtml(record.weight)}` : '',
           record.productSku ? `<b>Item:</b> ${escapeHtml(record.productSku)}` : '',
           `<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
-          `<b>Captured:</b> ${escapeHtml(formattedDate)} (IST)`,
-          record.notes ? `<b>Notes:</b> ${escapeHtml(record.notes)}` : ''
+          `<b>Captured:</b> ${escapeHtml(formattedDate)} (IST)`
         ].filter(Boolean);
-        const photoCaption = photoCaptionLines.join('\n');
+
         const photoFormData = new FormData();
         photoFormData.append('chat_id', chatId);
-        photoFormData.append('caption', photoCaption);
+        photoFormData.append('caption', photoCaptionLines.join('\n'));
         photoFormData.append('parse_mode', 'HTML');
         if (messageId) {
           photoFormData.append('reply_to_message_id', messageId);
           photoFormData.append('allow_sending_without_reply', 'true');
           photoFormData.append('reply_parameters', JSON.stringify({ message_id: Number(messageId), allow_sending_without_reply: true }));
         }
-        const photoBlob = new Blob([new Uint8Array(pBuf)], { type: 'image/jpeg' });
-        photoFormData.append('photo', photoBlob, `${safeOrderId}_${i + 1}.jpg`);
-        try {
-          const photoTgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
-            method: 'POST',
-            body: photoFormData
-          });
-          const photoResponseText = await photoTgResponse.text();
-          const photoTgResult = JSON.parse(photoResponseText);
-          if (!messageId && photoTgResult && photoTgResult.ok) {
-            messageId = photoTgResult.result?.message_id?.toString();
-            fileId = photoTgResult.result?.photo?.[photoTgResult.result.photo.length - 1]?.file_id;
-            tgResult = photoTgResult;
-          }
-        } catch (e) {
-          console.error(`Failed to send photo #${i + 1} to Telegram:`, e);
+        photoFormData.append('photo', new Blob([new Uint8Array(pBuf)], { type: 'image/jpeg' }), `${safeOrderId}_p${i+1}.jpg`);
+
+        return robustUpload('sendPhoto', photoFormData);
+      })());
+    });
+
+    // 3. Execute concurrently
+    if (uploadTasks.length > 0) {
+      try {
+        const results = await Promise.all(uploadTasks);
+        // Extract fileId from the first result that has it
+        const videoRes = results.find(r => r.result?.video);
+        if (videoRes) {
+          fileId = videoRes.result?.video?.file_id;
+        } else if (results[0]?.result?.photo) {
+          const photos = results[0].result.photo;
+          fileId = photos[photos.length - 1]?.file_id;
         }
+        if (!messageId && results[0]?.result?.message_id) {
+          messageId = results[0].result.message_id.toString();
+        }
+      } catch (err: any) {
+        console.error('Concurrent media upload failed:', err);
+        // We don't fail the whole request if the header was sent
       }
     }
     let cleanChannelId = chatId;

@@ -46,7 +46,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
   const pageTitles: Record<string, string> = {
     station: 'Packing Station',
-    search: 'Search Recordings',
+    search: 'Orders',
     history: 'Recording History',
     admin: 'Admin Dashboard',
   };
