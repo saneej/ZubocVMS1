@@ -191,20 +191,32 @@ function AppContent() {
     } catch (fsErr) {
       console.error('Firestore client write error on order completed:', fsErr);
     }
+    try {
+      await safeFetchJson(`/api/orders/${encodeURIComponent(newRecord.orderId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecord)
+      });
+    } catch (apiErr) {
+      console.warn('Server API write deferred on order completed:', apiErr);
+    }
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
     console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
-    // Optimistic update
-    setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
-    
-    let fsSaved = false;
+    // Optimistic state update (update existing or prepend new)
+    setOrders(prev => {
+      const exists = prev.some(o => o.orderId === updatedOrder.orderId);
+      if (exists) {
+        return prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o);
+      }
+      return [updatedOrder, ...prev];
+    });
 
     // Direct client-side Firestore write (Primary for production)
     try {
       const docRef = doc(db, 'orders', updatedOrder.orderId);
       await setDoc(docRef, cleanForFirestore(updatedOrder), { merge: true });
-      fsSaved = true;
       console.log('Firestore write succeeded for order:', updatedOrder.orderId);
     } catch (fsErr) {
       console.error('Firestore client write error:', fsErr);
@@ -213,18 +225,15 @@ function AppContent() {
       } catch {}
     }
 
-    // Secondary API write for Node Express server if running
+    // Secondary API write for Node Express server
     try {
-      await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
+      await safeFetchJson(`/api/orders/${encodeURIComponent(updatedOrder.orderId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
     } catch (apiErr) {
-      console.warn('Server API order update skipped/deferred (using Firestore directly):', apiErr);
-      if (!fsSaved) {
-        fetchOrdersAPI();
-      }
+      console.warn('Server API order update skipped/deferred:', apiErr);
     }
   };
 
@@ -236,7 +245,7 @@ function AppContent() {
       console.error('Firestore client delete error:', fsErr);
     }
     try {
-      await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
+      await safeFetchJson(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'DELETE' });
     } catch (apiErr) {
       console.warn('Server API delete deferred');
     }

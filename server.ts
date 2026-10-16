@@ -689,17 +689,18 @@ apiRouter.get('/orders', async (req, res) => {
   res.json(orders);
 });
 
-// Clear all orders (both local backup and Firestore)
-apiRouter.delete('/orders', async (req, res) => {
+// Clear all orders (both local backup and Firestore) - Requires explicit path
+apiRouter.delete('/orders/clear_all', async (req, res) => {
   ordersStore = {};
   saveLocalBackup();
 
-  if (firestoreDb && !firestoreQuotaExceeded) {
+  if (firestoreDb) {
     try {
       const colRef = collection(firestoreDb, 'orders');
       const snap = await getDocs(colRef);
       const deletePromises = snap.docs.map(d => deleteDoc(doc(firestoreDb, 'orders', d.id)));
       await Promise.all(deletePromises);
+      firestoreQuotaExceeded = false;
     } catch (e) {
       console.error('Error clearing orders from Firestore:', e);
     }
@@ -710,7 +711,9 @@ apiRouter.delete('/orders', async (req, res) => {
 
 // Orders GET by ID
 apiRouter.get('/orders/:orderId', async (req, res) => {
-  const orderId = sanitizeString(req.params.orderId);
+  const rawId = req.params.orderId;
+  if (!rawId || rawId === 'clear_all') return res.status(400).json({ error: 'Invalid order ID' });
+  const orderId = sanitizeString(decodeURIComponent(rawId));
   if (firestoreDb) {
     try {
       const docRef = doc(firestoreDb, 'orders', orderId);
@@ -853,7 +856,8 @@ apiRouter.post('/orders/bulk', async (req, res) => {
 
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
-  const { orderId } = req.params;
+  const rawId = req.params.orderId;
+  const orderId = sanitizeString(decodeURIComponent(rawId || req.body.orderId));
   console.log('Updating order:', orderId, 'Body:', JSON.stringify(req.body));
   const now = new Date().toISOString();
   const existing = ordersStore[orderId];
@@ -889,9 +893,10 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
 
 // Delete order record
 apiRouter.delete('/orders/:orderId', async (req, res) => {
-  const orderId = sanitizeString(req.params.orderId);
-  if (!orderId) {
-    return res.status(400).json({ error: 'orderId is required' });
+  const rawId = req.params.orderId;
+  const orderId = sanitizeString(decodeURIComponent(rawId));
+  if (!orderId || orderId === 'clear_all') {
+    return res.status(400).json({ error: 'Valid orderId is required' });
   }
 
   delete ordersStore[orderId];
