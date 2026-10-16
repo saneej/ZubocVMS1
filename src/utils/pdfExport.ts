@@ -107,13 +107,13 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
   };
 
   drawKpiCard(12, 'Total Shipments', String(totalOrders), '100% Manifested', PRIMARY_MAROON);
-  drawKpiCard(12 + cardWidth + 3, 'Total Order Value', `₹${totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 'GMV Invoice', ACCENT_EMERALD);
+  drawKpiCard(12 + cardWidth + 3, 'Total Order Value', `Rs. ${totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 'GMV Invoice', ACCENT_EMERALD);
   drawKpiCard(12 + (cardWidth + 3) * 2, 'Video Verified', String(packedCount), `${totalOrders > 0 ? Math.round((packedCount / totalOrders) * 100) : 0}% Verified`, ACCENT_EMERALD);
   drawKpiCard(12 + (cardWidth + 3) * 3, 'Pending Action', String(pendingCount), 'Needs Packing', AMBER_COLOR);
 
   // 3. AutoTable Data Presentation
   const tableData = orders.map((o, idx) => {
-    const amountStr = o.orderTotal ? `₹${parseFloat(o.orderTotal).toLocaleString('en-IN')}` : (o.orderAmount ? `₹${parseFloat(o.orderAmount).toLocaleString('en-IN')}` : '—');
+    const amountStr = o.orderTotal ? `Rs. ${parseFloat(o.orderTotal).toLocaleString('en-IN')}` : (o.orderAmount ? `Rs. ${parseFloat(o.orderAmount).toLocaleString('en-IN')}` : '—');
 
     return [
       idx + 1,
@@ -139,7 +139,7 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
       'Product SKU',
       'Carrier',
       'Weight',
-      'Value (₹)',
+      'Value (Rs.)',
       'Video Status',
       'Recorded IST'
     ]],
@@ -322,9 +322,9 @@ export function exportSingleOrderPDF(order: OrderRecord): void {
   drawField('Package Quantity:', `${order.itemCount || 1} Units`, 95, curY + 13);
   drawField('Gross Dead Weight:', order.weight ? `${order.weight} kg` : '0.50 kg', 140, curY + 13);
 
-  drawField('Item Amount (₹):', order.orderAmount ? `₹${parseFloat(order.orderAmount).toLocaleString('en-IN')}` : '₹0.00', 16, curY + 24);
-  drawField('Freight Charge (₹):', order.shippingAmount ? `₹${parseFloat(order.shippingAmount).toLocaleString('en-IN')}` : '₹0.00', 75, curY + 24);
-  drawField('Total Order Payable (₹):', order.orderTotal ? `₹${parseFloat(order.orderTotal).toLocaleString('en-IN')}` : '₹0.00', 140, curY + 24);
+  drawField('Item Amount (Rs.):', order.orderAmount ? `Rs. ${parseFloat(order.orderAmount).toLocaleString('en-IN')}` : 'Rs. 0.00', 16, curY + 24);
+  drawField('Freight Charge (Rs.):', order.shippingAmount ? `Rs. ${parseFloat(order.shippingAmount).toLocaleString('en-IN')}` : 'Rs. 0.00', 75, curY + 24);
+  drawField('Total Order Payable (Rs.):', order.orderTotal ? `Rs. ${parseFloat(order.orderTotal).toLocaleString('en-IN')}` : 'Rs. 0.00', 140, curY + 24);
 
   curY += 39;
 
@@ -441,11 +441,11 @@ export function exportShippingQuotePDF(params: {
     c.carrier.name,
     c.carrier.type,
     c.transitTime,
-    `₹${c.baseFreightRate.toFixed(2)}`,
-    `₹${c.docketFee.toFixed(2)}`,
-    `₹${c.fuelSurchargeAmount.toFixed(2)}`,
-    `₹${c.gstAmount.toFixed(2)}`,
-    `₹${c.totalPayable.toFixed(2)}`
+    `Rs. ${c.baseFreightRate.toFixed(2)}`,
+    `Rs. ${c.docketFee.toFixed(2)}`,
+    `Rs. ${c.fuelSurchargeAmount.toFixed(2)}`,
+    `Rs. ${c.gstAmount.toFixed(2)}`,
+    `Rs. ${c.totalPayable.toFixed(2)}`
   ]);
 
   autoTable(doc, {
@@ -458,7 +458,7 @@ export function exportShippingQuotePDF(params: {
       'Docket',
       'Fuel (FSC)',
       '18% GST',
-      'Total Payable (₹)'
+      'Total Payable (Rs.)'
     ]],
     body: tableRows,
     margin: { left: 12, right: 12 },

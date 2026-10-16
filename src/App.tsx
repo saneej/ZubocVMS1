@@ -51,8 +51,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.warn('Firestore Operation Notice (Fallback active):', JSON.stringify(errInfo));
 }
 
 const DEFAULT_STAFF: StaffMember = {
@@ -147,7 +146,7 @@ function AppContent() {
       setIsLoading(false);
     });
 
-    // Real-time listener for Firestore orders
+    // Real-time listener for Firestore orders with REST fallback
     const ordersPath = 'orders';
     try {
       const q = query(collection(db, ordersPath));
@@ -164,11 +163,13 @@ function AppContent() {
         },
         (error) => {
           handleFirestoreError(error, OperationType.GET, ordersPath);
+          fetchOrdersAPI();
         }
       );
       return () => unsubscribe();
     } catch (err) {
-      console.warn('Realtime Firestore subscription deferred to server API.');
+      console.warn('Realtime Firestore subscription deferred to server API:', err);
+      fetchOrdersAPI();
     }
   }, []);
 
