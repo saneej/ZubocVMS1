@@ -11,6 +11,10 @@ interface StatusCellProps {
 export const StatusCell: React.FC<StatusCellProps> = ({ order, onUpdate, staffName }) => {
   const [localStatus, setLocalStatus] = useState(order.fulfillmentStatus || 'Pending');
 
+  useEffect(() => {
+    setLocalStatus(order.fulfillmentStatus || 'Pending');
+  }, [order.fulfillmentStatus]);
+
   const handleStatusChange = (newStatus: string) => {
     setLocalStatus(newStatus);
   };
