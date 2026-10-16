@@ -305,12 +305,19 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   };
 
   // Capture high-res snapshot from live camera feed
-  const capturePhoto = useCallback((): { blob: Blob; dataUrl: string } | null => {
+  const capturePhoto = useCallback((customId?: string): { blob: Blob; dataUrl: string } | null => {
     if (!videoRef.current) return null;
     const video = videoRef.current;
+    
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+    
+    if (!width || !height) {
+      width = 1920;
+      height = 1080;
+    }
+
     const canvas = document.createElement('canvas');
-    const width = video.videoWidth || 1920;
-    const height = video.videoHeight || 1080;
     canvas.width = width;
     canvas.height = height;
 
@@ -319,59 +326,52 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
     ctx.drawImage(video, 0, 0, width, height);
 
-    // Render Order ID Watermark Badge in bottom corner
-    const targetId = activeOrderId || orderIdInput.trim() || 'ORDER';
-    const watermarkText = `ORDER ID: ${targetId}`;
-    const timestampText = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
+    try {
+      const targetId = customId || activeOrderId || orderIdInput.trim() || 'PACKING';
+      const watermarkText = `ORDER ID: ${targetId}`;
+      const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
 
-    const fontSize = Math.max(18, Math.floor(height * 0.03));
-    ctx.save();
-    ctx.font = `bold ${fontSize}px sans-serif`;
+      const fontSize = Math.max(16, Math.floor(height * 0.035));
+      ctx.save();
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      
+      const metrics1 = ctx.measureText(watermarkText);
+      const metrics2 = ctx.measureText(istDate);
+      const textWidth = Math.max(metrics1.width, metrics2.width);
+      
+      const paddingX = fontSize * 0.8;
+      const paddingY = fontSize * 0.5;
+      const boxWidth = textWidth + (paddingX * 2);
+      const boxHeight = (fontSize * 2.2) + (paddingY * 2);
+      
+      const margin = Math.max(15, Math.floor(width * 0.02));
+      const safeX = Math.max(0, width - boxWidth - margin);
+      const safeY = Math.max(0, height - boxHeight - margin);
 
-    const textMetrics1 = ctx.measureText(watermarkText);
-    const textMetrics2 = ctx.measureText(timestampText);
-    const textWidth = Math.max(textMetrics1.width, textMetrics2.width);
-    const paddingX = fontSize * 0.7;
-    const paddingY = fontSize * 0.5;
-    const boxWidth = textWidth + (paddingX * 2);
-    const boxHeight = (fontSize * 2.2) + (paddingY * 2);
+      // Simple Rect Backdrop (Robust)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(safeX, safeY, boxWidth, boxHeight);
 
-    const margin = Math.max(16, Math.floor(width * 0.02));
-    const x = width - boxWidth - margin;
-    const y = height - boxHeight - margin;
+      // Border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(safeX, safeY, boxWidth, boxHeight);
 
-    // Draw dark rounded badge
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; // Slate-900 translucent
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = Math.max(2, Math.floor(fontSize * 0.08));
+      // Text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textBaseline = 'top';
+      ctx.fillText(watermarkText, safeX + paddingX, safeY + paddingY);
 
-    const radius = Math.max(8, fontSize * 0.3);
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + boxWidth - radius, y);
-    ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + radius);
-    ctx.lineTo(x + boxWidth, y + boxHeight - radius);
-    ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - radius, y + boxHeight);
-    ctx.lineTo(x + radius, y + boxHeight);
-    ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+      ctx.fillStyle = '#00E5FF';
+      ctx.font = `bold ${Math.floor(fontSize * 0.75)}px monospace`;
+      ctx.fillText(istDate, safeX + paddingX, safeY + paddingY + fontSize + 4);
+      
+      ctx.restore();
+    } catch (e) {
+      console.warn('Photo watermark rendering error:', e);
+    }
 
-    // Draw Order ID text
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textBaseline = 'top';
-    ctx.fillText(watermarkText, x + paddingX, y + paddingY);
-
-    // Draw Timestamp text
-    ctx.fillStyle = '#38BDF8';
-    ctx.font = `${Math.floor(fontSize * 0.75)}px monospace`;
-    ctx.fillText(timestampText, x + paddingX, y + paddingY + fontSize + 4);
-    ctx.restore();
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
     // Convert dataURL to Blob
     const byteString = atob(dataUrl.split(',')[1]);
@@ -383,7 +383,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }
     const blob = new Blob([ab], { type: mimeString });
 
-    // Flash animation & audio feedback
     setSnapFlash(true);
     setTimeout(() => setSnapFlash(false), 150);
     playFeedbackTone('snap');
@@ -403,7 +402,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     const currentId = activeOrderId || cleanId;
     setActiveOrderId(currentId);
 
-    const snapshot = capturePhoto();
+    const snapshot = capturePhoto(currentId);
     if (snapshot) {
       const newPhoto = {
         id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,

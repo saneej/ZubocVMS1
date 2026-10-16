@@ -26,23 +26,47 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
     const bin = ffmpegPath || 'ffmpeg';
     const cleanOrderId = orderId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const istTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
+    
+    // Robust font selection
     const fontPath = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf';
-    
-    // Watermark lines: Order ID and Timestamp
-    const line1 = `ORDER ID\\: ${cleanOrderId}`;
-    const line2 = istTime.replace(/:/g, '\\:'); // Escape colons for FFmpeg
-    
-    const drawtextFilter = `drawtext=fontfile='${fontPath}':text='${line1}':x=w-tw-20:y=h-th-45:fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.65:boxborderw=8,` +
-                           `drawtext=fontfile='${fontPath}':text='${line2}':x=w-tw-20:y=h-th-15:fontcolor=lightskyblue:fontsize=h/38:box=1:boxcolor=black@0.65:boxborderw=8`;
+    const escapedTime = istTime.replace(/:/g, '\\:');
 
-    // Optimized for packing videos: H.264 compression with Order ID and Time watermark burned in bottom-right corner
-    const ffmpegCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -maxrate 800k -bufsize 1600k -pix_fmt yuv420p -vf "scale='min(1280,iw)':-2:flags=lanczos,${drawtextFilter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+    // Strategy 1: Professional Watermark (Attempting with system font path)
+    const line1 = `ORDER ID\\: ${cleanOrderId}`;
+    const line2 = istTime.replace(/:/g, '\\:');
+    
+    // Using simple font=Sans if path fails or as part of filter
+    const draw1 = `drawtext=text='${line1}':x=w-tw-20:y=h-th-50:fontcolor=white:fontsize=h/25:box=1:boxcolor=black@0.6:boxborderw=10`;
+    const draw2 = `drawtext=text='${line2}':x=w-tw-20:y=h-th-15:fontcolor=0x00E5FF:fontsize=h/35:box=1:boxcolor=black@0.6:boxborderw=10`;
+    
+    const professionalFilter = `scale='min(1280,iw)':-2:flags=lanczos,${draw1},${draw2}`;
+    
+    // Strategy 2: Absolute Basic (No boxes, fixed small size)
+    const basicFilter = `scale='min(1280,iw)':-2:flags=lanczos,drawtext=text='ID\\: ${cleanOrderId}':x=15:y=h-30:fontcolor=yellow:fontsize=20`;
+
+    // Strategy 3: Clean Transcode
+    const cleanFilter = `scale='min(1280,iw)':-2:flags=lanczos`;
+
+    let success = false;
+    
     try {
-      await execPromise(ffmpegCmd, { timeout: 300000 });
-    } catch (e) {
-      console.warn('Watermarked transcoding fallback triggered:', e);
-      const fallbackCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -maxrate 800k -bufsize 1600k -pix_fmt yuv420p -vf "scale='min(1280,iw)':-2:flags=lanczos" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
-      await execPromise(fallbackCmd, { timeout: 300000 });
+      // Try Strategy 1
+      const cmd1 = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 28 -maxrate 1000k -bufsize 2000k -pix_fmt yuv420p -vf "${professionalFilter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+      await execPromise(cmd1, { timeout: 300000 });
+      success = true;
+    } catch (e1: any) {
+      console.warn('Strategy 1 failed:', e1?.message);
+      try {
+        // Try Strategy 2
+        const cmd2 = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -vf "${basicFilter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+        await execPromise(cmd2, { timeout: 300000 });
+        success = true;
+      } catch (e2: any) {
+        console.warn('Strategy 2 failed:', e2?.message);
+        // Last resort
+        const cmd3 = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 32 -vf "${cleanFilter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+        await execPromise(cmd3, { timeout: 300000 });
+      }
     }
 
     if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
