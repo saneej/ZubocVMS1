@@ -557,8 +557,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                         </Link>
                         {onStartPacking && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            {/* Check if evidence exists in TG/system */}
-                            {(order.telegramMessageLink || order.videoUrl || (order.photoUrls && order.photoUrls.length > 0) || order.photoDataUrl) ? (
+                            {/* Check if evidence exists in TG/system - check for non-empty values */}
+                            {((order.telegramMessageLink && order.telegramMessageLink.trim() !== '') || 
+                              (order.videoUrl && order.videoUrl.trim() !== '') || 
+                              (order.photoUrls && order.photoUrls.some(url => url.trim() !== '')) || 
+                              (order.photoDataUrl && order.photoDataUrl.trim() !== '')) ? (
                               <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
                                 <span>Evidence in TG</span>

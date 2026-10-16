@@ -241,7 +241,10 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 
             {order.fulfillmentStatus === 'Pending' && (
               <div className="flex items-center gap-2">
-                {(order.telegramMessageLink || order.videoUrl || (order.photoUrls && order.photoUrls.length > 0) || order.photoDataUrl) ? (
+                {((order.telegramMessageLink && order.telegramMessageLink.trim() !== '') || 
+                  (order.videoUrl && order.videoUrl.trim() !== '') || 
+                  (order.photoUrls && order.photoUrls.some(url => url.trim() !== '')) || 
+                  (order.photoDataUrl && order.photoDataUrl.trim() !== '')) ? (
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs border border-emerald-200">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Evidence already in Telegram</span>

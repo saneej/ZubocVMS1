@@ -357,8 +357,7 @@ function AppContent() {
         onClose={() => setIsAddOrderOpen(false)}
         onSuccess={(rec) => {
           handleOrderCompleted(rec);
-          setSelectedOrderForPacking(rec);
-          navigate('/station');
+          // setSelectedOrderForPacking(rec); // Removed redirect
           fetchOrdersAPI();
         }}
         currentStaffId={currentStaff?.id}
