@@ -112,7 +112,7 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'shopify_orders_sample_packvision.csv');
+    link.setAttribute('download', 'shopify_orders_sample_zuboc.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

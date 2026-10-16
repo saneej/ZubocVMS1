@@ -14,8 +14,7 @@ service cloud.firestore {
     // Orders collection for VMS packing evidence
     match /orders/{orderId} {
       allow read: if true;
-      allow create, update: if isValidId(orderId);
-      allow delete: if false;
+      allow create, update, delete: if isValidId(orderId);
     }
 
     // Settings document for Telegram Bot configuration

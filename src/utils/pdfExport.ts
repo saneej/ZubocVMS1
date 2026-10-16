@@ -39,11 +39,11 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text('PV', 14, 16.5);
+  doc.text('ZB', 14, 16.5);
 
   doc.setTextColor(SECONDARY_DARK[0], SECONDARY_DARK[1], SECONDARY_DARK[2]);
   doc.setFontSize(16);
-  doc.text('PACKVISION LOGISTICS VMS', 26, 15);
+  doc.text('ZUBOC LOGISTICS VMS', 26, 15);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -107,13 +107,13 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
   };
 
   drawKpiCard(12, 'Total Shipments', String(totalOrders), '100% Manifested', PRIMARY_MAROON);
-  drawKpiCard(12 + cardWidth + 3, 'Total Order Value', `₹${totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 'GMV Invoice', ACCENT_EMERALD);
+  drawKpiCard(12 + cardWidth + 3, 'Total Order Value', `Rs. ${totalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 'GMV Invoice', ACCENT_EMERALD);
   drawKpiCard(12 + (cardWidth + 3) * 2, 'Video Verified', String(packedCount), `${totalOrders > 0 ? Math.round((packedCount / totalOrders) * 100) : 0}% Verified`, ACCENT_EMERALD);
   drawKpiCard(12 + (cardWidth + 3) * 3, 'Pending Action', String(pendingCount), 'Needs Packing', AMBER_COLOR);
 
   // 3. AutoTable Data Presentation
   const tableData = orders.map((o, idx) => {
-    const amountStr = o.orderTotal ? `₹${parseFloat(o.orderTotal).toLocaleString('en-IN')}` : (o.orderAmount ? `₹${parseFloat(o.orderAmount).toLocaleString('en-IN')}` : '—');
+    const amountStr = o.orderTotal ? `Rs. ${parseFloat(o.orderTotal).toLocaleString('en-IN')}` : (o.orderAmount ? `Rs. ${parseFloat(o.orderAmount).toLocaleString('en-IN')}` : '—');
 
     return [
       idx + 1,
@@ -139,7 +139,7 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
       'Product SKU',
       'Carrier',
       'Weight',
-      'Value (₹)',
+      'Value (Rs.)',
       'Video Status',
       'Recorded IST'
     ]],
@@ -197,7 +197,7 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
       doc.setLineWidth(0.3);
       doc.line(12, pageHeight - 12, pageWidth - 12, pageHeight - 12);
 
-      doc.text('PACKVISION VMS — Official Logistics Dispatch & Proof Manifest • Confidential Internal Record', 12, pageHeight - 7);
+      doc.text('ZUBOC VMS — Official Logistics Dispatch & Proof Manifest • Confidential Internal Record', 12, pageHeight - 7);
       doc.text(`Page ${currentPg}`, pageWidth - 12, pageHeight - 7, { align: 'right' });
     }
   });
@@ -234,7 +234,7 @@ export function exportSingleOrderPDF(order: OrderRecord): void {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(PRIMARY_MAROON[0], PRIMARY_MAROON[1], PRIMARY_MAROON[2]);
-  doc.text('PACKVISION LOGISTICS VMS', 18, 22);
+  doc.text('ZUBOC LOGISTICS VMS', 18, 22);
 
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
@@ -322,9 +322,9 @@ export function exportSingleOrderPDF(order: OrderRecord): void {
   drawField('Package Quantity:', `${order.itemCount || 1} Units`, 95, curY + 13);
   drawField('Gross Dead Weight:', order.weight ? `${order.weight} kg` : '0.50 kg', 140, curY + 13);
 
-  drawField('Item Amount (₹):', order.orderAmount ? `₹${parseFloat(order.orderAmount).toLocaleString('en-IN')}` : '₹0.00', 16, curY + 24);
-  drawField('Freight Charge (₹):', order.shippingAmount ? `₹${parseFloat(order.shippingAmount).toLocaleString('en-IN')}` : '₹0.00', 75, curY + 24);
-  drawField('Total Order Payable (₹):', order.orderTotal ? `₹${parseFloat(order.orderTotal).toLocaleString('en-IN')}` : '₹0.00', 140, curY + 24);
+  drawField('Item Amount (Rs.):', order.orderAmount ? `Rs. ${parseFloat(order.orderAmount).toLocaleString('en-IN')}` : 'Rs. 0.00', 16, curY + 24);
+  drawField('Freight Charge (Rs.):', order.shippingAmount ? `Rs. ${parseFloat(order.shippingAmount).toLocaleString('en-IN')}` : 'Rs. 0.00', 75, curY + 24);
+  drawField('Total Order Payable (Rs.):', order.orderTotal ? `Rs. ${parseFloat(order.orderTotal).toLocaleString('en-IN')}` : 'Rs. 0.00', 140, curY + 24);
 
   curY += 39;
 
@@ -362,13 +362,13 @@ export function exportSingleOrderPDF(order: OrderRecord): void {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(SECONDARY_DARK[0], SECONDARY_DARK[1], SECONDARY_DARK[2]);
-  doc.text('PACKVISION VERIFIED AUDIT SEAL', 12, curY + 5);
+  doc.text('ZUBOC VERIFIED AUDIT SEAL', 12, curY + 5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
   doc.text('This document certifies that the aforementioned parcel was packed and recorded under high-definition video monitoring.', 12, curY + 9);
-  doc.text('All rights reserved © Packvision Logistics VMS Engine.', 12, curY + 12.5);
+  doc.text('All rights reserved © Zuboc Logistics VMS Engine.', 12, curY + 12.5);
 
   doc.save(`dispatch_slip_${order.orderId || 'order'}_${Date.now()}.pdf`);
 }
@@ -441,11 +441,11 @@ export function exportShippingQuotePDF(params: {
     c.carrier.name,
     c.carrier.type,
     c.transitTime,
-    `₹${c.baseFreightRate.toFixed(2)}`,
-    `₹${c.docketFee.toFixed(2)}`,
-    `₹${c.fuelSurchargeAmount.toFixed(2)}`,
-    `₹${c.gstAmount.toFixed(2)}`,
-    `₹${c.totalPayable.toFixed(2)}`
+    `Rs. ${c.baseFreightRate.toFixed(2)}`,
+    `Rs. ${c.docketFee.toFixed(2)}`,
+    `Rs. ${c.fuelSurchargeAmount.toFixed(2)}`,
+    `Rs. ${c.gstAmount.toFixed(2)}`,
+    `Rs. ${c.totalPayable.toFixed(2)}`
   ]);
 
   autoTable(doc, {
@@ -458,7 +458,7 @@ export function exportShippingQuotePDF(params: {
       'Docket',
       'Fuel (FSC)',
       '18% GST',
-      'Total Payable (₹)'
+      'Total Payable (Rs.)'
     ]],
     body: tableRows,
     margin: { left: 12, right: 12 },

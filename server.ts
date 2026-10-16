@@ -391,6 +391,49 @@ async function syncSettingsFromFirestore() {
   }
 }
 
+async function syncOrdersWithFirestore() {
+  if (!firestoreDb || firestoreQuotaExceeded) return;
+  try {
+    const colRef = collection(firestoreDb, 'orders');
+    const snap = await getDocs(colRef);
+    const fsOrdersMap: Record<string, OrderRecord> = {};
+    snap.forEach(d => {
+      const dat = d.data() as OrderRecord;
+      if (dat && dat.orderId) {
+        fsOrdersMap[dat.orderId] = dat;
+      }
+    });
+
+    for (const [orderId, localOrd] of Object.entries(ordersStore)) {
+      if (!fsOrdersMap[orderId]) {
+        try {
+          await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(localOrd), { merge: true });
+        } catch (e) {
+          console.error('Error seeding order to Firestore:', orderId, e);
+        }
+      } else {
+        ordersStore[orderId] = {
+          ...fsOrdersMap[orderId],
+          ...localOrd
+        };
+      }
+    }
+
+    for (const [orderId, fsOrd] of Object.entries(fsOrdersMap)) {
+      if (!ordersStore[orderId]) {
+        ordersStore[orderId] = fsOrd;
+      }
+    }
+    saveLocalBackup();
+  } catch (e: any) {
+    if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+      firestoreQuotaExceeded = true;
+    } else {
+      console.error('Error in syncOrdersWithFirestore:', e);
+    }
+  }
+}
+
 // Helper to safely escape strings for Telegram HTML parse_mode
 function escapeHtml(str: string): string {
   if (!str) return '';
@@ -408,6 +451,7 @@ function cleanTelegramCredential(str: string): string {
 }
 
 syncSettingsFromFirestore();
+syncOrdersWithFirestore();
 
 // API Router supporting both /api/... and direct serverless paths
 const apiRouter = express.Router();
@@ -655,27 +699,9 @@ apiRouter.post('/auth/login', async (req, res) => {
 apiRouter.get('/orders', async (req, res) => {
   if (firestoreDb && !firestoreQuotaExceeded) {
     try {
-      const colRef = collection(firestoreDb, 'orders');
-      const snap = await getDocs(colRef);
-      const fsOrders: OrderRecord[] = [];
-      snap.forEach(d => {
-        fsOrders.push(d.data() as OrderRecord);
-      });
-      if (fsOrders.length > 0) {
-        fsOrders.forEach(o => {
-          ordersStore[o.orderId] = o;
-        });
-        saveLocalBackup();
-        return res.json(
-          fsOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        );
-      }
-    } catch (e: any) {
-      if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
-        firestoreQuotaExceeded = true;
-      } else {
-        console.error('Error fetching orders from Firestore:', e);
-      }
+      await syncOrdersWithFirestore();
+    } catch (e) {
+      console.error('Error syncing orders in GET /orders:', e);
     }
   }
 

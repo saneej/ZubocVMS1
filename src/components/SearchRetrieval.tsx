@@ -78,6 +78,9 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       updatedAt: new Date().toISOString()
     };
     try {
+      if (onUpdateOrder) {
+        onUpdateOrder(orderRecord);
+      }
       const res = await safeFetchJson("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

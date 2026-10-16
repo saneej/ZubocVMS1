@@ -159,7 +159,12 @@ function AppContent() {
             list.push(doc.data() as OrderRecord);
           });
           if (list.length > 0) {
-            setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            setOrders(prev => {
+              const map = new Map<string, OrderRecord>();
+              prev.forEach(o => map.set(o.orderId, o));
+              list.forEach(o => map.set(o.orderId, o));
+              return Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            });
           }
         },
         (error) => {
