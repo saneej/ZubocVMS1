@@ -335,71 +335,47 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     try {
       const targetId = customId || activeOrderId || orderIdInput.trim() || 'PACKING';
       const cleanOrderId = targetId.trim().replace(/[\u2010-\u2015\u2212]/g, '-');
-      const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
-      
-      const line1 = `ORDER ID: ${cleanOrderId}`;
-      const line2 = `${istDate}`;
-      const line3 = `PACKVISION VMS • VERIFIED EVIDENCE`;
+      const now = new Date();
+      const dateStr = now.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const watermarkText = `#${cleanOrderId} • ${dateStr}`;
 
       const baseDim = Math.max(width, height);
-      const orderFontSize = Math.max(18, Math.round(baseDim * 0.038));
-      const subFontSize = Math.max(12, Math.round(baseDim * 0.022));
-      const paddingX = Math.round(baseDim * 0.025);
-      const paddingY = Math.round(baseDim * 0.018);
-      const margin = Math.round(baseDim * 0.02);
+      const fontSize = Math.max(11, Math.round(baseDim * 0.015));
+      const paddingX = Math.round(fontSize * 0.85);
+      const paddingY = Math.round(fontSize * 0.4);
+      const margin = Math.round(baseDim * 0.015);
 
       ctx.save();
-      ctx.font = `bold ${orderFontSize}px "Courier New", monospace, sans-serif`;
-      const w1 = ctx.measureText(line1).width;
+      ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+      const textWidth = ctx.measureText(watermarkText).width;
 
-      ctx.font = `600 ${subFontSize}px sans-serif`;
-      const w2 = ctx.measureText(line2).width;
-
-      ctx.font = `bold ${Math.round(subFontSize * 0.85)}px sans-serif`;
-      const w3 = ctx.measureText(line3).width;
-
-      const boxWidth = Math.max(w1, w2, w3) + paddingX * 2;
-      const boxHeight = orderFontSize + subFontSize * 2 + paddingY * 2 + 14;
+      const boxWidth = textWidth + paddingX * 2;
+      const boxHeight = fontSize + paddingY * 2;
+      const borderRadius = boxHeight / 2;
 
       const x = width - boxWidth - margin;
       const y = height - boxHeight - margin;
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-      ctx.shadowBlur = 12;
-
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
       ctx.beginPath();
       if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(x, y, boxWidth, boxHeight, 10);
+        ctx.roundRect(x, y, boxWidth, boxHeight, borderRadius);
       } else {
         ctx.rect(x, y, boxWidth, boxHeight);
       }
       ctx.fill();
 
-      ctx.fillStyle = '#832f5e';
-      ctx.beginPath();
-      const accentHeight = Math.max(4, Math.round(baseDim * 0.005));
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(x, y, boxWidth, accentHeight, [10, 10, 0, 0]);
-      } else {
-        ctx.rect(x, y, boxWidth, accentHeight);
-      }
-      ctx.fill();
-
       ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-
-      ctx.font = `bold ${orderFontSize}px "Courier New", monospace, sans-serif`;
-      ctx.fillStyle = '#fde047';
-      ctx.fillText(line1, x + paddingX, y + paddingY + 2);
-
-      ctx.font = `600 ${subFontSize}px sans-serif`;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(line2, x + paddingX, y + paddingY + orderFontSize + 6);
-
-      ctx.font = `bold ${Math.round(subFontSize * 0.85)}px sans-serif`;
-      ctx.fillStyle = '#34d399';
-      ctx.fillText(line3, x + paddingX, y + paddingY + orderFontSize + subFontSize + 10);
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillText(watermarkText, x + paddingX, y + boxHeight / 2);
 
       ctx.restore();
     } catch (e) {
