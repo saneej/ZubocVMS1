@@ -198,6 +198,7 @@ function AppContent() {
         throw new Error('Failed to update order on server');
       }
       if (res.record) {
+        console.log('App: Server returned order:', res.record.orderId, 'Status:', res.record.fulfillmentStatus);
         setOrders(prev => prev.map(o => o.orderId === res.record.orderId ? res.record : o));
       }
     } catch (err) {
