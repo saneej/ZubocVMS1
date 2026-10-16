@@ -201,6 +201,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   const timerIntervalRef = useRef<any>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const stopTimeoutRef = useRef<any>(null);
+  const watermarkCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const requestRef = useRef<number | null>(null);
 
   // Enumerate cameras
   const refreshCameras = useCallback(async () => {
@@ -250,7 +252,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     }
   }, [selectedCameraId, refreshCameras]);
 
-  // Initial mount: Start camera preview immediately
   useEffect(() => {
     initCamera(selectedCameraId);
     return () => {
@@ -259,6 +260,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       }
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
   }, []);
 
@@ -328,47 +330,32 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
     try {
       const targetId = customId || activeOrderId || orderIdInput.trim() || 'PACKING';
-      const watermarkText = `ORDER ID: ${targetId}`;
-      const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+      const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
+      const watermarkText = `Order ID: ${targetId} | ${istDate}`;
 
-      const fontSize = Math.max(16, Math.floor(height * 0.035));
+      const fontSize = Math.max(14, Math.floor(height * 0.025));
       ctx.save();
       ctx.font = `bold ${fontSize}px sans-serif`;
       
-      const metrics1 = ctx.measureText(watermarkText);
-      const metrics2 = ctx.measureText(istDate);
-      const textWidth = Math.max(metrics1.width, metrics2.width);
-      
-      const paddingX = fontSize * 0.8;
-      const paddingY = fontSize * 0.5;
-      const boxWidth = textWidth + (paddingX * 2);
-      const boxHeight = (fontSize * 2.2) + (paddingY * 2);
-      
+      const metrics = ctx.measureText(watermarkText);
       const margin = Math.max(15, Math.floor(width * 0.02));
-      const safeX = Math.max(0, width - boxWidth - margin);
-      const safeY = Math.max(0, height - boxHeight - margin);
+      const x = width - metrics.width - margin;
+      const y = height - margin;
 
-      // Simple Rect Backdrop (Robust)
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillRect(safeX, safeY, boxWidth, boxHeight);
+      // Subtle shadow for readability without a bulky box
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
 
-      // Border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(safeX, safeY, boxWidth, boxHeight);
-
-      // Text
+      // Render Text (Clean White)
       ctx.fillStyle = '#FFFFFF';
-      ctx.textBaseline = 'top';
-      ctx.fillText(watermarkText, safeX + paddingX, safeY + paddingY);
-
-      ctx.fillStyle = '#00E5FF';
-      ctx.font = `bold ${Math.floor(fontSize * 0.75)}px monospace`;
-      ctx.fillText(istDate, safeX + paddingX, safeY + paddingY + fontSize + 4);
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(watermarkText, x, y);
       
       ctx.restore();
     } catch (e) {
-      console.warn('Photo watermark rendering error:', e);
+      console.warn('Photo watermark error:', e);
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
@@ -464,10 +451,12 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   // Auto-fill pre-entered order details if scanned or typed Order ID/AWB matches
   useEffect(() => {
     const q = orderIdInput.trim().toLowerCase();
-    if (!q) return;
+    if (!q || q.length < 3) return; // Don't auto-fill for very short strings unless exact match
+    
     const match = existingOrders.find(
       o => o.orderId.toLowerCase() === q || (o.awbNumber && o.awbNumber.toLowerCase() === q)
     );
+    
     if (match) {
       if (match.awbNumber) setAwbInput(match.awbNumber);
       if (match.courier) setCourierInput(match.courier);
@@ -535,13 +524,62 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         throw new Error('Camera stream could not be acquired.');
       }
 
-      if (videoRef.current && videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(() => {});
+      const video = videoRef.current;
+      if (!video) throw new Error('Video preview not available.');
+
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+        video.play().catch(() => {});
       }
 
+      // Setup Watermark Canvas Processing
+      const canvas = watermarkCanvasRef.current || document.createElement('canvas');
+      watermarkCanvasRef.current = canvas;
+      
+      const width = video.videoWidth || 1280;
+      const height = video.videoHeight || 720;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) throw new Error('Canvas context not available.');
+
+      const targetId = cleanId;
+      const istDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
+      const watermarkText = `Order ID: ${targetId} | ${istDate}`;
+      const fontSize = Math.max(14, Math.floor(height * 0.025));
+      const margin = Math.max(15, Math.floor(width * 0.02));
+
+      const drawFrame = () => {
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+        
+        // Draw video frame
+        ctx.drawImage(video, 0, 0, width, height);
+
+        // Draw Watermark
+        ctx.save();
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        ctx.textBaseline = 'bottom';
+        const metrics = ctx.measureText(watermarkText);
+        ctx.fillText(watermarkText, width - metrics.width - margin, height - margin);
+        ctx.restore();
+
+        requestRef.current = requestAnimationFrame(drawFrame);
+      };
+
+      // Start the loop
+      setIsRecording(true); // Set early to allow drawFrame to run
+      requestRef.current = requestAnimationFrame(drawFrame);
+
+      // Capture Stream from Canvas (30fps)
+      const canvasStream = canvas.captureStream(30);
+      
       // Create robust MediaRecorder
-      const recorder = createMediaRecorder(stream);
+      const recorder = createMediaRecorder(canvasStream);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -554,6 +592,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         console.error('MediaRecorder error:', event);
         setStationError('Recording device error encountered.');
         setIsRecording(false);
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
         setStep('READY');
       };
 
@@ -565,6 +604,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
         setIsRecording(false);
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
         setStep('CONFIRM');
       };
 
@@ -575,7 +615,6 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         recorder.start();
       }
 
-      setIsRecording(true);
       setStep('RECORDING');
       playFeedbackTone('beep');
 
@@ -593,6 +632,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       setStationError('Recording could not start: ' + (err.message || String(err)));
       setStep('READY');
       setIsRecording(false);
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
     }
   };
 

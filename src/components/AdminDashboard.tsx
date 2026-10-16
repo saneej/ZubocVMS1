@@ -254,13 +254,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
                     </td>
 
                     <td className="p-3 font-mono text-xs">
-                      {order.courier ? (
-                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200 text-[11px]">
-                          {order.courier}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-[10px]">—</span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {order.courier ? (
+                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200 text-[11px] w-fit">
+                            {order.courier}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[10px]">—</span>
+                        )}
+                        {order.deliveryMethod && (
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-1">
+                            <Zap className="w-2.5 h-2.5 text-amber-500" />
+                            {order.deliveryMethod}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="p-3 font-mono text-xs">
