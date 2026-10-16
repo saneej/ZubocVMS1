@@ -25,12 +25,14 @@ import {
 import { uploadQueueManager } from '../utils/uploadQueue';
 
 interface OrderDetailsPageProps {
+  orders?: OrderRecord[];
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
   currentStaffId?: string;
   currentStaffName?: string;
 }
 
 export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({ 
+  orders = [],
   onUpdateOrder, 
   currentStaffId = 'Operator-ID',
   currentStaffName = 'Operator'
@@ -42,9 +44,29 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
 
+  // Sync with parent orders list if it changes (e.g. real-time update from Firestore)
+  useEffect(() => {
+    if (orderId && orders.length > 0) {
+      const match = orders.find(o => o.orderId === orderId);
+      if (match) {
+        setOrder(match);
+        setIsLoading(false);
+      }
+    }
+  }, [orders, orderId]);
+
   useEffect(() => {
     const fetchOrder = async () => {
       if (!orderId) return;
+      
+      // If we already have it from props, don't show loading spinner again
+      const existingInProps = orders.find(o => o.orderId === orderId);
+      if (existingInProps) {
+        setOrder(existingInProps);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
         const data = await safeFetchJson(`/api/orders/${orderId}`);

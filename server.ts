@@ -1089,7 +1089,7 @@ apiRouter.post('/telegram/update-caption', async (req, res) => {
     return res.status(404).json({ error: 'Order not found' });
   }
   Object.keys(req.body).forEach(key => {
-    if (['awbNumber', 'courier', 'weight', 'productSku', 'customerName', 'contactPerson', 'contactPhone', 'orderReceivedDate', 'dispatchDate', 'orderAmount', 'shippingAmount', 'orderTotal', 'deliveredDate', 'itemCount', 'notes'].includes(key)) {
+    if (['awbNumber', 'courier', 'weight', 'productSku', 'customerName', 'contactPerson', 'contactPhone', 'orderReceivedDate', 'dispatchDate', 'orderAmount', 'shippingAmount', 'orderTotal', 'deliveredDate', 'itemCount', 'notes', 'fulfillmentStatus', 'remarks'].includes(key)) {
       (record as any)[key] = sanitizeString(req.body[key]);
     }
   });
@@ -1129,7 +1129,9 @@ apiRouter.post('/telegram/update-caption', async (req, res) => {
       `<b>📍 Station:</b> ${escapeHtml(record.stationId)}`,
       `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
       `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`,
+      `<b>🚛 Fulfillment:</b> <b>${escapeHtml(record.fulfillmentStatus || 'Pending')}</b>`,
       record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : '',
+      record.remarks ? `<b>✅ QC Remarks:</b> ${escapeHtml(record.remarks)}` : '',
       '<b>✏️ Status:</b> Order details edited & synced by Management'
     ].filter(Boolean);
     const newCaption = captionLines.join('\n');

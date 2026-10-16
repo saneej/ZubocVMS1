@@ -314,6 +314,7 @@ function AppContent() {
             } />
             <Route path="/order/:orderId" element={
               <OrderDetailsPage
+                orders={orders}
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffId={currentStaff?.id}
                 currentStaffName={currentStaff?.name}
