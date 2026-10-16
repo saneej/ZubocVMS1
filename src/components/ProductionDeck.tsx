@@ -363,7 +363,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   }, [isAutoScrollActive, isUserHovering, scrollSpeed]);
 
   const normalizedList = useMemo(() => {
-    return orders.map(ord => ({
+    return orders.filter(ord => ord.isProductionDeckOrder).map(ord => ({
       raw: ord,
       norm: normalizeOrder(ord)
     }));
@@ -1369,6 +1369,9 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
   const [totalBillingAmount, setTotalBillingAmount] = useState(24500);
   const [advanceReceived, setAdvanceReceived] = useState(12000);
   const [notes, setNotes] = useState('');
+  const [customisations, setCustomisations] = useState<ZubocCustomisations>({
+    goldFoil: true, digitalPrinting: true, screenPrinting: true, dieCutting: true, waxStamp: true, rubberStamp: false, embosserStamp: false, seals: true
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1385,6 +1388,7 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
       durationSeconds: 0,
       recordingStatus: 'PENDING',
       uploadStatus: 'PENDING',
+      isProductionDeckOrder: true,
       clientName,
       product,
       customerName: clientName,
@@ -1392,12 +1396,25 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
       formFillingDate: now.slice(0, 10),
       preparedBy: currentStaff.name,
       checkedBy: 'Supervisor',
-      customisations: { goldFoil: true, digitalPrinting: true, screenPrinting: true, waxStamp: true },
-      subAssemblyProgress: { envelopeDieCutting: false, screenPrinting: false, goldFoiling: false },
+      customisations,
+      subAssemblyProgress: {
+        envelopeDieCutting: false,
+        screenPrinting: false,
+        goldFoiling: false,
+        waxSealApplied: false,
+        curationCompleted: false,
+        photoshootCompleted: false,
+        qcPackedCompleted: false
+      },
       productionStage: 'PRE_PRODUCTION',
       promisedDeliveryDate,
       dispatchDate: promisedDeliveryDate,
-      paymentGate: { totalBillingAmount, advanceReceived, balanceAmount: balance, balanceStatus: balance <= 0 ? 'COMPLETED' : 'PENDING' },
+      paymentGate: { 
+        totalBillingAmount, 
+        advanceReceived, 
+        balanceAmount: balance, 
+        balanceStatus: balance <= 0 ? 'COMPLETED' : 'PENDING' 
+      },
       fulfillmentStatus: 'Pending',
       productionNotes: notes,
       remarks: notes,
@@ -1446,6 +1463,28 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
             <div>
               <label className="font-bold text-stone-600">Advance (₹)</label>
               <input type="number" value={advanceReceived} onChange={(e) => setAdvanceReceived(parseFloat(e.target.value) || 0)} className="w-full mt-1 px-2.5 py-1.5 rounded-lg border border-stone-300 font-mono" />
+            </div>
+          </div>
+
+          <div>
+            <label className="font-bold text-stone-600 block mb-1">Customisations</label>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { k: 'goldFoil', label: 'Gold Foil' },
+                { k: 'dieCutting', label: 'Die Cut' },
+                { k: 'screenPrinting', label: 'Screen Print' },
+                { k: 'waxStamp', label: 'Wax Stamp' }
+              ].map(({ k, label }) => (
+                <label key={k} className="flex items-center gap-1.5 text-xs text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(customisations[k as keyof ZubocCustomisations])}
+                    onChange={(e) => setCustomisations({ ...customisations, [k]: e.target.checked })}
+                    className="rounded text-[#832f5e]"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
             </div>
           </div>
 

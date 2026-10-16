@@ -107,6 +107,7 @@ export interface OrderRecord {
   paymentGate?: PaymentGateInfo;
   productionStage?: ProductionStage;
   productionNotes?: string;
+  isProductionDeckOrder?: boolean;
 
   createdAt: string;
   updatedAt: string;
