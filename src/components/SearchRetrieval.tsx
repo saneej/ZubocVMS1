@@ -557,7 +557,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                         </Link>
                         {onStartPacking && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            {(order.fulfillmentStatus === 'Pending' && !order.telegramMessageLink && !order.videoUrl && (!order.photoUrls || order.photoUrls.length === 0)) && (
+                            {/* Check if evidence exists in TG/system */}
+                            {(order.telegramMessageLink || order.videoUrl || (order.photoUrls && order.photoUrls.length > 0) || order.photoDataUrl) ? (
+                              <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Evidence in TG</span>
+                              </div>
+                            ) : (order.fulfillmentStatus === 'Pending' && (
                               <>
                                 <button
                                   onClick={() => onStartPacking(order)}
@@ -579,17 +585,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                                   <span>File</span>
                                 </button>
                               </>
-                            )}
-                            {(order.fulfillmentStatus !== 'Packed' && order.fulfillmentStatus !== 'Shipped' && order.fulfillmentStatus !== 'Fulfilled' && order.fulfillmentStatus !== 'Delivered') && (
-                              <button
-                                onClick={() => handleQuickStatusUpdate(order, 'Packed')}
-                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 border border-slate-300"
-                                title="Mark as packed (Evidence is already in Telegram)"
-                              >
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>Already in TG</span>
-                              </button>
-                            )}
+                            ))}
                           </div>
                         )}
                       </div>

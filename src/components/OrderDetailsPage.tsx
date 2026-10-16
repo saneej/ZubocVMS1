@@ -239,29 +239,31 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
               </select>
             </div>
 
-            {order.fulfillmentStatus === 'Pending' && !order.telegramMessageLink && (
+            {order.fulfillmentStatus === 'Pending' && (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigate('/station')}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-[#832f5e]/20 cursor-pointer"
-                >
-                  <Video className="w-4 h-4" />
-                  <span>PACK (VIDEO)</span>
-                </button>
-                <button
-                  onClick={() => document.getElementById('detail-media-upload')?.click()}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>PACK (FILE)</span>
-                </button>
-                <button
-                  onClick={() => handleStatusUpdate('Packed')}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs border border-slate-300 transition-all cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>ALREADY IN TG</span>
-                </button>
+                {(order.telegramMessageLink || order.videoUrl || (order.photoUrls && order.photoUrls.length > 0) || order.photoDataUrl) ? (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs border border-emerald-200">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Evidence already in Telegram</span>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => navigate('/station')}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-[#832f5e]/20 cursor-pointer"
+                    >
+                      <Video className="w-4 h-4" />
+                      <span>PACK (VIDEO)</span>
+                    </button>
+                    <button
+                      onClick={() => document.getElementById('detail-media-upload')?.click()}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>PACK (FILE)</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
