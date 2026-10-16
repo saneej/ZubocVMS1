@@ -763,10 +763,13 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
           if (snap.exists()) {
               existing = snap.data() as OrderRecord;
               ordersStore[orderId] = existing;
+              console.log('Fetched existing order from Firestore:', orderId, 'Status:', existing.fulfillmentStatus);
           }
       } catch (e) {
           console.error('Error fetching existing order for update:', e);
       }
+  } else if (existing) {
+      console.log('Using existing order from memory:', orderId, 'Status:', existing.fulfillmentStatus);
   }
 
   const now = new Date().toISOString();
