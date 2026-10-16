@@ -1802,6 +1802,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
         </div>
       </div>
 
+      {/* Hidden processing canvas for video watermarking */}
+      <canvas ref={watermarkCanvasRef} className="hidden" aria-hidden="true" />
     </div>
   </div>
 );

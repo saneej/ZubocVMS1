@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet, Zap } from 'lucide-react';
+import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet, Zap, FileText, Eye } from 'lucide-react';
 import { OrderRecord, AppSettings } from '../types';
 import { safeFetchJson } from '../utils/api';
+import { Link } from 'react-router-dom';
 import { formatIST } from '../utils/time';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 
@@ -9,12 +10,71 @@ interface AdminDashboardProps {
   orders: OrderRecord[];
   settings: AppSettings;
   onOpenSettings: () => void;
+  onUpdateOrder?: (updatedOrder: OrderRecord) => void;
+  currentStaffId?: string;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings, onOpenSettings }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings, onOpenSettings, onUpdateOrder, currentStaffId = 'Admin-01' }) => {
   const [isSendingDemo, setIsSendingDemo] = useState(false);
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleQuickStatusUpdate = async (order: OrderRecord, newStatus: string) => {
+    if (!onUpdateOrder) return;
+    const nowIso = new Date().toISOString();
+    const newLogs = [...(order.auditLogs || [])];
+    newLogs.push({
+      timestamp: nowIso,
+      staffId: currentStaffId,
+      action: 'QUICK_STATUS_UPDATE',
+      details: `Fulfillment status changed from "${order.fulfillmentStatus || 'Pending'}" to "${newStatus}"`,
+      type: 'CHANGE_LOG'
+    });
+
+    const updated: OrderRecord = {
+      ...order,
+      fulfillmentStatus: newStatus,
+      auditLogs: newLogs,
+      updatedAt: nowIso
+    };
+
+    onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
+  };
+
+  const handleQuickNoteUpdate = async (order: OrderRecord) => {
+    const newNote = window.prompt(`Edit notes for Order ${order.orderId}:`, order.notes || '');
+    if (newNote === null) return;
+
+    if (!onUpdateOrder) return;
+    const nowIso = new Date().toISOString();
+    const newLogs = [...(order.auditLogs || [])];
+    newLogs.push({
+      timestamp: nowIso,
+      staffId: currentStaffId,
+      action: 'QUICK_NOTE_UPDATE',
+      details: `Notes updated via quick-note icon from Admin Dashboard`,
+      type: 'EDIT_LOG'
+    });
+
+    const updated: OrderRecord = {
+      ...order,
+      notes: newNote.trim() || undefined,
+      auditLogs: newLogs,
+      updatedAt: nowIso
+    };
+
+    onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
+  };
 
   const totalOrders = orders.length;
   const successfulUploads = orders.filter(o => o.uploadStatus === 'SUCCESS').length;
@@ -227,6 +287,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
                 <th className="p-3">Customer / City</th>
                 <th className="p-3">Station & Staff</th>
                 <th className="p-3">Time (IST)</th>
+                <th className="p-3">Fulfillment</th>
                 <th className="p-3">Status</th>
                 <th className="p-3 text-right">Evidence</th>
               </tr>
@@ -242,7 +303,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
                 filteredOrders.slice(0, 50).map((order) => (
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
-                      <div className="font-mono font-bold text-slate-900 text-xs">{order.orderId}</div>
+                      <Link 
+                        to={`/order/${order.orderId}`}
+                        className="font-mono font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
+                      >
+                        <span>{order.orderId}</span>
+                        <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
                       {order.awbNumber ? (
                         <div className="font-mono text-[11px] text-blue-600 flex items-center gap-1 mt-0.5">
                           <Truck className="w-3 h-3 text-blue-500 shrink-0" />
@@ -313,6 +380,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
 
                     <td className="p-3 font-mono text-[11px] text-slate-500">
                       {formatIST(order.createdAt)}
+                    </td>
+
+                    <td className="p-3 font-mono text-xs">
+                      <div className="space-y-1.5 min-w-[120px]">
+                        <select
+                          value={order.fulfillmentStatus || 'Pending'}
+                          onChange={(e) => handleQuickStatusUpdate(order, e.target.value)}
+                          className={`w-full px-1.5 py-1 rounded border text-[10px] font-bold focus:outline-none cursor-pointer ${
+                            order.fulfillmentStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            order.fulfillmentStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            order.fulfillmentStatus === 'Fulfilled' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            order.fulfillmentStatus === 'Packed' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Packed">Packed</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Fulfilled">Fulfilled</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                        
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => handleQuickNoteUpdate(order)}
+                            className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded transition-all border ${
+                              order.notes ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-slate-400 bg-slate-50 border-slate-200 hover:text-slate-600'
+                            }`}
+                            title={order.notes || 'Add Note'}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[100px]">{order.notes || 'Notes'}</span>
+                          </button>
+
+                          {order.remarks && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="truncate max-w-[100px]">{order.remarks}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
                     <td className="p-3 font-mono text-[10px]">

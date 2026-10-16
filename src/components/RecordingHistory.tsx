@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { formatIST } from '../utils/time';
-import { Download, RefreshCw, ExternalLink, Trash2, Truck, Scale, Tag, FileText, FileSpreadsheet } from 'lucide-react';
+import { Download, RefreshCw, ExternalLink, Trash2, Truck, Scale, Tag, FileText, FileSpreadsheet, Eye } from 'lucide-react';
 import { OrderRecord } from '../types';
+import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 
 interface RecordingHistoryProps {
@@ -94,7 +95,13 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
                 {orders.map(order => (
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
-                      <div className="font-bold text-slate-900 text-xs">{order.orderId}</div>
+                      <Link 
+                        to={`/order/${order.orderId}`}
+                        className="font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
+                      >
+                        <span>{order.orderId}</span>
+                        <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
                       {order.awbNumber ? (
                         <div className="text-[11px] text-blue-600 flex items-center gap-1 mt-0.5">
                           <Truck className="w-3 h-3 text-blue-500 shrink-0" />

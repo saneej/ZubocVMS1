@@ -33,6 +33,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
   const [orderTotal, setOrderTotal] = useState('');
   const [deliveredDate, setDeliveredDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [remarks, setRemarks] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,6 +74,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
       orderTotal: orderTotal.trim() || undefined,
       deliveredDate: deliveredDate || undefined,
       notes: notes.trim() || undefined,
+      remarks: remarks.trim() || undefined,
       staffId: currentStaffId,
       stationId: 'Packing-01',
       recordingStatus: 'PENDING',
@@ -112,6 +114,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
           setOrderTotal('');
           setDeliveredDate('');
           setNotes('');
+          setRemarks('');
           onClose();
         }, 1000);
       } else {
@@ -441,7 +444,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
 
               <div>
                 <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
-                  Notes / QC Remarks
+                  Internal Notes
                 </label>
                 <div className="relative">
                   <FileText className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-stone-400" />
@@ -449,7 +452,23 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
                     type="text"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="e.g. Packed OK, Bubble wrap"
+                    placeholder="e.g. Bubble wrap"
+                    className="w-full bg-white border border-stone-200 focus:border-[#832f5e] rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
+                  QC Remarks
+                </label>
+                <div className="relative">
+                  <CheckCircle2 className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-stone-400" />
+                  <input
+                    type="text"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="e.g. Quality check passed"
                     className="w-full bg-white border border-stone-200 focus:border-[#832f5e] rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
                   />
                 </div>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { PackingStation } from './components/PackingStation';
 import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
+import { OrderDetailsPage } from './components/OrderDetailsPage';
 import { SettingsModal } from './components/SettingsModal';
 import { PreEnterOrderModal } from './components/PreEnterOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
@@ -58,8 +60,21 @@ const DEFAULT_STAFF: StaffMember = {
   stationId: 'Packing-HQ'
 };
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin'>('station');
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Map path to active tab
+  const getActiveTab = (path: string) => {
+    if (path === '/station') return 'station';
+    if (path === '/orders' || path === '/search') return 'search';
+    if (path === '/history') return 'history';
+    if (path === '/admin') return 'admin';
+    if (path.startsWith('/order/')) return 'search'; // Order detail counts as search context
+    return 'station';
+  };
+
+  const activeTab = getActiveTab(location.pathname);
   
   // Authentication State
   const [currentStaff, setCurrentStaff] = useState<StaffMember>(() => {
@@ -215,7 +230,7 @@ export default function App() {
       {/* Persistent Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => navigate(`/${tab === 'search' ? 'orders' : tab}`)}
         currentStaff={currentStaff}
         setCurrentStaff={(st) => {
           setCurrentStaff(st);
@@ -246,48 +261,59 @@ export default function App() {
 
         {/* Dynamic Page Views */}
         <main className="flex-1 pb-16">
-          {activeTab === 'station' && (
-            <PackingStation
-              currentStaff={currentStaff}
-              settings={settings}
-              onOrderCompleted={handleOrderCompleted}
-              existingOrders={orders}
-              onOpenPreEnter={() => setIsPreEnterOpen(true)}
-              selectedOrderForPacking={selectedOrderForPacking}
-              onClearSelectedPackingOrder={() => setSelectedOrderForPacking(null)}
-            />
-          )}
-
-          {activeTab === 'search' && (
-            <SearchRetrieval
-              orders={orders}
-              onRefreshOrders={fetchOrdersAPI}
-              onDeleteOrder={handleDeleteOrder}
-              onUpdateOrder={handleUpdateOrder}
-              onStartPacking={(ord) => {
-                setSelectedOrderForPacking(ord);
-                setActiveTab('station');
-              }}
-              onOpenPreEnter={() => setIsPreEnterOpen(true)}
-              currentStaffId={currentStaff?.id}
-            />
-          )}
-
-          {activeTab === 'history' && (
-            <RecordingHistory
-              orders={orders}
-              onRefresh={fetchOrdersAPI}
-              onDeleteOrder={handleDeleteOrder}
-            />
-          )}
-
-          {activeTab === 'admin' && (
-            <AdminDashboard
-              orders={orders}
-              settings={settings}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-            />
-          )}
+          <Routes>
+            <Route path="/" element={<Navigate to="/station" replace />} />
+            <Route path="/station" element={
+              <PackingStation
+                currentStaff={currentStaff}
+                settings={settings}
+                onOrderCompleted={handleOrderCompleted}
+                existingOrders={orders}
+                onOpenPreEnter={() => setIsPreEnterOpen(true)}
+                selectedOrderForPacking={selectedOrderForPacking}
+                onClearSelectedPackingOrder={() => setSelectedOrderForPacking(null)}
+              />
+            } />
+            <Route path="/orders" element={
+              <SearchRetrieval
+                orders={orders}
+                onRefreshOrders={fetchOrdersAPI}
+                onDeleteOrder={handleDeleteOrder}
+                onUpdateOrder={handleUpdateOrder}
+                onStartPacking={(ord) => {
+                  setSelectedOrderForPacking(ord);
+                  navigate('/station');
+                }}
+                onOpenPreEnter={() => setIsPreEnterOpen(true)}
+                currentStaffId={currentStaff?.id}
+              />
+            } />
+            <Route path="/search" element={<Navigate to="/orders" replace />} />
+            <Route path="/history" element={
+              <RecordingHistory
+                orders={orders}
+                onRefresh={fetchOrdersAPI}
+                onDeleteOrder={handleDeleteOrder}
+              />
+            } />
+            <Route path="/admin" element={
+              <AdminDashboard
+                orders={orders}
+                settings={settings}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onUpdateOrder={handleUpdateOrder}
+                currentStaffId={currentStaff?.id}
+              />
+            } />
+            <Route path="/order/:orderId" element={
+              <OrderDetailsPage
+                onUpdateOrder={handleUpdateOrder}
+                currentStaffId={currentStaff?.id}
+              />
+            } />
+            {/* Fallback to station */}
+            <Route path="*" element={<Navigate to="/station" replace />} />
+          </Routes>
         </main>
 
         <UploadQueueBanner />
@@ -323,12 +349,20 @@ export default function App() {
         onSuccess={(rec) => {
           handleOrderCompleted(rec);
           setSelectedOrderForPacking(rec);
-          setActiveTab('station');
+          navigate('/station');
           fetchOrdersAPI();
         }}
         currentStaffId={currentStaff?.id}
       />
 
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }

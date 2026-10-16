@@ -1,8 +1,9 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye } from 'lucide-react';
 import { OrderRecord } from '../types';
+import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 
 interface SearchRetrievalProps {
@@ -39,6 +40,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [newItemCount, setNewItemCount] = useState("1");
   const [newOrderTotal, setNewOrderTotal] = useState("");
   const [newNotes, setNewNotes] = useState("");
+  const [newRemarks, setNewRemarks] = useState("");
 
   const handlePreEnterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +64,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       itemCount: newItemCount,
       orderTotal: newOrderTotal,
       notes: newNotes,
+      remarks: newRemarks,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -82,6 +85,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         setNewItemCount("1");
         setNewOrderTotal("");
         setNewNotes("");
+        setNewRemarks("");
       } else {
         alert("Failed to save pre-entered order");
       }
@@ -108,6 +112,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [editOrderTotal, setEditOrderTotal] = useState('');
   const [editDeliveredDate, setEditDeliveredDate] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editRemarks, setEditRemarks] = useState('');
+  const [editFulfillmentStatus, setEditFulfillmentStatus] = useState('Pending');
   
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
 
@@ -166,6 +172,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     setEditOrderTotal(order.orderTotal || '');
     setEditDeliveredDate(order.deliveredDate || '');
     setEditNotes(order.notes || '');
+    setEditRemarks(order.remarks || '');
+    setEditFulfillmentStatus(order.fulfillmentStatus || 'Pending');
   };
 
   const handleSaveOrderEdit = (e: React.FormEvent) => {
@@ -203,6 +211,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     checkChange('Total Amount', editingOrder.orderTotal, editOrderTotal.trim());
     checkChange('Delivered Date', editingOrder.deliveredDate, editDeliveredDate);
     checkChange('Notes', editingOrder.notes, editNotes.trim());
+    checkChange('Remarks', editingOrder.remarks, editRemarks.trim());
+    checkChange('Fulfillment Status', editingOrder.fulfillmentStatus, editFulfillmentStatus);
 
     newLogs.push({
       timestamp: nowIso,
@@ -237,6 +247,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       orderTotal: editOrderTotal.trim() || undefined,
       deliveredDate: editDeliveredDate || undefined,
       notes: editNotes.trim() || undefined,
+      remarks: editRemarks.trim() || undefined,
+      fulfillmentStatus: editFulfillmentStatus,
       auditLogs: newLogs,
       updatedAt: nowIso
     };
@@ -248,6 +260,63 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       body: JSON.stringify(updated)
     }).catch(() => {});
     setEditingOrder(null);
+  };
+
+  const handleQuickStatusUpdate = async (order: OrderRecord, newStatus: string) => {
+    if (!onUpdateOrder) return;
+    const nowIso = new Date().toISOString();
+    const newLogs = [...(order.auditLogs || [])];
+    newLogs.push({
+      timestamp: nowIso,
+      staffId: currentStaffId,
+      action: 'QUICK_STATUS_UPDATE',
+      details: `Fulfillment status changed from "${order.fulfillmentStatus || 'Pending'}" to "${newStatus}"`,
+      type: 'CHANGE_LOG'
+    });
+
+    const updated: OrderRecord = {
+      ...order,
+      fulfillmentStatus: newStatus,
+      auditLogs: newLogs,
+      updatedAt: nowIso
+    };
+
+    onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
+  };
+
+  const handleQuickNoteUpdate = async (order: OrderRecord) => {
+    const newNote = window.prompt(`Edit notes for Order ${order.orderId}:`, order.notes || '');
+    if (newNote === null) return;
+
+    if (!onUpdateOrder) return;
+    const nowIso = new Date().toISOString();
+    const newLogs = [...(order.auditLogs || [])];
+    newLogs.push({
+      timestamp: nowIso,
+      staffId: currentStaffId,
+      action: 'QUICK_NOTE_UPDATE',
+      details: `Notes updated via quick-note icon`,
+      type: 'EDIT_LOG'
+    });
+
+    const updated: OrderRecord = {
+      ...order,
+      notes: newNote.trim() || undefined,
+      auditLogs: newLogs,
+      updatedAt: nowIso
+    };
+
+    onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
   };
 
   const handleExportExcel = () => {
@@ -332,9 +401,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                 <th className="p-3">Amounts (₹)</th>
                 <th className="p-3">Item / SKU</th>
                 <th className="p-3">Customer & Dates</th>
-                <th className="p-3">Station & Operator</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Recorded Time</th>
+                <th className="p-3">Fulfillment</th>
+                <th className="p-3">Recorded By</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -350,7 +418,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
                       <div className="flex items-center gap-2">
-                        <div className="font-mono font-bold text-slate-900 text-xs">{order.orderId}</div>
+                        <Link 
+                          to={`/order/${order.orderId}`}
+                          className="font-mono font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
+                        >
+                          <span>{order.orderId}</span>
+                          <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </Link>
                         {onStartPacking && (
                           <button
                             onClick={() => onStartPacking(order)}
@@ -416,22 +490,50 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                     </td>
 
                     <td className="p-3 font-mono text-xs">
-                      <div className="text-slate-700 font-medium">{order.stationId}</div>
-                      <div className="text-slate-400 text-[10px]">{order.staffId}</div>
+                      <div className="space-y-1.5">
+                        <select
+                          value={order.fulfillmentStatus || 'Pending'}
+                          onChange={(e) => handleQuickStatusUpdate(order, e.target.value)}
+                          className={`w-full px-1.5 py-1 rounded border text-[10px] font-bold focus:outline-none cursor-pointer ${
+                            order.fulfillmentStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            order.fulfillmentStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            order.fulfillmentStatus === 'Fulfilled' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            order.fulfillmentStatus === 'Packed' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Packed">Packed</option>
+                          <option value="Shipped">Shipped</option>
+                          <option value="Fulfilled">Fulfilled</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                        
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => handleQuickNoteUpdate(order)}
+                            className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded transition-all border ${
+                              order.notes ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-slate-400 bg-slate-50 border-slate-200 hover:text-slate-600'
+                            }`}
+                            title={order.notes || 'Add Note'}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[100px]">{order.notes || 'Notes'}</span>
+                          </button>
+
+                          {order.remarks && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span className="truncate max-w-[100px]">{order.remarks}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
-                    <td className="p-3 font-mono">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        order.uploadStatus === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' :
-                        order.uploadStatus === 'FAILED' ? 'bg-rose-100 text-rose-800' :
-                        'bg-amber-100 text-amber-800'
-                      }`}>
-                        {order.uploadStatus}
-                      </span>
-                    </td>
-
-                    <td className="p-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">
-                      {formatIST(order.createdAt)}
+                    <td className="p-3 font-mono text-xs">
+                      <div className="text-slate-700 font-medium">{order.staffId}</div>
+                      <div className="text-slate-400 text-[10px]">{formatIST(order.createdAt)}</div>
                     </td>
 
                     <td className="p-3 text-right space-x-1.5 font-mono whitespace-nowrap">
@@ -644,24 +746,41 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                     />
                   </div>
 
-                  {/* Delivered Date */}
-                  <div className="bg-emerald-50/60 border border-emerald-200 p-2 rounded-lg">
-                    <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">Delivered Date</label>
-                    <input
-                      type="date"
-                      value={editDeliveredDate}
-                      onChange={(e) => setEditDeliveredDate(e.target.value)}
-                      className="w-full bg-white border border-emerald-300 focus:border-emerald-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
-                    />
+                  {/* Fulfillment Status */}
+                  <div className="bg-blue-50/60 border border-blue-200 p-2 rounded-lg">
+                    <label className="block text-[10px] font-bold text-blue-800 uppercase mb-0.5">Fulfillment Status</label>
+                    <select
+                      value={editFulfillmentStatus}
+                      onChange={(e) => setEditFulfillmentStatus(e.target.value)}
+                      className="w-full bg-white border border-blue-300 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Packed">Packed</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Fulfilled">Fulfilled</option>
+                      <option value="Delivered">Delivered</option>
+                    </select>
                   </div>
 
-                  {/* Notes */}
+                  {/* Notes & Remarks */}
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Notes / QC Remarks</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Internal Notes</label>
                     <input
                       type="text"
                       value={editNotes}
                       onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Add internal notes..."
+                      className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">QC Remarks</label>
+                    <input
+                      type="text"
+                      value={editRemarks}
+                      onChange={(e) => setEditRemarks(e.target.value)}
+                      placeholder="QC Remarks..."
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
                   </div>

@@ -30,15 +30,17 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
 
     // Minimal and Neat Style: Single line, bottom-right, white with black shadow
     const watermarkText = `ID\\: ${cleanOrderId} | ${escapedTime}`;
-    const filter = `scale='min(1280,iw)':-2,drawtext=text='${watermarkText}':x=w-tw-15:y=h-th-15:fontcolor=white@0.8:fontsize=14:shadowcolor=black@0.4:shadowx=1:shadowy=1`;
+    // Using a very small font size and slightly transparent white for "minimal" look
+    // We omit 'fontfile' to let FFmpeg pick the system default, but we'll use a safer filter string
+    const filter = `scale='min(1280,iw)':-2,drawtext=text='${watermarkText}':x=w-tw-10:y=h-th-10:fontcolor=white@0.6:fontsize=12:shadowcolor=black@0.3:shadowx=1:shadowy=1`;
 
     try {
       // Primary attempt with watermark - ULTRAFAST preset for high throughput
       const cmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 30 -maxrate 1200k -bufsize 2400k -pix_fmt yuv420p -vf "${filter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
-      await execPromise(cmd, { timeout: 600000 }); // Increase timeout to 10 mins for large files
+      await execPromise(cmd, { timeout: 600000 }); 
     } catch (e: any) {
-      console.warn('Watermarked transcoding failed, falling back to clean transcode:', e?.message);
-      // Absolute fallback: No watermark
+      console.warn('Watermarked transcoding failed, trying minimal scale-only fallback:', e?.message);
+      // Fallback: No watermark but still transcode for Telegram compatibility
       const fallbackCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 32 -vf "scale='min(1280,iw)':-2" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
       await execPromise(fallbackCmd, { timeout: 600000 });
     }
