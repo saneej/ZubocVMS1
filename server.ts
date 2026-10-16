@@ -323,6 +323,7 @@ try {
 
 function saveLocalBackup() {
   const payload = JSON.stringify({ orders: ordersStore, settings, staffs: staffsStore }, null, 2);
+  console.log('Saving local backup to:', DATA_FILE);
   try {
     fs.writeFileSync(DATA_FILE, payload);
   } catch (e: any) {
@@ -732,14 +733,19 @@ apiRouter.post('/orders', async (req, res) => {
   saveLocalBackup();
 
   if (fulfillmentChanged) {
-      await sendTelegramUpdate(record);
+      try {
+          await sendTelegramUpdate(record);
+      } catch (e) {
+          console.error('Error sending Telegram update:', e);
+      }
   }
 
   if (firestoreDb) {
     try {
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error writing order record to Firestore:', e);
+      return res.status(500).json({ error: 'Firestore write failed: ' + e.message });
     }
   }
 
@@ -749,7 +755,6 @@ apiRouter.post('/orders', async (req, res) => {
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
   const { orderId } = req.params;
-  console.log('Updating order:', orderId, 'Body:', JSON.stringify(req.body));
   const now = new Date().toISOString();
   const existing = ordersStore[orderId];
 
@@ -767,15 +772,19 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
   saveLocalBackup();
 
   if (fulfillmentChanged) {
-      await sendTelegramUpdate(record);
+      try {
+          await sendTelegramUpdate(record);
+      } catch (e) {
+          console.error('Error sending Telegram update:', e);
+      }
   }
 
   if (firestoreDb) {
     try {
-      console.log('Writing to Firestore order:', orderId, 'Data:', JSON.stringify(record));
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error updating order record in Firestore:', e);
+      return res.status(500).json({ error: 'Firestore update failed: ' + e.message });
     }
   }
 
