@@ -23,6 +23,7 @@ import {
   Upload
 } from 'lucide-react';
 import { uploadQueueManager } from '../utils/uploadQueue';
+import { StatusCell } from './StatusCell';
 
 interface OrderDetailsPageProps {
   orders?: OrderRecord[];
@@ -215,27 +216,10 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col gap-1 min-w-[140px]">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Fulfillment Status</label>
-              <select
-                value={order.fulfillmentStatus || 'Pending'}
-                onChange={(e) => handleStatusUpdate(e.target.value)}
-                className={`w-full px-3 py-2 rounded-xl border text-xs font-bold focus:outline-none cursor-pointer transition-all ${
-                  order.fulfillmentStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100' :
-                  order.fulfillmentStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm shadow-blue-100' :
-                  order.fulfillmentStatus === 'Fulfilled' ? 'bg-purple-50 text-purple-700 border-purple-200 shadow-sm shadow-purple-100' :
-                  order.fulfillmentStatus === 'Packed' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100' :
-                  'bg-slate-50 text-slate-600 border-slate-200'
-                }`}
-              >
-                <option value="Pending">Pending</option>
-                <option value="Packed">Packed</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Fulfilled">Fulfilled</option>
-                <option value="Delivered">Delivered</option>
-              </select>
+              <StatusCell order={order} onUpdate={onUpdateOrder} staffName={currentStaffName} />
             </div>
 
-            {order.fulfillmentStatus === 'Pending' && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
                 {((order.telegramMessageLink && order.telegramMessageLink.trim() !== '') || 
                   (order.videoUrl && order.videoUrl.trim() !== '') || 
                   (order.photoUrls && order.photoUrls.some(url => url.trim() !== '')) || 
@@ -251,19 +235,18 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       className="inline-flex items-center gap-2 px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-[#832f5e]/20 cursor-pointer"
                     >
                       <Video className="w-4 h-4" />
-                      <span>PACK (VIDEO)</span>
+                      <span>RECORD (VIDEO)</span>
                     </button>
                     <button
                       onClick={() => document.getElementById('detail-media-upload')?.click()}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
                     >
                       <Upload className="w-4 h-4" />
-                      <span>PACK (FILE)</span>
+                      <span>UPLOAD (FILE)</span>
                     </button>
                   </>
                 )}
               </div>
-            )}
 
             {order.telegramMessageLink && (
               <a

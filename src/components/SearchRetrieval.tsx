@@ -6,6 +6,7 @@ import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 import { uploadQueueManager } from '../utils/uploadQueue';
+import { StatusCell } from './StatusCell';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -642,23 +643,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
                     <td className="p-3 font-mono text-xs">
                       <div className="space-y-1.5">
-                        <select
-                          value={order.fulfillmentStatus || 'Pending'}
-                          onChange={(e) => handleQuickStatusUpdate(order, e.target.value)}
-                          className={`w-full px-1.5 py-1 rounded border text-[10px] font-bold focus:outline-none cursor-pointer ${
-                            order.fulfillmentStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            order.fulfillmentStatus === 'Shipped' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            order.fulfillmentStatus === 'Fulfilled' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                            order.fulfillmentStatus === 'Packed' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-slate-50 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Packed">Packed</option>
-                          <option value="Shipped">Shipped</option>
-                          <option value="Fulfilled">Fulfilled</option>
-                          <option value="Delivered">Delivered</option>
-                        </select>
+                        <StatusCell order={order} onUpdate={onUpdateOrder} staffName={currentStaffName} />
                         
                         <div className="flex flex-col gap-1">
                           <button
