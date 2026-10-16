@@ -220,6 +220,7 @@ function AppContent() {
     });
 
     // Real-time listener for Firestore orders
+    /*
     const ordersPath = 'orders';
     try {
       const q = query(collection(db, ordersPath));
@@ -268,6 +269,7 @@ function AppContent() {
     } catch (err) {
       console.warn('Realtime Firestore subscription deferred to server API.');
     }
+    */
   }, []);
 
   const handleLoginSuccess = (staff: StaffMember) => {
