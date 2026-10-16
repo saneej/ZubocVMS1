@@ -755,10 +755,21 @@ apiRouter.post('/orders', async (req, res) => {
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
   const { orderId } = req.params;
-  const now = new Date().toISOString();
-  const existing = ordersStore[orderId];
+  let existing = ordersStore[orderId];
+  
+  if (!existing && firestoreDb) {
+      try {
+          const snap = await getDoc(doc(firestoreDb, 'orders', orderId));
+          if (snap.exists()) {
+              existing = snap.data() as OrderRecord;
+              ordersStore[orderId] = existing;
+          }
+      } catch (e) {
+          console.error('Error fetching existing order for update:', e);
+      }
+  }
 
-  console.log('Update Order Request Body for:', orderId, 'fulfillmentStatus:', req.body.fulfillmentStatus);
+  const now = new Date().toISOString();
   const record: OrderRecord = {
     ...(existing || {}),
     ...req.body,
