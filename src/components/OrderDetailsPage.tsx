@@ -39,52 +39,12 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 }) => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<OrderRecord | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  const order = orders.find(o => o.orderId === orderId);
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
-
-  // Sync with parent orders list if it changes (e.g. real-time update from Firestore)
-  useEffect(() => {
-    if (orderId && orders.length > 0) {
-      const match = orders.find(o => o.orderId === orderId);
-      if (match) {
-        setOrder(match);
-        setIsLoading(false);
-      }
-    }
-  }, [orders, orderId]);
-
-  useEffect(() => {
-    const fetchOrder = async () => {
-      if (!orderId) return;
-      
-      // If we already have it from props, don't show loading spinner again
-      const existingInProps = orders.find(o => o.orderId === orderId);
-      if (existingInProps) {
-        setOrder(existingInProps);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const data = await safeFetchJson(`/api/orders/${orderId}`);
-        if (data) {
-          setOrder(data);
-        } else {
-          setError('Order not found');
-        }
-      } catch (err) {
-        console.error('Error fetching order:', err);
-        setError('Failed to load order details');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrder();
-  }, [orderId]);
+  
+  const isLoading = !order && orders.length === 0; // Only show loading if we don't have order AND orders not loaded
+  const error = !order && orders.length > 0 ? 'Order not found' : null;
 
   const handleStatusUpdate = async (newStatus: string) => {
     if (!order || !onUpdateOrder) return;
@@ -105,7 +65,6 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
       updatedAt: nowIso
     };
 
-    setOrder(updated);
     onUpdateOrder(updated);
     fetch("/api/telegram/update-caption", {
       method: "POST",
@@ -166,7 +125,6 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
         notes: order.notes
       });
 
-      setOrder(updated);
       onUpdateOrder(updated);
       alert(`Order ${order.orderId} marked as Packed with ${isVideo ? 'video' : 'photo'} evidence.`);
     };
@@ -516,7 +474,6 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                     };
 
                     // Optimistic update
-                    setOrder(updatedOrder);
                     input.value = '';
 
                     try {
@@ -534,7 +491,6 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                     } catch (err) {
                       console.error('Failed to add note:', err);
                       alert('Failed to save note. Please try again.');
-                      setOrder(order); // Rollback
                     }
                   }}
                   className="flex gap-2"
