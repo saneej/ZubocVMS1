@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, Save, X } from 'lucide-react';
 import { OrderRecord } from '../types';
 
 interface StatusCellProps {
@@ -10,9 +10,16 @@ interface StatusCellProps {
 
 export const StatusCell: React.FC<StatusCellProps> = ({ order, onUpdate, staffName }) => {
   const [currentStatus, setCurrentStatus] = useState(order.fulfillmentStatus || 'Pending');
+  const [justSaved, setJustSaved] = useState(false);
+
+  useEffect(() => {
+    setCurrentStatus(order.fulfillmentStatus || 'Pending');
+  }, [order.fulfillmentStatus]);
+
+  const hasChanged = currentStatus !== (order.fulfillmentStatus || 'Pending');
 
   const handleSaveStatus = () => {
-    if (currentStatus === (order.fulfillmentStatus || 'Pending')) return;
+    if (!hasChanged) return;
 
     const nowIso = new Date().toISOString();
     const newLogs = [...(order.auditLogs || [])];
@@ -34,10 +41,16 @@ export const StatusCell: React.FC<StatusCellProps> = ({ order, onUpdate, staffNa
     if (onUpdate) {
       onUpdate(updated);
     }
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
+  };
+
+  const handleCancel = () => {
+    setCurrentStatus(order.fulfillmentStatus || 'Pending');
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5 flex-wrap">
       <select
         value={currentStatus}
         onChange={(e) => setCurrentStatus(e.target.value)}
@@ -47,7 +60,7 @@ export const StatusCell: React.FC<StatusCellProps> = ({ order, onUpdate, staffNa
           currentStatus === 'Fulfilled' ? 'bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100' :
           currentStatus === 'Packed' ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100' :
           'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-        }`}
+        } ${hasChanged ? 'ring-2 ring-emerald-500/40 border-emerald-500' : ''}`}
       >
         <option value="Pending">Pending</option>
         <option value="Packed">Packed</option>
@@ -55,14 +68,32 @@ export const StatusCell: React.FC<StatusCellProps> = ({ order, onUpdate, staffNa
         <option value="Fulfilled">Fulfilled</option>
         <option value="Delivered">Delivered</option>
       </select>
-      {currentStatus !== (order.fulfillmentStatus || 'Pending') && (
-        <button
-          onClick={handleSaveStatus}
-          className="p-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 cursor-pointer"
-          title="Save status change"
-        >
+
+      {hasChanged && (
+        <div className="flex items-center gap-1 animate-in fade-in duration-150">
+          <button
+            onClick={handleSaveStatus}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-extrabold shadow-sm transition-all cursor-pointer"
+            title="Save status change to database"
+          >
+            <Save className="w-3 h-3" />
+            <span>Save</span>
+          </button>
+          <button
+            onClick={handleCancel}
+            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            title="Cancel and revert"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {justSaved && !hasChanged && (
+        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
           <Check className="w-3 h-3" />
-        </button>
+          <span>Saved</span>
+        </span>
       )}
     </div>
   );

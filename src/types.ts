@@ -5,6 +5,56 @@ export interface ChatNote {
   timestamp: string;
 }
 
+export type ProductionStage = 
+  | 'PRE_PRODUCTION'      // 1. Pre-Production & Print (Die Cutting / Digital / Screen / Foiling / Stamp Making)
+  | 'CURATION_ASSEMBLY'   // 2. In-House Curation & Assembly (Pasting, folding, ribbon work, wax sealing)
+  | 'PHOTOSHOOT'          // 3. Photography Table (Photoshoot in progress)
+  | 'QC_PACKED'           // 4. QC & Packed (Awaiting Dispatch)
+  | 'DISPATCHED';         // 5. Dispatched
+
+export interface ZubocCustomisations {
+  goldFoil?: boolean;
+  digitalPrinting?: boolean;
+  screenPrinting?: boolean;
+  dieCutting?: boolean;
+  waxStamp?: boolean;
+  rubberStamp?: boolean;
+  embosserStamp?: boolean;
+  seals?: boolean;
+}
+
+export interface SubAssemblyProgress {
+  envelopeDieCutting?: boolean;
+  screenPrinting?: boolean;
+  goldFoiling?: boolean;
+  waxSealApplied?: boolean;
+  curationCompleted?: boolean;
+  photoshootCompleted?: boolean;
+  qcPackedCompleted?: boolean;
+}
+
+export interface ZubocTimeline {
+  orderConfirmationDate?: string;
+  designingOutDate?: string;
+  clientApprovalDate?: string;
+  productionSendDate?: string;
+  productionArrivalDate?: string;
+  assemblyCurationDate?: string;
+  photoshootDate?: string;
+  dispatchingDate?: string;
+}
+
+export interface PaymentGateInfo {
+  totalBillingAmount?: number | string;
+  advanceReceived?: number | string;
+  balanceAmount?: number | string;
+  balanceStatus?: 'COMPLETED' | 'PENDING';
+  adminDispatchOverride?: boolean;
+  overrideReason?: string;
+  overrideBy?: string;
+  overrideTimestamp?: string;
+}
+
 export interface OrderRecord {
   orderId: string;
   staffId: string;
@@ -43,6 +93,21 @@ export interface OrderRecord {
   remarks?: string;
   chatNotes?: ChatNote[];
   auditLogs?: { timestamp: string; staffId: string; action: string; details: string; type: 'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG' }[];
+  
+  // Zuboc Client Order & Production Tracking Form fields
+  clientName?: string;
+  product?: string;
+  formFillingDate?: string;
+  preparedBy?: string;
+  checkedBy?: string;
+  customisations?: ZubocCustomisations;
+  subAssemblyProgress?: SubAssemblyProgress;
+  timeline?: ZubocTimeline;
+  promisedDeliveryDate?: string;
+  paymentGate?: PaymentGateInfo;
+  productionStage?: ProductionStage;
+  productionNotes?: string;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +119,9 @@ export interface AppSettings {
   hasToken?: boolean;
   autoUpload: boolean;
   stationId: string;
+  maxDailyDispatches?: number;
+  tvAutoScroll?: boolean;
+  tvScrollSpeed?: number;
 }
 
 export interface StaffMember {

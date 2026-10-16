@@ -12,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { AddOrderModal } from './components/AddOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
+import { ProductionDeck } from './components/ProductionDeck';
 import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, onSnapshot, query, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -69,7 +70,8 @@ function AppContent() {
   const location = useLocation();
   
   // Map path to active tab
-  const getActiveTab = (path: string): 'station' | 'search' | 'history' | 'admin' | 'calculator' => {
+  const getActiveTab = (path: string): 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' => {
+    if (path === '/deck' || path === '/production-deck' || path === '/tv-dashboard' || path === '/production') return 'deck';
     if (path === '/station') return 'station';
     if (path === '/orders' || path === '/search' || path === '/') return 'search';
     if (path === '/calculator' || path === '/rate-calculator') return 'calculator';
@@ -387,7 +389,7 @@ function AppContent() {
       {/* Persistent Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={(tab) => navigate(`/${tab === 'search' ? 'orders' : tab}`)}
+        setActiveTab={(tab) => navigate(tab === 'search' ? '/orders' : tab === 'deck' ? '/production-deck' : `/${tab}`)}
         currentStaff={currentStaff}
         setCurrentStaff={(st) => {
           setCurrentStaff(st);
@@ -414,6 +416,7 @@ function AppContent() {
           onRefreshOrders={fetchOrdersAPI}
           onLogout={handleLogout}
           onOpenAddOrder={() => setIsAddOrderOpen(true)}
+          onOpenDeck={() => navigate('/production-deck')}
         />
 
         {isFirestoreQuotaExceeded && (
@@ -518,6 +521,25 @@ function AppContent() {
               />
             } />
             <Route path="/rate-calculator" element={<Navigate to="/calculator" replace />} />
+            
+            {/* Zuboc Official Production Deck & Live Schedule TV Dashboard */}
+            <Route path="/production-deck" element={
+              <ProductionDeck
+                orders={orders}
+                onUpdateOrder={handleUpdateOrder}
+                onRefreshOrders={fetchOrdersAPI}
+                currentStaff={currentStaff}
+                settings={settings}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onSaveCapacityLimit={(limit) => {
+                  setSettings(prev => ({ ...prev, maxDailyDispatches: limit }));
+                }}
+              />
+            } />
+            <Route path="/deck" element={<Navigate to="/production-deck" replace />} />
+            <Route path="/tv-dashboard" element={<Navigate to="/production-deck" replace />} />
+            <Route path="/production" element={<Navigate to="/production-deck" replace />} />
+
             {/* Fallback to orders */}
             <Route path="*" element={<Navigate to="/orders" replace />} />
           </Routes>

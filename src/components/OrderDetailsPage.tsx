@@ -550,24 +550,22 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         </div>
                       </div>
 
-                      {!isEditingAll && (
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            onClick={() => handleSaveFields({
-                              courier: formData.courier,
-                              awbNumber: formData.awbNumber,
-                              weight: formData.weight,
-                              stationId: formData.stationId,
-                              staffId: formData.staffId
-                            }, 'Updated shipment information')}
-                            disabled={isSaving}
-                            className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Save Shipment Info</span>
-                          </button>
-                        </div>
-                      )}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => handleSaveFields({
+                            courier: formData.courier,
+                            awbNumber: formData.awbNumber,
+                            weight: formData.weight,
+                            stationId: formData.stationId,
+                            staffId: formData.staffId
+                          }, 'Updated shipment information')}
+                          disabled={isSaving}
+                          className="px-3.5 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Shipment Info</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -641,22 +639,20 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         </div>
                       </div>
 
-                      {!isEditingAll && (
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            onClick={() => handleSaveFields({
-                              productSku: formData.productSku,
-                              itemCount: formData.itemCount,
-                              orderTotal: formData.orderTotal
-                            }, 'Updated product SKU and item totals')}
-                            disabled={isSaving}
-                            className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Save Order Details</span>
-                          </button>
-                        </div>
-                      )}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => handleSaveFields({
+                            productSku: formData.productSku,
+                            itemCount: formData.itemCount,
+                            orderTotal: formData.orderTotal
+                          }, 'Updated product SKU and item totals')}
+                          disabled={isSaving}
+                          className="px-3.5 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Order Details</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -734,22 +730,20 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         />
                       </div>
 
-                      {!isEditingAll && (
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            onClick={() => handleSaveFields({
-                              customerName: formData.customerName,
-                              contactPerson: formData.contactPerson,
-                              contactPhone: formData.contactPhone
-                            }, 'Updated customer contact details')}
-                            disabled={isSaving}
-                            className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Save Customer Details</span>
-                          </button>
-                        </div>
-                      )}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => handleSaveFields({
+                            customerName: formData.customerName,
+                            contactPerson: formData.contactPerson,
+                            contactPhone: formData.contactPhone
+                          }, 'Updated customer contact details')}
+                          disabled={isSaving}
+                          className="px-3.5 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Customer Details</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -821,22 +815,20 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         />
                       </div>
 
-                      {!isEditingAll && (
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            onClick={() => handleSaveFields({
-                              orderReceivedDate: formData.orderReceivedDate,
-                              dispatchDate: formData.dispatchDate,
-                              deliveredDate: formData.deliveredDate
-                            }, 'Updated order timeline dates')}
-                            disabled={isSaving}
-                            className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Save Timeline Dates</span>
-                          </button>
-                        </div>
-                      )}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => handleSaveFields({
+                            orderReceivedDate: formData.orderReceivedDate,
+                            dispatchDate: formData.dispatchDate,
+                            deliveredDate: formData.deliveredDate
+                          }, 'Updated order timeline dates')}
+                          disabled={isSaving}
+                          className="px-3.5 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Timeline Dates</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -906,9 +898,9 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       <button
                         onClick={handleSaveInternalNote}
                         disabled={isSaving}
-                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                       >
-                        <Check className="w-3.5 h-3.5" />
+                        <Save className="w-3.5 h-3.5" />
                         <span>Save Internal Note</span>
                       </button>
                     </div>
@@ -1044,9 +1036,9 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       <button
                         onClick={handleSaveQcRemarks}
                         disabled={isSaving}
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                       >
-                        <Check className="w-3.5 h-3.5" />
+                        <Save className="w-3.5 h-3.5" />
                         <span>Save QC Remarks</span>
                       </button>
                     </div>

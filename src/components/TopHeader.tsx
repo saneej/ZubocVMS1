@@ -7,13 +7,14 @@ import {
   RefreshCw,
   LogOut,
   User,
-  PackagePlus
+  PackagePlus,
+  Tv
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopHeaderProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator';
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck';
   currentStaff: StaffMember;
   settings: AppSettings;
   onOpenSettings: () => void;
@@ -21,6 +22,7 @@ interface TopHeaderProps {
   onRefreshOrders?: () => void;
   onLogout?: () => void;
   onOpenAddOrder?: () => void;
+  onOpenDeck?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -31,7 +33,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   setIsMobileOpen,
   onRefreshOrders,
   onLogout,
-  onOpenAddOrder
+  onOpenAddOrder,
+  onOpenDeck
 }) => {
   const [timeIst, setTimeUtc] = useState<string>('');
 
@@ -50,6 +53,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     history: 'Recording History',
     admin: 'Operations & Fulfillment Insights',
     calculator: 'Shipping Rate Calculator',
+    deck: 'Production Deck & Live Schedule TV Dashboard',
   };
 
   const title = pageTitles[activeTab] || 'Dashboard';
@@ -89,6 +93,22 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             >
               <PackagePlus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Order</span>
+            </button>
+          )}
+
+          {/* TV Live Deck Button */}
+          {onOpenDeck && (
+            <button
+              onClick={onOpenDeck}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'deck' 
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white hover:bg-stone-100 text-slate-700 border-stone-200'
+              }`}
+              title="Launch Wall TV Production Deck"
+            >
+              <Tv className={`w-4 h-4 ${activeTab === 'deck' ? 'text-amber-400' : 'text-[#832f5e]'}`} />
+              <span className="hidden md:inline">TV Deck</span>
             </button>
           )}
 

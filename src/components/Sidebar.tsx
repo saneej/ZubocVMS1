@@ -6,13 +6,14 @@ import {
   BarChart3, 
   Settings, 
   X,
-  Calculator
+  Calculator,
+  Tv
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
 interface SidebarProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator';
-  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator') => void;
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck';
+  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck') => void;
   currentStaff: StaffMember;
   setCurrentStaff: (staff: StaffMember) => void;
   settings: AppSettings;
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems = [
     { id: 'search', label: 'Orders', icon: Search },
+    { id: 'deck', label: 'Production TV Deck', icon: Tv, badge: '55" TV' },
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
     { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
     { id: 'history', label: 'Recording History', icon: History },
