@@ -12,9 +12,10 @@ import { AddOrderModal } from './components/AddOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { OrderRecord, StaffMember, AppSettings } from './types';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
+import { cleanForFirestore } from './utils/firestoreHelper';
 
 enum OperationType {
   CREATE = 'create',
@@ -180,8 +181,14 @@ function AppContent() {
     setIsLoggedIn(false);
   };
 
-  const handleOrderCompleted = (newRecord: OrderRecord) => {
+  const handleOrderCompleted = async (newRecord: OrderRecord) => {
     setOrders(prev => [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)]);
+    try {
+      const docRef = doc(db, 'orders', newRecord.orderId);
+      await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
+    } catch (fsErr) {
+      console.error('Firestore client write error on order completed:', fsErr);
+    }
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
@@ -189,30 +196,47 @@ function AppContent() {
     // Optimistic update
     setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
     
+    let fsSaved = false;
+
+    // Direct client-side Firestore write (Primary for production)
     try {
-      const res = await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
+      const docRef = doc(db, 'orders', updatedOrder.orderId);
+      await setDoc(docRef, cleanForFirestore(updatedOrder), { merge: true });
+      fsSaved = true;
+      console.log('Firestore write succeeded for order:', updatedOrder.orderId);
+    } catch (fsErr) {
+      console.error('Firestore client write error:', fsErr);
+      try {
+        handleFirestoreError(fsErr, OperationType.WRITE, `orders/${updatedOrder.orderId}`);
+      } catch {}
+    }
+
+    // Secondary API write for Node Express server if running
+    try {
+      await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
-      if (!res || !res.success) {
-        throw new Error('Failed to update order on server');
+    } catch (apiErr) {
+      console.warn('Server API order update skipped/deferred (using Firestore directly):', apiErr);
+      if (!fsSaved) {
+        fetchOrdersAPI();
       }
-    } catch (err) {
-      console.error('Error updating order:', err);
-      // Revert on failure by re-fetching
-      fetchOrdersAPI();
     }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
+    setOrders(prev => prev.filter(o => o.orderId !== orderId));
     try {
-      const res = await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
-      if (res && res.success) {
-        setOrders(prev => prev.filter(o => o.orderId !== orderId));
-      }
-    } catch (err) {
-      console.error('Error deleting order:', err);
+      await deleteDoc(doc(db, 'orders', orderId));
+    } catch (fsErr) {
+      console.error('Firestore client delete error:', fsErr);
+    }
+    try {
+      await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
+    } catch (apiErr) {
+      console.warn('Server API delete deferred');
     }
   };
 

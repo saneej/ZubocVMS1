@@ -4,7 +4,7 @@ import { OrderRecord } from '../types';
 
 interface StatusCellProps {
   order: OrderRecord;
-  onUpdate: (updatedOrder: OrderRecord) => void;
+  onUpdate?: (updatedOrder: OrderRecord) => void;
   staffName: string;
 }
 
@@ -32,7 +32,9 @@ export const StatusCell: React.FC<StatusCellProps> = ({ order, onUpdate, staffNa
       auditLogs: newLogs,
       updatedAt: nowIso
     };
-    onUpdate(updated);
+    if (onUpdate) {
+      onUpdate(updated);
+    }
   };
 
   return (

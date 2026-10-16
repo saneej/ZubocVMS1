@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { X, PackagePlus, AlertCircle, CheckCircle2, Box, Truck, Scale, Tag, FileText, Camera, Image as ImageIcon, Upload } from 'lucide-react';
 import { safeFetchJson } from '../utils/api';
 import { OrderRecord } from '../types';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { cleanForFirestore } from '../utils/firestoreHelper';
 
 interface AddOrderModalProps {
   isOpen: boolean;
@@ -94,6 +97,15 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       updatedAt: now
     };
 
+    let fsCreated = false;
+    try {
+      const docRef = doc(db, 'orders', cleanId);
+      await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
+      fsCreated = true;
+    } catch (fsErr) {
+      console.error('Firestore client create error:', fsErr);
+    }
+
     try {
       const res = await safeFetchJson('/api/orders', {
         method: 'POST',
@@ -101,40 +113,44 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
         body: JSON.stringify(newRecord)
       });
 
-      if (res && res.success) {
+      setSuccessMsg(`Order ${cleanId} added successfully!`);
+      if (onSuccess) onSuccess((res && res.record) ? res.record : newRecord as OrderRecord);
+    } catch (err) {
+      if (fsCreated) {
         setSuccessMsg(`Order ${cleanId} added successfully!`);
-        if (onSuccess) onSuccess(res.record || newRecord);
-        setTimeout(() => {
-          setIsSubmitting(false);
-          setSuccessMsg(null);
-          // reset form
-          setOrderId('');
-          setCourier('');
-          setDeliveryMethod('Normal');
-          setAwb('');
-          setWeight('');
-          setSku('');
-          setItemCount('1');
-          setCustomer('');
-          setContactPerson('');
-          setContactPhone('');
-          setOrderReceivedDate('');
-          setDispatchDate('');
-          setOrderAmount('');
-          setShippingAmount('');
-          setOrderTotal('');
-          setDeliveredDate('');
-          setNotes('');
-          setRemarks('');
-          onClose();
-        }, 1000);
+        if (onSuccess) onSuccess(newRecord as OrderRecord);
       } else {
-        throw new Error('Failed to save pre-entered order');
+        console.error('Error adding order record:', err);
+        setError('Failed to save order record. Please check your network connection.');
+        setIsSubmitting(false);
+        return;
       }
-    } catch (err: any) {
-      setIsSubmitting(false);
-      setError(err.message || 'Error creating order record');
     }
+
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setSuccessMsg(null);
+      // reset form
+      setOrderId('');
+      setCourier('');
+      setDeliveryMethod('Normal');
+      setAwb('');
+      setWeight('');
+      setSku('');
+      setItemCount('1');
+      setCustomer('');
+      setContactPerson('');
+      setContactPhone('');
+      setOrderReceivedDate('');
+      setDispatchDate('');
+      setOrderAmount('');
+      setShippingAmount('');
+      setOrderTotal('');
+      setDeliveredDate('');
+      setNotes('');
+      setRemarks('');
+      onClose();
+    }, 1000);
   };
 
   return (
