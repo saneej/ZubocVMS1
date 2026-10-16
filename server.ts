@@ -664,11 +664,11 @@ apiRouter.get('/orders', async (req, res) => {
       });
       if (fsOrders.length > 0) {
         fsOrders.forEach(o => {
-          ordersStore[o.orderId] = o;
+          ordersStore[o.orderId] = { ...(ordersStore[o.orderId] || {}), ...o };
         });
         saveLocalBackup();
         return res.json(
-          fsOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          Object.values(ordersStore).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         );
       }
     } catch (e: any) {
@@ -758,6 +758,7 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
   const now = new Date().toISOString();
   const existing = ordersStore[orderId];
 
+  console.log('Update Order Request Body for:', orderId, 'fulfillmentStatus:', req.body.fulfillmentStatus);
   const record: OrderRecord = {
     ...(existing || {}),
     ...req.body,
