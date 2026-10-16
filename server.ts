@@ -301,7 +301,12 @@ let ordersStore: Record<string, OrderRecord> = {};
 try {
   let activeDataPath = DATA_FILE;
   if (!fs.existsSync(activeDataPath)) {
-    activeDataPath = TMP_DATA_FILE;
+    const altPath = path.join(process.cwd(), 'vms_data.json');
+    if (fs.existsSync(altPath)) {
+      activeDataPath = altPath;
+    } else {
+      activeDataPath = TMP_DATA_FILE;
+    }
   }
   if (fs.existsSync(activeDataPath)) {
     const raw = fs.readFileSync(activeDataPath, 'utf-8');
