@@ -185,6 +185,7 @@ function AppContent() {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
+    console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
     // Optimistic update
     setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
     

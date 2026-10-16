@@ -205,7 +205,7 @@ try {
     }
     const dbId = firebaseConfig.firestoreDatabaseId || process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || '(default)';
     firestoreDb = getFirestore(firebaseApp, dbId);
-    console.log('Server initialized Firebase Firestore:', firebaseConfig.projectId, 'Database:', dbId);
+    console.log('Server initialized Firebase Firestore:', firebaseConfig.projectId, 'Database:', dbId, 'Connected:', Boolean(firestoreDb));
   } else {
     console.warn('No Firebase configuration found on server.');
   }
@@ -749,6 +749,7 @@ apiRouter.post('/orders', async (req, res) => {
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
   const { orderId } = req.params;
+  console.log('Updating order:', orderId, 'Body:', JSON.stringify(req.body));
   const now = new Date().toISOString();
   const existing = ordersStore[orderId];
 
@@ -771,6 +772,7 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
 
   if (firestoreDb) {
     try {
+      console.log('Writing to Firestore order:', orderId, 'Data:', JSON.stringify(record));
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
     } catch (e) {
       console.error('Error updating order record in Firestore:', e);
