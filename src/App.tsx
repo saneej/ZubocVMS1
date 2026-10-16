@@ -185,7 +185,6 @@ function AppContent() {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
-    console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
     // Optimistic update
     setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
     
@@ -197,6 +196,9 @@ function AppContent() {
       });
       if (!res || !res.success) {
         throw new Error('Failed to update order on server');
+      }
+      if (res.record) {
+        setOrders(prev => prev.map(o => o.orderId === res.record.orderId ? res.record : o));
       }
     } catch (err) {
       console.error('Error updating order:', err);
