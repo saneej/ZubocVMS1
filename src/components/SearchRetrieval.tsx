@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
+import { watermarkPhoto } from '../utils/watermark';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -347,19 +348,32 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result as string;
-      const nowIso = new Date().toISOString();
-      
-      const evidenceType: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO' = isVideo ? 'VIDEO' : 'PHOTO';
+    const nowIso = new Date().toISOString();
+    const evidenceType: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO' = isVideo ? 'VIDEO' : 'PHOTO';
+
+    let watermarkedDataUrl: string | undefined = undefined;
+    let watermarkedBlob: Blob = mediaFile;
+
+    if (isImage) {
+      try {
+        const wmResult = await watermarkPhoto(mediaFile, order.orderId);
+        watermarkedDataUrl = wmResult.dataUrl;
+        watermarkedBlob = wmResult.blob;
+      } catch (err) {
+        console.warn('Failed to watermark photo, falling back to original file:', err);
+      }
+    }
+
+    const processUpload = (fallbackDataUrl?: string) => {
+      const finalDataUrl = watermarkedDataUrl || fallbackDataUrl;
 
       const updated: OrderRecord = {
         ...order,
         recordingStatus: 'COMPLETED',
         uploadStatus: 'PENDING',
         evidenceType,
-        photoDataUrl: isImage ? dataUrl : undefined,
+        photoDataUrl: isImage ? finalDataUrl : undefined,
+        photoUrls: isImage && finalDataUrl ? [finalDataUrl] : undefined,
         fulfillmentStatus: 'Packed',
         updatedAt: nowIso,
         recordingStartedAt: nowIso
@@ -373,8 +387,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         durationSeconds: 0,
         evidenceType,
         videoBlob: isVideo ? mediaFile : undefined,
-        photoBlobs: isImage ? [mediaFile] : [],
-        photoDataUrls: isImage ? [dataUrl] : [],
+        photoBlobs: isImage ? [watermarkedBlob] : [],
+        photoDataUrls: isImage && finalDataUrl ? [finalDataUrl] : [],
         recordingDate: nowIso,
         width: 0,
         height: 0,
@@ -392,7 +406,14 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       onUpdateOrder(updated);
       alert(`Order ${order.orderId} marked as Packed with ${isVideo ? 'video' : 'photo'} evidence.`);
     };
-    reader.readAsDataURL(mediaFile);
+
+    if (isImage && watermarkedDataUrl) {
+      processUpload(watermarkedDataUrl);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => processUpload(e.target?.result as string);
+      reader.readAsDataURL(mediaFile);
+    }
   };
 
   const handleExportExcel = () => {
