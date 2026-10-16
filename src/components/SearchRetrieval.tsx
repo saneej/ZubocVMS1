@@ -8,6 +8,7 @@ import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
 import { watermarkPhoto } from '../utils/watermark';
+import { ImportShopifyCsvModal } from './ImportShopifyCsvModal';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -37,6 +38,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
 
   const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
+  const [isShopifyCsvModalOpen, setIsShopifyCsvModalOpen] = useState(false);
   const [newOrderId, setNewOrderId] = useState("");
   const [newCustomer, setNewCustomer] = useState("");
   const [newAwb, setNewAwb] = useState("");
@@ -459,6 +461,15 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           {/* Export & Actions */}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setIsShopifyCsvModalOpen(true)}
+              className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              title="Import orders from Shopify CSV export"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Import Shopify CSV</span>
+            </button>
+
+            <button
               onClick={() => onOpenAddOrder ? onOpenAddOrder() : setIsAddOrderOpen(true)}
               className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
@@ -471,7 +482,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
               className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Excel</span>
+              <span>Export Excel</span>
             </button>
 
             <button
@@ -482,6 +493,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
             </button>
           </div>
         </div>
+
+        <ImportShopifyCsvModal
+          isOpen={isShopifyCsvModalOpen}
+          onClose={() => setIsShopifyCsvModalOpen(false)}
+          onSuccess={() => onRefreshOrders()}
+          existingOrderIds={orders.map(o => o.orderId)}
+        />
 
         {/* Fulfillment Summary & Filters */}
         <div className="pt-2 border-t border-slate-100 space-y-3">

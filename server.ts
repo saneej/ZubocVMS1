@@ -323,7 +323,6 @@ try {
 
 function saveLocalBackup() {
   const payload = JSON.stringify({ orders: ordersStore, settings, staffs: staffsStore }, null, 2);
-  console.log('Saving local backup to:', DATA_FILE);
   try {
     fs.writeFileSync(DATA_FILE, payload);
   } catch (e: any) {
@@ -664,11 +663,11 @@ apiRouter.get('/orders', async (req, res) => {
       });
       if (fsOrders.length > 0) {
         fsOrders.forEach(o => {
-          ordersStore[o.orderId] = { ...(ordersStore[o.orderId] || {}), ...o };
+          ordersStore[o.orderId] = o;
         });
         saveLocalBackup();
         return res.json(
-          Object.values(ordersStore).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          fsOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         );
       }
     } catch (e: any) {
@@ -733,51 +732,109 @@ apiRouter.post('/orders', async (req, res) => {
   saveLocalBackup();
 
   if (fulfillmentChanged) {
-      try {
-          await sendTelegramUpdate(record);
-      } catch (e) {
-          console.error('Error sending Telegram update:', e);
-      }
+      await sendTelegramUpdate(record);
   }
 
   if (firestoreDb) {
     try {
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
-    } catch (e: any) {
+    } catch (e) {
       console.error('Error writing order record to Firestore:', e);
-      return res.status(500).json({ error: 'Firestore write failed: ' + e.message });
     }
   }
 
   res.json({ success: true, record });
 });
 
-// Update specific order
-apiRouter.post('/orders/:orderId', async (req, res) => {
-  const { orderId } = req.params;
-  
-  // Always fetch latest from Firestore for the update to ensure persistence
-  let existing: OrderRecord | null = null;
-  if (firestoreDb) {
-      try {
-          const snap = await getDoc(doc(firestoreDb, 'orders', orderId));
-          if (snap.exists()) {
-              existing = snap.data() as OrderRecord;
-          }
-      } catch (e) {
-          console.error('Error fetching existing order for update:', e);
-      }
-  }
-  // Fallback to memory
-  if (!existing) existing = ordersStore[orderId];
-  
-  console.log(`POST /api/orders/${orderId} - Incoming body:`, JSON.stringify(req.body));
-  
-  if (req.body.fulfillmentStatus === undefined) {
-      console.warn('POST /orders/:orderId received update WITHOUT fulfillmentStatus. Body:', JSON.stringify(req.body));
+// Bulk import orders (e.g. from Shopify CSV)
+apiRouter.post('/orders/bulk', async (req, res) => {
+  const { orders, conflictStrategy = 'skip' } = req.body;
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return res.status(400).json({ error: 'An array of order objects is required under "orders"' });
   }
 
   const now = new Date().toISOString();
+  let createdCount = 0;
+  let updatedCount = 0;
+  let skippedCount = 0;
+  const processedRecords: OrderRecord[] = [];
+
+  for (const rawRecord of orders) {
+    const cleanId = sanitizeString(rawRecord.orderId);
+    if (!cleanId) continue;
+
+    const existing = ordersStore[cleanId];
+    if (existing && conflictStrategy === 'skip') {
+      skippedCount++;
+      continue;
+    }
+
+    let recordToSave: OrderRecord;
+    if (existing && conflictStrategy === 'merge') {
+      recordToSave = {
+        ...existing,
+        ...rawRecord,
+        orderId: cleanId,
+        updatedAt: now,
+        createdAt: existing.createdAt || rawRecord.createdAt || now
+      };
+      updatedCount++;
+    } else if (existing && conflictStrategy === 'overwrite') {
+      recordToSave = {
+        ...rawRecord,
+        orderId: cleanId,
+        updatedAt: now,
+        createdAt: rawRecord.createdAt || now
+      };
+      updatedCount++;
+    } else {
+      recordToSave = {
+        ...rawRecord,
+        orderId: cleanId,
+        fulfillmentStatus: rawRecord.fulfillmentStatus || 'Pending',
+        recordingStatus: rawRecord.recordingStatus || 'PENDING',
+        uploadStatus: rawRecord.uploadStatus || 'PENDING',
+        createdAt: rawRecord.createdAt || now,
+        updatedAt: now
+      };
+      createdCount++;
+    }
+
+    ordersStore[cleanId] = recordToSave;
+    processedRecords.push(recordToSave);
+
+    if (firestoreDb) {
+      try {
+        await setDoc(doc(firestoreDb, 'orders', cleanId), cleanForFirestore(recordToSave), { merge: true });
+      } catch (e) {
+        console.error('Error writing bulk order to Firestore:', cleanId, e);
+      }
+    }
+  }
+
+  saveLocalBackup();
+
+  res.json({
+    success: true,
+    message: `Bulk import completed: ${createdCount} created, ${updatedCount} updated, ${skippedCount} skipped.`,
+    stats: {
+      totalInput: orders.length,
+      created: createdCount,
+      updated: updatedCount,
+      skipped: skippedCount,
+      processed: processedRecords.length
+    },
+    records: processedRecords
+  });
+});
+
+// Update specific order
+apiRouter.post('/orders/:orderId', async (req, res) => {
+  const { orderId } = req.params;
+  console.log('Updating order:', orderId, 'Body:', JSON.stringify(req.body));
+  const now = new Date().toISOString();
+  const existing = ordersStore[orderId];
+
   const record: OrderRecord = {
     ...(existing || {}),
     ...req.body,
@@ -785,32 +842,22 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
     updatedAt: now,
     createdAt: existing?.createdAt || req.body.createdAt || now
   };
-  
-  console.log('Final record to be saved:', JSON.stringify(record));
 
   const fulfillmentChanged = existing && existing.fulfillmentStatus !== record.fulfillmentStatus;
-  console.log(`Updating order ${orderId}: existing status=${existing?.fulfillmentStatus}, new status=${record.fulfillmentStatus}, changed=${fulfillmentChanged}`);
 
   ordersStore[orderId] = record;
   saveLocalBackup();
 
   if (fulfillmentChanged) {
-      try {
-          await sendTelegramUpdate(record);
-      } catch (e) {
-          console.error('Error sending Telegram update:', e);
-      }
+      await sendTelegramUpdate(record);
   }
 
   if (firestoreDb) {
     try {
-      const cleaned = cleanForFirestore(record);
-      console.log('Attempting Firestore update for:', orderId, 'Data:', JSON.stringify(cleaned));
-      await setDoc(doc(firestoreDb, 'orders', orderId), cleaned, { merge: true });
-      console.log('Firestore update successful for:', orderId);
-    } catch (e: any) {
-      console.error('Error updating order record in Firestore (ignoring):', e);
-      // Don't fail the request if just quota, local backup is already saved
+      console.log('Writing to Firestore order:', orderId, 'Data:', JSON.stringify(record));
+      await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
+    } catch (e) {
+      console.error('Error updating order record in Firestore:', e);
     }
   }
 

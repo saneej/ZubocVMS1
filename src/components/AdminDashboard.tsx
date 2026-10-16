@@ -31,6 +31,7 @@ import { safeFetchJson } from '../utils/api';
 import { Link } from 'react-router-dom';
 import { formatIST } from '../utils/time';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
+import { ImportShopifyCsvModal } from './ImportShopifyCsvModal';
 
 interface AdminDashboardProps {
   orders: OrderRecord[];
@@ -55,6 +56,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isSendingDemo, setIsSendingDemo] = useState(false);
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   
   // Interactive Filters
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
@@ -307,6 +309,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={() => setIsCsvModalOpen(true)}
+            className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+            title="Import orders from Shopify CSV export"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>IMPORT SHOPIFY CSV</span>
+          </button>
+
+          <button
             onClick={handleSendDemoMessage}
             disabled={isSendingDemo}
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
@@ -332,6 +343,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
         </div>
       </div>
+
+      <ImportShopifyCsvModal
+        isOpen={isCsvModalOpen}
+        onClose={() => setIsCsvModalOpen(false)}
+        onSuccess={() => {
+          // Trigger refresh if available
+          window.location.reload();
+        }}
+        existingOrderIds={orders.map(o => o.orderId)}
+      />
 
       {demoStatus && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 text-xs text-blue-900 flex items-center gap-2 font-medium">
