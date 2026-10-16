@@ -20,7 +20,7 @@ interface TopHeaderProps {
   setIsMobileOpen: (open: boolean) => void;
   onRefreshOrders?: () => void;
   onLogout?: () => void;
-  onOpenPreEnter?: () => void;
+  onOpenAddOrder?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -31,7 +31,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   setIsMobileOpen,
   onRefreshOrders,
   onLogout,
-  onOpenPreEnter
+  onOpenAddOrder
 }) => {
   const [timeIst, setTimeUtc] = useState<string>('');
 
@@ -79,15 +79,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         {/* Right Side: Simple Actions */}
         <div className="flex items-center gap-2">
           
-          {/* Quick Pre-Enter Order Button in Header */}
-          {onOpenPreEnter && (
+          {/* Add Order Button in Header */}
+          {onOpenAddOrder && (
             <button
-              onClick={onOpenPreEnter}
+              onClick={onOpenAddOrder}
               className="px-3.5 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-              title="Pre-enter order details before packing"
+              title="Add a new order manually"
             >
               <PackagePlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Pre-Enter Order</span>
+              <span className="hidden sm:inline">Add Order</span>
             </button>
           )}
 

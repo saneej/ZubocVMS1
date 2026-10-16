@@ -8,7 +8,7 @@ import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
 import { OrderDetailsPage } from './components/OrderDetailsPage';
 import { SettingsModal } from './components/SettingsModal';
-import { PreEnterOrderModal } from './components/PreEnterOrderModal';
+import { AddOrderModal } from './components/AddOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { OrderRecord, StaffMember, AppSettings } from './types';
@@ -101,7 +101,7 @@ function AppContent() {
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isPreEnterOpen, setIsPreEnterOpen] = useState(false);
+  const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -261,7 +261,7 @@ function AppContent() {
           setIsMobileOpen={setIsMobileOpen}
           onRefreshOrders={fetchOrdersAPI}
           onLogout={handleLogout}
-          onOpenPreEnter={() => setIsPreEnterOpen(true)}
+          onOpenAddOrder={() => setIsAddOrderOpen(true)}
         />
 
         {/* Dynamic Page Views */}
@@ -274,7 +274,7 @@ function AppContent() {
                 settings={settings}
                 onOrderCompleted={handleOrderCompleted}
                 existingOrders={orders}
-                onOpenPreEnter={() => setIsPreEnterOpen(true)}
+                onOpenAddOrder={() => setIsAddOrderOpen(true)}
                 selectedOrderForPacking={selectedOrderForPacking}
                 onClearSelectedPackingOrder={() => setSelectedOrderForPacking(null)}
               />
@@ -289,7 +289,7 @@ function AppContent() {
                   setSelectedOrderForPacking(ord);
                   navigate('/station');
                 }}
-                onOpenPreEnter={() => setIsPreEnterOpen(true)}
+                onOpenAddOrder={() => setIsAddOrderOpen(true)}
                 currentStaffId={currentStaff?.id}
                 currentStaffName={currentStaff?.name}
               />
@@ -352,9 +352,9 @@ function AppContent() {
         }}
       />
 
-      <PreEnterOrderModal
-        isOpen={isPreEnterOpen}
-        onClose={() => setIsPreEnterOpen(false)}
+      <AddOrderModal
+        isOpen={isAddOrderOpen}
+        onClose={() => setIsAddOrderOpen(false)}
         onSuccess={(rec) => {
           handleOrderCompleted(rec);
           setSelectedOrderForPacking(rec);

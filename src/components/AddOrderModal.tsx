@@ -3,7 +3,7 @@ import { X, PackagePlus, AlertCircle, CheckCircle2, Box, Truck, Scale, Tag, File
 import { safeFetchJson } from '../utils/api';
 import { OrderRecord } from '../types';
 
-interface PreEnterOrderModalProps {
+interface AddOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (record: OrderRecord) => void;
@@ -11,7 +11,7 @@ interface PreEnterOrderModalProps {
   currentStaffName?: string;
 }
 
-export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
+export const AddOrderModal: React.FC<AddOrderModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
@@ -60,7 +60,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
     const now = new Date().toISOString();
     const finalNotes = notes.trim();
     const initialChatNote = finalNotes ? [{
-      id: `note-pre-${Date.now()}`,
+      id: `note-add-${Date.now()}`,
       text: finalNotes,
       staffId: currentStaffId,
       timestamp: now
@@ -102,7 +102,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
       });
 
       if (res && res.success) {
-        setSuccessMsg(`Order ${cleanId} pre-entered successfully!`);
+        setSuccessMsg(`Order ${cleanId} added successfully!`);
         if (onSuccess) onSuccess(res.record || newRecord);
         setTimeout(() => {
           setIsSubmitting(false);
@@ -148,8 +148,8 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
               <PackagePlus className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold text-slate-900 font-sans">Pre-Enter Order Details</h2>
-              <p className="text-xs text-stone-500 font-sans">Pre-stage order information for packing</p>
+              <h2 className="text-lg font-extrabold text-slate-900 font-sans">Add Order Details</h2>
+              <p className="text-xs text-stone-500 font-sans">Manually create or stage order information</p>
             </div>
           </div>
           <button
@@ -503,7 +503,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
               className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#832f5e] hover:bg-[#6e264e] shadow-md shadow-[#832f5e]/20 disabled:opacity-50 transition-all cursor-pointer flex items-center gap-2"
             >
               <PackagePlus className="w-4 h-4" />
-              <span>{isSubmitting ? 'Saving Order...' : 'Save Complete Order Details'}</span>
+              <span>{isSubmitting ? 'Saving Order...' : 'Add New Order'}</span>
             </button>
           </div>
 

@@ -13,7 +13,7 @@ interface SearchRetrievalProps {
   onDeleteOrder: (orderId: string) => void;
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
   onStartPacking?: (order: OrderRecord) => void;
-  onOpenPreEnter?: () => void;
+  onOpenAddOrder?: () => void;
   currentStaffId?: string;
   currentStaffName?: string;
 }
@@ -24,7 +24,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   onDeleteOrder, 
   onUpdateOrder,
   onStartPacking,
-  onOpenPreEnter,
+  onOpenAddOrder,
   currentStaffId = 'Operator-ID',
   currentStaffName = 'Operator'
 }) => {
@@ -34,7 +34,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
 
-  const [isPreEnterOpen, setIsPreEnterOpen] = useState(false);
+  const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [newOrderId, setNewOrderId] = useState("");
   const [newCustomer, setNewCustomer] = useState("");
   const [newAwb, setNewAwb] = useState("");
@@ -46,7 +46,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [newNotes, setNewNotes] = useState("");
   const [newRemarks, setNewRemarks] = useState("");
 
-  const handlePreEnterSubmit = async (e: React.FormEvent) => {
+  const handleAddOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrderId.trim()) {
       alert("Please enter an Order ID");
@@ -80,7 +80,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       });
       if (res && res.success) {
         onRefreshOrders();
-        setIsPreEnterOpen(false);
+        setIsAddOrderOpen(false);
         setNewOrderId("");
         setNewCustomer("");
         setNewAwb("");
@@ -452,11 +452,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           {/* Export & Actions */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onOpenPreEnter ? onOpenPreEnter() : setIsPreEnterOpen(true)}
+              onClick={() => onOpenAddOrder ? onOpenAddOrder() : setIsAddOrderOpen(true)}
               className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
               <PackagePlus className="w-4 h-4" />
-              <span>New Order</span>
+              <span>Add Order</span>
             </button>
 
             <button
