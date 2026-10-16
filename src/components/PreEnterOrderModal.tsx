@@ -56,6 +56,14 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
     setSuccessMsg(null);
 
     const now = new Date().toISOString();
+    const finalNotes = notes.trim();
+    const initialChatNote = finalNotes ? [{
+      id: `note-pre-${Date.now()}`,
+      text: finalNotes,
+      staffId: currentStaffId,
+      timestamp: now
+    }] : [];
+
     const newRecord: Partial<OrderRecord> = {
       orderId: cleanId,
       courier: courier.trim() || undefined,
@@ -73,7 +81,8 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
       shippingAmount: shippingAmount.trim() || undefined,
       orderTotal: orderTotal.trim() || undefined,
       deliveredDate: deliveredDate || undefined,
-      notes: notes.trim() || undefined,
+      notes: finalNotes || undefined,
+      chatNotes: initialChatNote,
       remarks: remarks.trim() || undefined,
       staffId: currentStaffId,
       stationId: 'Packing-01',

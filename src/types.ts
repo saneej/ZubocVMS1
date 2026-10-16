@@ -1,3 +1,10 @@
+export interface ChatNote {
+  id: string;
+  text: string;
+  staffId: string;
+  timestamp: string;
+}
+
 export interface OrderRecord {
   orderId: string;
   staffId: string;
@@ -34,6 +41,7 @@ export interface OrderRecord {
   fulfillmentStatus?: 'Pending' | 'Packed' | 'Shipped' | 'Fulfilled' | 'Delivered' | string;
   notes?: string;
   remarks?: string;
+  chatNotes?: ChatNote[];
   auditLogs?: { timestamp: string; staffId: string; action: string; details: string; type: 'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG' }[];
   createdAt: string;
   updatedAt: string;

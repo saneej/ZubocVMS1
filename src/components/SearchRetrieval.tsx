@@ -290,23 +290,31 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   };
 
   const handleQuickNoteUpdate = async (order: OrderRecord) => {
-    const newNote = window.prompt(`Edit notes for Order ${order.orderId}:`, order.notes || '');
-    if (newNote === null) return;
+    const text = window.prompt(`Add a new chat note for Order ${order.orderId}:`);
+    if (!text || !text.trim()) return;
 
     if (!onUpdateOrder) return;
     const nowIso = new Date().toISOString();
+    
+    const newChatNote = {
+      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      text: text.trim(),
+      staffId: currentStaffId,
+      timestamp: nowIso
+    };
+
     const newLogs = [...(order.auditLogs || [])];
     newLogs.push({
       timestamp: nowIso,
       staffId: currentStaffId,
-      action: 'QUICK_NOTE_UPDATE',
-      details: `Notes updated via quick-note icon`,
+      action: 'ADD_CHAT_NOTE',
+      details: `Quick note added via table: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
       type: 'EDIT_LOG'
     });
 
     const updated: OrderRecord = {
       ...order,
-      notes: newNote.trim() || undefined,
+      chatNotes: [...(order.chatNotes || []), newChatNote],
       auditLogs: newLogs,
       updatedAt: nowIso
     };
@@ -513,12 +521,21 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                           <button
                             onClick={() => handleQuickNoteUpdate(order)}
                             className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded transition-all border ${
-                              order.notes ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-slate-400 bg-slate-50 border-slate-200 hover:text-slate-600'
+                              (order.notes || (order.chatNotes && order.chatNotes.length > 0)) ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-slate-400 bg-slate-50 border-slate-200 hover:text-slate-600'
                             }`}
-                            title={order.notes || 'Add Note'}
+                            title={order.notes || (order.chatNotes?.[order.chatNotes.length - 1]?.text) || 'Add Note'}
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            <span className="truncate max-w-[100px]">{order.notes || 'Notes'}</span>
+                            <span className="truncate max-w-[100px]">
+                              {order.chatNotes && order.chatNotes.length > 0 
+                                ? order.chatNotes[order.chatNotes.length - 1].text 
+                                : order.notes || 'Notes'}
+                            </span>
+                            {order.chatNotes && order.chatNotes.length > 0 && (
+                              <span className="bg-blue-600 text-white text-[8px] px-1 rounded-full min-w-[14px] text-center">
+                                {order.chatNotes.length}
+                              </span>
+                            )}
                           </button>
 
                           {order.remarks && (

@@ -162,6 +162,13 @@ try {
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
 const TMP_DATA_FILE = '/tmp/vms_data.json';
 
+interface ChatNote {
+  id: string;
+  text: string;
+  staffId: string;
+  timestamp: string;
+}
+
 interface OrderRecord {
   orderId: string;
   staffId: string;
@@ -169,13 +176,16 @@ interface OrderRecord {
   recordingStartedAt: string;
   recordingCompletedAt?: string;
   durationSeconds: number;
-  recordingStatus: 'RECORDING' | 'COMPLETED' | 'FAILED';
+  recordingStatus: 'RECORDING' | 'COMPLETED' | 'FAILED' | 'PENDING';
   uploadStatus: 'PENDING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
   telegramChatId?: string;
   telegramMessageId?: string;
   telegramFileId?: string;
   telegramMessageLink?: string;
   videoUrl?: string;
+  photoUrls?: string[];
+  photoDataUrl?: string;
+  evidenceType?: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO';
   awbNumber?: string;
   courier?: string;
   deliveryMethod?: string;
@@ -191,7 +201,10 @@ interface OrderRecord {
   orderTotal?: string;
   deliveredDate?: string;
   itemCount?: string | number;
+  fulfillmentStatus?: string;
   notes?: string;
+  remarks?: string;
+  chatNotes?: ChatNote[];
   auditLogs?: { timestamp: string; staffId: string; action: string; details: string; type: 'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG' }[];
   createdAt: string;
   updatedAt: string;

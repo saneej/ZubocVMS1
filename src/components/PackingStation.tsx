@@ -717,6 +717,14 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       }
     }
 
+    const finalNotes = notesInput.trim();
+    const initialChatNote = finalNotes ? [{
+      id: `note-initial-${Date.now()}`,
+      text: finalNotes,
+      staffId: currentStaff.id,
+      timestamp: new Date().toISOString()
+    }] : [];
+
     // Queue task for Telegram dispatch
     uploadQueueManager.addTask({
       orderId: targetOrderId,
@@ -746,7 +754,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       orderTotal: orderTotalInput.trim() || undefined,
       deliveredDate: deliveredDateInput.trim() || undefined,
       itemCount: itemCountInput.trim() || undefined,
-      notes: notesInput.trim() || undefined
+      notes: finalNotes || undefined
     });
 
     onOrderCompleted({
@@ -775,7 +783,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       orderTotal: orderTotalInput.trim() || undefined,
       deliveredDate: deliveredDateInput.trim() || undefined,
       itemCount: itemCountInput.trim() || undefined,
-      notes: notesInput.trim() || undefined,
+      notes: finalNotes || undefined,
+      chatNotes: initialChatNote,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });

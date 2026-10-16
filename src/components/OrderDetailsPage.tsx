@@ -308,26 +308,132 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 
             {/* Notes & Remarks Section */}
             <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
+              
+              {/* Chat-like Notes Section */}
+              <div className="space-y-3 flex flex-col h-[400px]">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <FileText className="w-4 h-4 text-blue-500" />
-                  Internal Staff Notes
+                  Internal Order Chat / Notes
                 </h3>
-                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 min-h-[80px]">
-                  {order.notes ? (
-                    <p className="text-sm text-slate-800 leading-relaxed italic">"{order.notes}"</p>
+                
+                <div className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl p-4 overflow-y-auto space-y-4 font-sans text-sm custom-scrollbar">
+                  {(!order.chatNotes || order.chatNotes.length === 0) && !order.notes ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 italic text-center px-4">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-2">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <p>No chat history yet. Start by adding a note below.</p>
+                    </div>
                   ) : (
-                    <p className="text-sm text-slate-400 italic">No internal notes added.</p>
+                    <>
+                      {/* Legacy Note as first message if exists */}
+                      {order.notes && (
+                        <div className="flex flex-col items-start max-w-[85%]">
+                          <div className="bg-white border border-slate-200 px-4 py-2.5 rounded-2xl rounded-tl-none shadow-xs text-slate-700 leading-relaxed italic">
+                            {order.notes}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 px-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Initial Note</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chat Notes */}
+                      {order.chatNotes?.map((note) => (
+                        <div 
+                          key={note.id} 
+                          className={`flex flex-col max-w-[85%] ${note.staffId === currentStaffId ? 'ml-auto items-end' : 'items-start'}`}
+                        >
+                          <div className={`px-4 py-2.5 rounded-2xl shadow-xs leading-relaxed ${
+                            note.staffId === currentStaffId 
+                              ? 'bg-blue-600 text-white rounded-tr-none' 
+                              : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+                          }`}>
+                            {note.text}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 px-1">
+                            <span className={`text-[10px] font-bold uppercase tracking-tighter ${
+                              note.staffId === currentStaffId ? 'text-blue-500' : 'text-slate-400'
+                            }`}>
+                              {note.staffId}
+                            </span>
+                            <span className="text-slate-300 text-[10px]">•</span>
+                            <span className="text-[10px] text-slate-400 font-medium">{formatIST(note.timestamp)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
+
+                {/* Note Input */}
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const input = form.elements.namedItem('note-text') as HTMLInputElement;
+                    const text = input.value.trim();
+                    if (!text) return;
+
+                    const newNote = {
+                      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                      text,
+                      staffId: currentStaffId,
+                      timestamp: new Date().toISOString()
+                    };
+
+                    const updatedNotes = [...(order.chatNotes || []), newNote];
+                    const updatedOrder: any = {
+                      ...order,
+                      chatNotes: updatedNotes,
+                      updatedAt: new Date().toISOString()
+                    };
+
+                    // Optimistic update
+                    setOrder(updatedOrder);
+                    input.value = '';
+
+                    try {
+                      await onUpdateOrder?.(updatedOrder);
+                      // Record log
+                      const logs = [...(order.auditLogs || [])];
+                      logs.push({
+                        timestamp: newNote.timestamp,
+                        staffId: currentStaffId,
+                        action: 'ADD_CHAT_NOTE',
+                        details: `Added new chat note: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
+                        type: 'EDIT_LOG'
+                      });
+                      await onUpdateOrder?.({ ...updatedOrder, auditLogs: logs });
+                    } catch (err) {
+                      console.error('Failed to add note:', err);
+                      alert('Failed to save note. Please try again.');
+                      setOrder(order); // Rollback
+                    }
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    name="note-text"
+                    autoComplete="off"
+                    placeholder="Type a new note..."
+                    className="flex-1 bg-white border border-slate-200 focus:border-blue-600 rounded-xl px-4 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600/10"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-sm shadow-blue-100 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                  >
+                    ADD
+                  </button>
+                </form>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3 flex flex-col">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                   QC Remarks & Observations
                 </h3>
-                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 min-h-[80px]">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 min-h-[80px] flex-1">
                   {order.remarks ? (
                     <p className="text-sm text-slate-800 leading-relaxed font-medium">"{order.remarks}"</p>
                   ) : (
