@@ -82,14 +82,14 @@ export const ZONES_CONFIG: Record<number, ZoneInfo> = {
 };
 
 export function getZonesConfig(originPincode: string = '676505'): Record<number, ZoneInfo> {
-  const cleanOrigin = originPincode.trim().replace(/\D/g, '');
-  const isKerala = cleanOrigin.startsWith('67') || cleanOrigin.startsWith('68') || cleanOrigin.startsWith('69');
+  const cleanOrigin = originPincode.trim().replace(/\D/g, '') || '676505';
+  const isKerala = cleanOrigin.startsWith('67') || cleanOrigin.startsWith('68') || cleanOrigin.startsWith('69') || cleanOrigin === '676505';
 
   if (isKerala) {
     return ZONES_CONFIG;
   }
 
-  // Fallback for Delhi / NCR
+  // Secondary Fallback for North / NCR
   if (cleanOrigin.startsWith('11') || cleanOrigin.startsWith('12') || cleanOrigin.startsWith('13') || cleanOrigin.startsWith('20')) {
     return {
       1: { id: 1, name: 'Zone 1: Local / Intra-NCR', code: 'NCR', description: 'Delhi, Faridabad, Gurgaon, Noida, Ghaziabad', sampleCities: ['Delhi', 'Faridabad', 'Gurgaon', 'Noida'] },
@@ -106,10 +106,10 @@ export function getZonesConfig(originPincode: string = '676505'): Record<number,
 // Auto-resolve Zone from 6-digit Indian Pincode relative to Origin
 export function resolveZoneFromPincode(pincode: string, originPincode: string = '676505'): { zoneId: number; cityGuess: string } {
   const cleanPin = pincode.trim().replace(/\D/g, '');
-  const cleanOrigin = originPincode.trim().replace(/\D/g, '');
+  const cleanOrigin = originPincode.trim().replace(/\D/g, '') || '676505';
   if (cleanPin.length < 3) return { zoneId: 4, cityGuess: 'Rest of India' };
 
-  const isOriginKerala = cleanOrigin.startsWith('67') || cleanOrigin.startsWith('68') || cleanOrigin.startsWith('69') || cleanOrigin === '';
+  const isOriginKerala = cleanOrigin.startsWith('67') || cleanOrigin.startsWith('68') || cleanOrigin.startsWith('69') || cleanOrigin === '676505';
 
   if (isOriginKerala) {
     // Zone 1: Intra-Kerala
