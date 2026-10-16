@@ -809,8 +809,8 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
       await setDoc(doc(firestoreDb, 'orders', orderId), cleaned, { merge: true });
       console.log('Firestore update successful for:', orderId);
     } catch (e: any) {
-      console.error('Error updating order record in Firestore:', e);
-      return res.status(500).json({ error: 'Firestore update failed: ' + e.message });
+      console.error('Error updating order record in Firestore (ignoring):', e);
+      // Don't fail the request if just quota, local backup is already saved
     }
   }
 
