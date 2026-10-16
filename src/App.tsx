@@ -17,6 +17,8 @@ import { collection, onSnapshot, query, doc, setDoc, deleteDoc } from 'firebase/
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
 import { cleanForFirestore } from './utils/firestoreHelper';
+import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
+import { INITIAL_STAFFS } from './utils/initialStaffs';
 
 enum OperationType {
   CREATE = 'create',
@@ -92,7 +94,16 @@ function AppContent() {
     return Boolean(localStorage.getItem('zuboc_auth_user'));
   });
 
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [staffList, setStaffList] = useState<StaffMember[]>(() => {
+    try {
+      const cached = localStorage.getItem('zuboc_staffs_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_STAFFS;
+  });
 
   const [settings, setSettings] = useState<AppSettings>({
     telegramBotToken: '',
@@ -102,18 +113,69 @@ function AppContent() {
     stationId: 'Packing-01'
   });
 
-  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [orders, setOrders] = useState<OrderRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('zuboc_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading cached orders from localStorage:', e);
+    }
+    return INITIAL_FALLBACK_ORDERS;
+  });
+
+  const [isFirestoreQuotaExceeded, setIsFirestoreQuotaExceeded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Auto-sync orders state into localStorage on any change
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      try {
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(orders));
+      } catch (e) {
+        console.warn('Error saving orders to localStorage:', e);
+      }
+    }
+  }, [orders]);
+
   const fetchOrdersAPI = async () => {
     try {
       const data = await safeFetchJson('/api/orders');
-      if (Array.isArray(data)) {
-        setOrders(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setOrders(prev => {
+          const map = new Map<string, OrderRecord>();
+          // Seed with incoming API orders
+          data.forEach(o => {
+            if (o && o.orderId) map.set(o.orderId, o);
+          });
+          // Preserve any local orders and edits that are newer
+          prev.forEach(localOrd => {
+            if (!localOrd || !localOrd.orderId) return;
+            const remoteOrd = map.get(localOrd.orderId);
+            if (!remoteOrd) {
+              map.set(localOrd.orderId, localOrd);
+            } else {
+              const localTime = new Date(localOrd.updatedAt || localOrd.createdAt || 0).getTime();
+              const remoteTime = new Date(remoteOrd.updatedAt || remoteOrd.createdAt || 0).getTime();
+              if (localTime >= remoteTime) {
+                map.set(localOrd.orderId, { ...remoteOrd, ...localOrd });
+              }
+            }
+          });
+          const merged = Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          try {
+            localStorage.setItem('zuboc_orders_cache', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
       }
     } catch (err) {
       console.error('Error fetching orders via API:', err);
@@ -134,8 +196,18 @@ function AppContent() {
   const fetchStaffsAPI = async () => {
     try {
       const data = await safeFetchJson('/api/staffs');
-      if (Array.isArray(data)) {
-        setStaffList(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setStaffList(prev => {
+          const map = new Map<string, StaffMember>();
+          INITIAL_STAFFS.forEach(s => map.set(s.id.toLowerCase(), s));
+          prev.forEach(s => map.set(s.id.toLowerCase(), s));
+          data.forEach(s => map.set(s.id.toLowerCase(), s));
+          const list = Array.from(map.values());
+          try {
+            localStorage.setItem('zuboc_staffs_cache', JSON.stringify(list));
+          } catch {}
+          return list;
+        });
       }
     } catch (err) {
       console.warn('Error fetching staffs via API:', err);
@@ -161,14 +233,35 @@ function AppContent() {
           if (list.length > 0) {
             setOrders(prev => {
               const map = new Map<string, OrderRecord>();
-              prev.forEach(o => map.set(o.orderId, o));
               list.forEach(o => map.set(o.orderId, o));
-              return Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              // Merge local orders to keep offline edits
+              prev.forEach(localOrd => {
+                const remote = map.get(localOrd.orderId);
+                if (!remote) {
+                  map.set(localOrd.orderId, localOrd);
+                } else {
+                  const localTime = new Date(localOrd.updatedAt || 0).getTime();
+                  const remoteTime = new Date(remote.updatedAt || 0).getTime();
+                  if (localTime >= remoteTime) {
+                    map.set(localOrd.orderId, { ...remote, ...localOrd });
+                  }
+                }
+              });
+              const merged = Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              try {
+                localStorage.setItem('zuboc_orders_cache', JSON.stringify(merged));
+              } catch {}
+              return merged;
             });
           }
         },
-        (error) => {
-          handleFirestoreError(error, OperationType.GET, ordersPath);
+        (error: any) => {
+          if (error?.message?.includes('Quota') || error?.code === 'resource-exhausted') {
+            setIsFirestoreQuotaExceeded(true);
+            console.warn('Firestore daily read quota limit reached. Using persistent local storage & server backup.');
+          } else {
+            console.warn('Firestore subscription status:', error?.message);
+          }
         }
       );
       return () => unsubscribe();
@@ -189,36 +282,58 @@ function AppContent() {
   };
 
   const handleOrderCompleted = async (newRecord: OrderRecord) => {
-    setOrders(prev => [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)]);
+    setOrders(prev => {
+      const next = [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)];
+      try {
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
     try {
       const docRef = doc(db, 'orders', newRecord.orderId);
       await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
-    } catch (fsErr) {
-      console.error('Firestore client write error on order completed:', fsErr);
+    } catch (fsErr: any) {
+      console.warn('Firestore client write on order completed:', fsErr?.message || fsErr);
+      if (fsErr?.message?.includes('Quota') || fsErr?.code === 'resource-exhausted') {
+        setIsFirestoreQuotaExceeded(true);
+      }
     }
+
+    try {
+      await safeFetchJson('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecord)
+      });
+    } catch {}
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
     console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
-    // Optimistic update
-    setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
     
-    let fsSaved = false;
+    // 1. Immediate local state & localStorage persistence (Zero revert guarantee)
+    setOrders(prev => {
+      const next = prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o);
+      try {
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
-    // Direct client-side Firestore write (Primary for production)
+    // 2. Direct client-side Firestore write
     try {
       const docRef = doc(db, 'orders', updatedOrder.orderId);
       await setDoc(docRef, cleanForFirestore(updatedOrder), { merge: true });
-      fsSaved = true;
       console.log('Firestore write succeeded for order:', updatedOrder.orderId);
-    } catch (fsErr) {
-      console.error('Firestore client write error:', fsErr);
-      try {
-        handleFirestoreError(fsErr, OperationType.WRITE, `orders/${updatedOrder.orderId}`);
-      } catch {}
+    } catch (fsErr: any) {
+      console.warn('Firestore write failed/offline (using local storage & server):', fsErr?.message || fsErr);
+      if (fsErr?.message?.includes('Quota') || fsErr?.code === 'resource-exhausted') {
+        setIsFirestoreQuotaExceeded(true);
+      }
     }
 
-    // Secondary API write for Node Express server if running
+    // 3. Secondary API write for Node Express server if running
     try {
       await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
         method: 'POST',
@@ -226,19 +341,22 @@ function AppContent() {
         body: JSON.stringify(updatedOrder)
       });
     } catch (apiErr) {
-      console.warn('Server API order update skipped/deferred (using Firestore directly):', apiErr);
-      if (!fsSaved) {
-        fetchOrdersAPI();
-      }
+      console.warn('Server API order update skipped/deferred:', apiErr);
     }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    setOrders(prev => prev.filter(o => o.orderId !== orderId));
+    setOrders(prev => {
+      const next = prev.filter(o => o.orderId !== orderId);
+      try {
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     try {
       await deleteDoc(doc(db, 'orders', orderId));
-    } catch (fsErr) {
-      console.error('Firestore client delete error:', fsErr);
+    } catch (fsErr: any) {
+      console.warn('Firestore client delete error:', fsErr?.message || fsErr);
     }
     try {
       await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
@@ -295,6 +413,34 @@ function AppContent() {
           onLogout={handleLogout}
           onOpenAddOrder={() => setIsAddOrderOpen(true)}
         />
+
+        {isFirestoreQuotaExceeded && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-xs text-amber-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-amber-900 bg-amber-200/60 px-1.5 py-0.5 rounded text-[11px] uppercase tracking-wide">Backup & Cache Mode</span>
+              <span>
+                Firestore daily read quota limit reached for today. Orders & edits are actively saved in persistent Local Storage & Zuboc server backup. Free quota resets tomorrow.
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <a
+                href="https://console.firebase.google.com/project/gen-lang-client-0834100727/firestore/databases/ai-studio-packvisionvms-e5327fc1-c93a-4e08-b2b9-5787bd242adc/data?openUpgradeDialog=true"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-amber-900 underline hover:text-amber-950"
+              >
+                Manage / Upgrade Quota &rarr;
+              </a>
+              <button
+                onClick={() => setIsFirestoreQuotaExceeded(false)}
+                className="text-amber-600 hover:text-amber-900 font-bold ml-2 text-sm px-1 cursor-pointer"
+                title="Dismiss"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic Page Views */}
         <main className="flex-1 pb-16">

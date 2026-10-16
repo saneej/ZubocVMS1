@@ -7,6 +7,8 @@ import multer from 'multer';
 import ffmpegPath from 'ffmpeg-static';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { INITIAL_FALLBACK_ORDERS } from './src/utils/initialOrders';
+import { INITIAL_STAFFS } from './src/utils/initialStaffs';
 
 import { exec } from 'child_process';
 import util from 'util';
@@ -288,15 +290,19 @@ interface StaffMember {
   createdAt?: string;
 }
 
-const DEFAULT_STAFFS: StaffMember[] = [
-  { id: 'Admin-01', name: 'David Admin', role: 'ADMIN', stationId: 'Packing-HQ', password: 'password123', createdAt: new Date().toISOString() },
-];
+const DEFAULT_STAFFS: StaffMember[] = INITIAL_STAFFS;
 
-let staffsStore: Record<string, StaffMember> = {
-  'Admin-01': DEFAULT_STAFFS[0],
-};
+let staffsStore: Record<string, StaffMember> = {};
+for (const s of INITIAL_STAFFS) {
+  staffsStore[s.id] = s;
+}
 
 let ordersStore: Record<string, OrderRecord> = {};
+for (const ord of INITIAL_FALLBACK_ORDERS) {
+  if (ord && ord.orderId) {
+    ordersStore[ord.orderId] = ord;
+  }
+}
 
 try {
   let activeDataPath = DATA_FILE;
@@ -311,7 +317,7 @@ try {
   if (fs.existsSync(activeDataPath)) {
     const raw = fs.readFileSync(activeDataPath, 'utf-8');
     const parsed = JSON.parse(raw);
-    if (parsed.orders) ordersStore = parsed.orders;
+    if (parsed.orders) ordersStore = { ...ordersStore, ...parsed.orders };
     if (parsed.staffs) staffsStore = { ...staffsStore, ...parsed.staffs };
     if (parsed.settings) {
       settings = {
@@ -349,14 +355,23 @@ function cleanForFirestore(obj: any): any {
   }));
 }
 
-async function syncStaffsFromFirestore() {
+let lastStaffsSyncTime = 0;
+
+async function syncStaffsFromFirestore(force = false) {
   if (!firestoreDb || firestoreQuotaExceeded) return;
+  const now = Date.now();
+  if (!force && now - lastStaffsSyncTime < 120000) return;
+  lastStaffsSyncTime = now;
+
   try {
     const colRef = collection(firestoreDb, 'staffs');
     const snap = await getDocs(colRef);
     if (!snap.empty) {
       snap.forEach(d => {
-        staffsStore[d.id] = d.data() as StaffMember;
+        staffsStore[d.id] = {
+          ...(staffsStore[d.id] || {}),
+          ...(d.data() as StaffMember)
+        };
       });
       saveLocalBackup();
     } else {
@@ -366,7 +381,7 @@ async function syncStaffsFromFirestore() {
       }
     }
   } catch (e: any) {
-    if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+    if (e?.message?.includes('Quota') || e?.message?.includes('quota') || e?.code === 'resource-exhausted') {
       firestoreQuotaExceeded = true;
       console.warn('Firestore quota exceeded. Running on local storage fallback mode.');
     } else {
@@ -396,8 +411,16 @@ async function syncSettingsFromFirestore() {
   }
 }
 
-async function syncOrdersWithFirestore() {
+let lastOrdersSyncTime = 0;
+
+async function syncOrdersWithFirestore(force = false) {
   if (!firestoreDb || firestoreQuotaExceeded) return;
+  const now = Date.now();
+  if (!force && now - lastOrdersSyncTime < 120000) {
+    return; // Throttle to prevent exhausting Firestore daily read units
+  }
+  lastOrdersSyncTime = now;
+
   try {
     const colRef = collection(firestoreDb, 'orders');
     const snap = await getDocs(colRef);
@@ -431,8 +454,9 @@ async function syncOrdersWithFirestore() {
     }
     saveLocalBackup();
   } catch (e: any) {
-    if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+    if (e?.message?.includes('Quota') || e?.message?.includes('quota') || e?.code === 'resource-exhausted') {
       firestoreQuotaExceeded = true;
+      console.warn('Firestore daily read quota limit reached on server. Using in-memory & local storage.');
     } else {
       console.error('Error in syncOrdersWithFirestore:', e);
     }
