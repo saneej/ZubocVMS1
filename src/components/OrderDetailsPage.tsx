@@ -19,7 +19,8 @@ import {
   Edit3,
   Zap,
   Camera,
-  Video
+  Video,
+  Upload
 } from 'lucide-react';
 import { uploadQueueManager } from '../utils/uploadQueue';
 
@@ -91,20 +92,30 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     }).catch(() => {});
   };
 
-  const handleMarkAsPacked = async (photoFile: File) => {
+  const handleMarkAsPacked = async (mediaFile: File) => {
     if (!order || !onUpdateOrder) return;
     
+    const isVideo = mediaFile.type.startsWith('video/');
+    const isImage = mediaFile.type.startsWith('image/');
+    
+    if (!isVideo && !isImage) {
+      alert("Invalid file type. Please upload an image or video.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
       const nowIso = new Date().toISOString();
       
+      const evidenceType: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO' = isVideo ? 'VIDEO' : 'PHOTO';
+
       const updated: OrderRecord = {
         ...order,
         recordingStatus: 'COMPLETED',
         uploadStatus: 'PENDING',
-        evidenceType: 'PHOTO',
-        photoDataUrl: dataUrl,
+        evidenceType,
+        photoDataUrl: isImage ? dataUrl : undefined,
         fulfillmentStatus: 'Packed',
         updatedAt: nowIso,
         recordingStartedAt: nowIso
@@ -115,9 +126,10 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
         staffId: currentStaffName,
         stationId: order.stationId || 'Manual-Upload',
         durationSeconds: 0,
-        evidenceType: 'PHOTO',
-        photoBlobs: [photoFile],
-        photoDataUrls: [dataUrl],
+        evidenceType,
+        videoBlob: isVideo ? mediaFile : undefined,
+        photoBlobs: isImage ? [mediaFile] : [],
+        photoDataUrls: isImage ? [dataUrl] : [],
         recordingDate: nowIso,
         width: 0,
         height: 0,
@@ -134,9 +146,9 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 
       setOrder(updated);
       onUpdateOrder(updated);
-      alert(`Order ${order.orderId} marked as Packed with photo evidence.`);
+      alert(`Order ${order.orderId} marked as Packed with ${isVideo ? 'video' : 'photo'} evidence.`);
     };
-    reader.readAsDataURL(photoFile);
+    reader.readAsDataURL(mediaFile);
   };
 
   if (isLoading) {
@@ -171,10 +183,9 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 font-sans">
       <input
         type="file"
-        id="detail-photo-upload"
+        id="detail-media-upload"
         className="hidden"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,video/*"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
@@ -258,11 +269,11 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                   <span>PACK (VIDEO)</span>
                 </button>
                 <button
-                  onClick={() => document.getElementById('detail-photo-upload')?.click()}
+                  onClick={() => document.getElementById('detail-media-upload')?.click()}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
                 >
-                  <Camera className="w-4 h-4" />
-                  <span>PACK (PHOTO)</span>
+                  <Upload className="w-4 h-4" />
+                  <span>PACK (FILE)</span>
                 </button>
               </div>
             )}

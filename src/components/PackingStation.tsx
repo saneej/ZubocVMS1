@@ -29,7 +29,8 @@ import {
   PackagePlus,
   Zap,
   RefreshCw,
-  Search
+  Search,
+  Upload
 } from 'lucide-react';
 import { StaffMember, AppSettings, OrderRecord } from '../types';
 import { uploadQueueManager, UploadTask } from '../utils/uploadQueue';
@@ -794,6 +795,96 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     handleResetForNextOrder();
   };
 
+  const handleFileUpload = async (file: File) => {
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    
+    if (!isVideo && !isImage) {
+      setStationError("Invalid file type. Please upload an image or video.");
+      return;
+    }
+
+    const targetOrderId = orderIdInput.trim() || activeOrderId || `UPLOAD-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const evidenceType: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO' = isVideo ? 'VIDEO' : 'PHOTO';
+
+    const processFile = (dataUrl?: string) => {
+      uploadQueueManager.addTask({
+        orderId: targetOrderId,
+        staffId: currentStaff.name,
+        stationId: settings.stationId,
+        durationSeconds: 0,
+        evidenceType,
+        videoBlob: isVideo ? file : undefined,
+        photoBlobs: isImage ? [file] : [],
+        photoDataUrls: dataUrl ? [dataUrl] : [],
+        recordingDate: nowIso,
+        width: 0,
+        height: 0,
+        awbNumber: awbInput.trim() || undefined,
+        courier: courierInput.trim() || undefined,
+        deliveryMethod: deliveryMethodInput.trim() || 'Normal',
+        weight: weightInput.trim() || undefined,
+        productSku: skuInput.trim() || undefined,
+        customerName: customerInput.trim() || undefined,
+        contactPerson: contactPersonInput.trim() || undefined,
+        contactPhone: contactPhoneInput.trim() || undefined,
+        fulfillFrom: fulfillFromInput.trim() || undefined,
+        orderReceivedDate: orderReceivedDateInput.trim() || undefined,
+        dispatchDate: dispatchDateInput.trim() || undefined,
+        orderAmount: orderAmountInput.trim() || undefined,
+        shippingAmount: shippingAmountInput.trim() || undefined,
+        orderTotal: orderTotalInput.trim() || undefined,
+        deliveredDate: deliveredDateInput.trim() || undefined,
+        itemCount: itemCountInput.trim() || undefined,
+        notes: notesInput.trim() || undefined
+      });
+
+      onOrderCompleted({
+        orderId: targetOrderId,
+        staffId: currentStaff.name,
+        stationId: settings.stationId,
+        recordingStartedAt: nowIso,
+        durationSeconds: 0,
+        recordingStatus: 'COMPLETED',
+        uploadStatus: 'PENDING',
+        evidenceType,
+        photoDataUrl: dataUrl,
+        awbNumber: awbInput.trim() || undefined,
+        courier: courierInput.trim() || undefined,
+        deliveryMethod: deliveryMethodInput.trim() || 'Normal',
+        weight: weightInput.trim() || undefined,
+        productSku: skuInput.trim() || undefined,
+        customerName: customerInput.trim() || undefined,
+        contactPerson: contactPersonInput.trim() || undefined,
+        contactPhone: contactPhoneInput.trim() || undefined,
+        fulfillFrom: fulfillFromInput.trim() || undefined,
+        orderReceivedDate: orderReceivedDateInput.trim() || undefined,
+        dispatchDate: dispatchDateInput.trim() || undefined,
+        orderAmount: orderAmountInput.trim() || undefined,
+        shippingAmount: shippingAmountInput.trim() || undefined,
+        orderTotal: orderTotalInput.trim() || undefined,
+        deliveredDate: deliveredDateInput.trim() || undefined,
+        itemCount: itemCountInput.trim() || undefined,
+        notes: notesInput.trim() || undefined,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+
+      playFeedbackTone('success');
+      setLastCompletedOrder(targetOrderId);
+      handleResetForNextOrder();
+    };
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (e) => processFile(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      processFile();
+    }
+  };
+
   // Reset station state for next order
   const handleResetForNextOrder = () => {
     setActiveOrderId('');
@@ -923,6 +1014,27 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
         {/* Packed Today Badge */}
         <div className="flex items-center gap-2">
+          <input
+            type="file"
+            id="station-media-upload"
+            className="hidden"
+            accept="image/*,video/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleFileUpload(file);
+                e.target.value = '';
+              }
+            }}
+          />
+          <button
+            onClick={() => document.getElementById('station-media-upload')?.click()}
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-100 cursor-pointer"
+          >
+            <Upload className="w-4 h-4" />
+            <span>UPLOAD FILE</span>
+          </button>
+
           <div className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-mono text-xs font-bold flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>PACKED TODAY: <strong className="text-emerald-700 text-sm ml-0.5">{todayCount}</strong></span>

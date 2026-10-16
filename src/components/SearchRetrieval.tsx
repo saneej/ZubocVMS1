@@ -1,7 +1,7 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
@@ -330,21 +330,30 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }).catch(() => {});
   };
 
-  const handleMarkAsPacked = async (order: OrderRecord, photoFile: File) => {
+  const handleMarkAsPacked = async (order: OrderRecord, mediaFile: File) => {
     if (!onUpdateOrder) return;
     
-    // Read file as Data URL for preview/upload
+    const isVideo = mediaFile.type.startsWith('video/');
+    const isImage = mediaFile.type.startsWith('image/');
+    
+    if (!isVideo && !isImage) {
+      alert("Invalid file type. Please upload an image or video.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
       const nowIso = new Date().toISOString();
       
+      const evidenceType: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO' = isVideo ? 'VIDEO' : 'PHOTO';
+
       const updated: OrderRecord = {
         ...order,
         recordingStatus: 'COMPLETED',
         uploadStatus: 'PENDING',
-        evidenceType: 'PHOTO',
-        photoDataUrl: dataUrl,
+        evidenceType,
+        photoDataUrl: isImage ? dataUrl : undefined,
         fulfillmentStatus: 'Packed',
         updatedAt: nowIso,
         recordingStartedAt: nowIso
@@ -356,9 +365,10 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         staffId: currentStaffName,
         stationId: order.stationId || 'Manual-Upload',
         durationSeconds: 0,
-        evidenceType: 'PHOTO',
-        photoBlobs: [photoFile],
-        photoDataUrls: [dataUrl],
+        evidenceType,
+        videoBlob: isVideo ? mediaFile : undefined,
+        photoBlobs: isImage ? [mediaFile] : [],
+        photoDataUrls: isImage ? [dataUrl] : [],
         recordingDate: nowIso,
         width: 0,
         height: 0,
@@ -374,9 +384,9 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       });
 
       onUpdateOrder(updated);
-      alert(`Order ${order.orderId} marked as Packed with photo evidence.`);
+      alert(`Order ${order.orderId} marked as Packed with ${isVideo ? 'video' : 'photo'} evidence.`);
     };
-    reader.readAsDataURL(photoFile);
+    reader.readAsDataURL(mediaFile);
   };
 
   const handleExportExcel = () => {
@@ -391,10 +401,9 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 font-sans">
       <input
         type="file"
-        id="manual-photo-upload"
+        id="manual-media-upload"
         className="hidden"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,video/*"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file && (window as any).pendingMarkAsPackedOrder) {
@@ -513,13 +522,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                             <button
                               onClick={() => {
                                 (window as any).pendingMarkAsPackedOrder = order;
-                                document.getElementById('manual-photo-upload')?.click();
+                                document.getElementById('manual-media-upload')?.click();
                               }}
                               className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title="Mark as packed with photo only"
+                              title="Mark as packed with photo or video from files"
                             >
-                              <Camera className="w-3 h-3" />
-                              <span>Pack (Photo)</span>
+                              <Upload className="w-3 h-3" />
+                              <span>Pack (File)</span>
                             </button>
                           </div>
                         )}
