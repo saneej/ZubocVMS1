@@ -248,22 +248,24 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate('/station')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-[#832f5e]/20 cursor-pointer"
-              >
-                <Video className="w-4 h-4" />
-                <span>PACK (VIDEO)</span>
-              </button>
-              <button
-                onClick={() => document.getElementById('detail-photo-upload')?.click()}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
-              >
-                <Camera className="w-4 h-4" />
-                <span>PACK (PHOTO)</span>
-              </button>
-            </div>
+            {order.recordingStatus !== 'COMPLETED' && order.uploadStatus !== 'SUCCESS' && !order.telegramMessageLink && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/station')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-[#832f5e]/20 cursor-pointer"
+                >
+                  <Video className="w-4 h-4" />
+                  <span>PACK (VIDEO)</span>
+                </button>
+                <button
+                  onClick={() => document.getElementById('detail-photo-upload')?.click()}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>PACK (PHOTO)</span>
+                </button>
+              </div>
+            )}
 
             {order.telegramMessageLink && (
               <a

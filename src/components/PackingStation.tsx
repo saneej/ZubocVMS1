@@ -839,7 +839,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
   const pendingPreOrders = existingOrders.filter(o => {
     const isPending = o.recordingStatus === 'PENDING' || (o.recordingStatus as string) === 'NOT_RECORDED';
-    if (!isPending) return false;
+    const isAlreadySent = o.uploadStatus === 'SUCCESS' || !!o.telegramMessageLink;
+    if (!isPending || isAlreadySent) return false;
     if (!preOrderSearch.trim()) return true;
     const q = preOrderSearch.toLowerCase();
     return (

@@ -44,8 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const effectiveStaffList = staffList && staffList.length > 0 ? staffList : DEFAULT_STAFF_LIST;
 
   const navItems = [
-    { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
     { id: 'search', label: 'Orders', icon: Search },
+    { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
     { id: 'history', label: 'Recording History', icon: History },
     { id: 'admin', label: 'Admin Dashboard', icon: Activity },
   ];

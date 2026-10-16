@@ -500,7 +500,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                           <span>{order.orderId}</span>
                           <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
-                        {onStartPacking && (
+                        {onStartPacking && order.recordingStatus !== 'COMPLETED' && order.uploadStatus !== 'SUCCESS' && !order.telegramMessageLink && (
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => onStartPacking(order)}
