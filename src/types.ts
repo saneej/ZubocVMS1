@@ -17,6 +17,7 @@ export interface OrderRecord {
   evidenceType?: 'VIDEO' | 'PHOTO' | 'PHOTO_VIDEO';
   awbNumber?: string;
   courier?: string;
+  deliveryMethod?: 'Normal' | 'Express' | 'Next day delivery (porter/SKS)' | string;
   weight?: string;
   productSku?: string;
   customerName?: string;

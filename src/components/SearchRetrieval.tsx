@@ -1,8 +1,9 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet } from 'lucide-react';
 import { OrderRecord } from '../types';
+import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -249,39 +250,12 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     setEditingOrder(null);
   };
 
-  const exportFilteredCSV = () => {
-    const headers = ['Order ID', 'AWB Number', 'Courier', 'Weight', 'Product SKU', 'Quantity', 'Customer', 'Contact Person', 'Contact Phone', 'Received Date', 'Despatch Date', 'Order Amount', 'Shipping Amount', 'Total Amount', 'Delivered Date', 'Notes', 'Station', 'Operator', 'Upload Status', 'Timestamp (IST)'];
-    const rows = filteredOrders.map(o => [
-      `"${o.orderId}"`,
-      `"${o.awbNumber || ''}"`,
-      `"${o.courier || ''}"`,
-      `"${o.weight || ''}"`,
-      `"${o.productSku || ''}"`,
-      `"${o.itemCount || ''}"`,
-      `"${o.customerName || ''}"`,
-      `"${o.contactPerson || ''}"`,
-      `"${o.contactPhone || ''}"`,
-      `"${o.orderReceivedDate || ''}"`,
-      `"${o.dispatchDate || ''}"`,
-      `"${o.orderAmount || ''}"`,
-      `"${o.shippingAmount || ''}"`,
-      `"${o.orderTotal || ''}"`,
-      `"${o.deliveredDate || ''}"`,
-      `"${(o.notes || '').replace(/"/g, '""')}"`,
-      `"${o.stationId}"`,
-      `"${o.staffId}"`,
-      o.uploadStatus,
-      `"${formatIST(o.createdAt)}"`
-    ]);
+  const handleExportExcel = () => {
+    exportOrdersToExcel(filteredOrders, 'zuboc_order_packings');
+  };
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `zuboc_recordings_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportCSV = () => {
+    exportOrdersToCSV(filteredOrders, 'zuboc_order_packings');
   };
 
   return (
@@ -325,9 +299,20 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
             <PackagePlus className="w-3.5 h-3.5" />
             <span>Pre-Enter Order</span>
           </button>
+
           <button
-            onClick={exportFilteredCSV}
+            onClick={handleExportExcel}
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+            title="Export complete order details to formatted Excel (.xlsx) file"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>EXPORT EXCEL</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+            title="Export as UTF-8 CSV"
           >
             <Download className="w-3.5 h-3.5" />
             <span>CSV</span>

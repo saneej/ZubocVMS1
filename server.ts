@@ -161,6 +161,7 @@ interface OrderRecord {
   videoUrl?: string;
   awbNumber?: string;
   courier?: string;
+  deliveryMethod?: string;
   weight?: string;
   productSku?: string;
   customerName?: string;
@@ -663,6 +664,7 @@ apiRouter.post('/orders', async (req, res) => {
     videoUrl: videoUrl || existing?.videoUrl || '',
     awbNumber: awbNumber || existing?.awbNumber || '',
     courier: courier || existing?.courier || '',
+    deliveryMethod: req.body.deliveryMethod || existing?.deliveryMethod || 'Normal',
     weight: weight || existing?.weight || '',
     productSku: productSku || existing?.productSku || '',
     customerName: customerName || existing?.customerName || '',
@@ -839,16 +841,17 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     let fileId = '';
     let tgResult: any = null;
 
-    // 1. Upload Video if present
-    if (videoBuffer) {
+    // Step 1: Send Header Card message first to establish thread parent for all order evidence
+    try {
       const durMin = Math.floor((durationSeconds || record.durationSeconds || 0) / 60);
       const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
       const durationStr = `${durMin}m ${durSec}s`;
 
-      const captionLines = [
-        `<b>📦 Order ID: ${safeOrderId}</b>`,
+      const headerTextLines = [
+        `📦 <b>ORDER PACKING DETAILS • ${safeOrderId}</b>`,
         record.awbNumber ? `<b>🚚 AWB / Tracking:</b> ${escapeHtml(record.awbNumber)}` : '',
         record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
+        record.deliveryMethod ? `<b>🚀 Delivery Method:</b> ${escapeHtml(record.deliveryMethod)}` : '',
         record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
         record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
         record.itemCount ? `<b>🔢 Qty:</b> ${escapeHtml(String(record.itemCount))}` : '',
@@ -861,12 +864,44 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         record.shippingAmount ? `<b>📦 Shipping Amount:</b> ₹${escapeHtml(record.shippingAmount)}` : '',
         record.orderTotal ? `<b>💵 Total Amount:</b> ₹${escapeHtml(record.orderTotal)}` : '',
         record.deliveredDate ? `<b>✅ Delivered Date:</b> ${escapeHtml(record.deliveredDate)}` : '',
-        `<b>👷 Staff:</b> ${safeStaffId}`,
-        `<b>📍 Station:</b> ${safeStationId}`,
+        `<b>👷 Staff:</b> ${safeStaffId} | <b>📍 Station:</b> ${safeStationId}`,
         `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
-        `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`,
-        record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : '',
-        photoBuffers[0] ? '<b>📷 Photos Attached:</b> Yes' : ''
+        record.durationSeconds ? `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}` : '',
+        record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : ''
+      ].filter(Boolean);
+
+      const headerRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: headerTextLines.join('\n'),
+          parse_mode: 'HTML'
+        })
+      });
+      const headerData = await headerRes.json();
+      if (headerData.ok && headerData.result?.message_id) {
+        messageId = headerData.result.message_id.toString();
+      }
+    } catch (e) {
+      console.warn('Header message creation error in server:', e);
+    }
+
+    // 1. Upload Video if present
+    if (videoBuffer) {
+      const durMin = Math.floor((durationSeconds || record.durationSeconds || 0) / 60);
+      const durSec = (durationSeconds || record.durationSeconds || 0) % 60;
+      const durationStr = `${durMin}m ${durSec}s`;
+
+      const captionLines = [
+        `<b>🎥 Packing Video • Order ID: ${safeOrderId}</b>`,
+        record.awbNumber ? `<b>🚚 AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
+        record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
+        record.deliveryMethod ? `<b>🚀 Delivery Method:</b> ${escapeHtml(record.deliveryMethod)}` : '',
+        record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
+        record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
+        `<b>👷 Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
+        `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST) • <b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`
       ].filter(Boolean);
 
       const caption = captionLines.join('\n');
@@ -878,6 +913,11 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
       formData.append('chat_id', chatId);
       formData.append('caption', caption);
       formData.append('parse_mode', 'HTML');
+      if (messageId) {
+        formData.append('reply_to_message_id', messageId);
+        formData.append('allow_sending_without_reply', 'true');
+        formData.append('reply_parameters', JSON.stringify({ message_id: Number(messageId), allow_sending_without_reply: true }));
+      }
       formData.append('supports_streaming', 'true');
 
       const width = Number(req.body.width);
@@ -918,11 +958,13 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
         throw new Error(tgResult.description || 'Telegram Video upload error');
       }
 
-      messageId = tgResult.result?.message_id?.toString();
+      if (!messageId) {
+        messageId = tgResult.result?.message_id?.toString();
+      }
       fileId = tgResult.result?.video?.file_id || tgResult.result?.document?.file_id;
     }
 
-    // 2. Upload Photos if present (threaded as replies under video message if video exists)
+    // 2. Upload Photos if present (threaded as replies under video/header message)
     if (photoBuffers.length > 0) {
       for (let i = 0; i < photoBuffers.length; i++) {
         const pBuf = photoBuffers[i];
@@ -932,6 +974,7 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
             : `<b>📷 Photo Evidence #${i + 1} • Order ID: ${safeOrderId}</b>`,
           record.awbNumber ? `<b>AWB:</b> ${escapeHtml(record.awbNumber)}` : '',
           record.courier ? `<b>Courier:</b> ${escapeHtml(record.courier)}` : '',
+          record.deliveryMethod ? `<b>Delivery:</b> ${escapeHtml(record.deliveryMethod)}` : '',
           record.weight ? `<b>Weight:</b> ${escapeHtml(record.weight)}` : '',
           record.productSku ? `<b>Item:</b> ${escapeHtml(record.productSku)}` : '',
           `<b>Staff:</b> ${safeStaffId} • <b>Station:</b> ${safeStationId}`,
@@ -957,7 +1000,7 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
           });
           const photoResponseText = await photoTgResponse.text();
           const photoTgResult = JSON.parse(photoResponseText);
-          if (!videoBuffer && i === 0 && photoTgResult && photoTgResult.ok) {
+          if (!messageId && photoTgResult && photoTgResult.ok) {
             messageId = photoTgResult.result?.message_id?.toString();
             fileId = photoTgResult.result?.photo?.[photoTgResult.result.photo.length - 1]?.file_id;
             tgResult = photoTgResult;
@@ -1252,6 +1295,72 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
   } catch (err: any) {
     console.error('Test connection error:', err);
     res.status(500).json({ error: err.message || 'Failed to verify Telegram credentials' });
+  }
+});
+
+// Detect Group or Channel Chat ID from Bot Updates
+apiRouter.post('/telegram/detect-chat-id', async (req, res) => {
+  const bodyToken = req.body?.telegramBotToken ? cleanTelegramCredential(req.body.telegramBotToken) : '';
+  const rawBotToken = bodyToken || settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+  const botToken = cleanTelegramCredential(rawBotToken);
+
+  if (!botToken) {
+    return res.status(400).json({ error: 'Please enter a valid Telegram Bot Token first.' });
+  }
+
+  try {
+    const updatesRes = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates?limit=50`);
+    const updatesText = await updatesRes.text();
+    let updatesData: any = null;
+    try {
+      updatesData = JSON.parse(updatesText);
+    } catch {
+      throw new Error('Telegram API returned non-JSON response');
+    }
+
+    if (!updatesData || !updatesData.ok) {
+      throw new Error(updatesData?.description || 'Failed to fetch Telegram bot updates');
+    }
+
+    const foundChats: { id: string; title: string; type: string }[] = [];
+    const seenIds = new Set<string>();
+
+    const results = updatesData.result || [];
+    for (const update of results) {
+      const chat = update?.message?.chat || update?.channel_post?.chat || update?.my_chat_member?.chat || update?.edited_message?.chat;
+      if (chat && chat.id) {
+        const idStr = String(chat.id);
+        if (!seenIds.has(idStr)) {
+          seenIds.add(idStr);
+          foundChats.push({
+            id: idStr,
+            title: chat.title || chat.username || chat.first_name || `Chat ${idStr}`,
+            type: chat.type || 'group'
+          });
+        }
+      }
+    }
+
+    if (foundChats.length === 0) {
+      return res.json({
+        success: false,
+        message: 'No recent messages found. Steps: 1) Add your bot to your Telegram Group, 2) Send a message (e.g. "hello bot") in the group, 3) Click Detect Chat ID again!'
+      });
+    }
+
+    const preferredChat = foundChats.find(c => c.type === 'supergroup' || c.type === 'group' || c.type === 'channel') || foundChats[foundChats.length - 1];
+
+    res.json({
+      success: true,
+      chatId: preferredChat.id,
+      chatTitle: preferredChat.title,
+      chatType: preferredChat.type,
+      chats: foundChats,
+      message: `Found group "${preferredChat.title}" (Chat ID: ${preferredChat.id})`
+    });
+  } catch (err: any) {
+    console.error('Detect Chat ID error:', err);
+    res.status(500).json({ error: err.message || 'Failed to detect group Chat ID' });
   }
 });
 

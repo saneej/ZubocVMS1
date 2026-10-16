@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search } from 'lucide-react';
+import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet } from 'lucide-react';
 import { OrderRecord, AppSettings } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
+import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 
 interface AdminDashboardProps {
   orders: OrderRecord[];
@@ -183,15 +184,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
             </span>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by Order, AWB, SKU, Courier..."
-              className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter by Order, AWB, SKU, Courier..."
+                className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none"
+              />
+            </div>
+
+            <button
+              onClick={() => exportOrdersToExcel(filteredOrders, 'zuboc_admin_packages')}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              title="Export complete order details to formatted Excel (.xlsx) file"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>EXPORT EXCEL</span>
+            </button>
+
+            <button
+              onClick={() => exportOrdersToCSV(filteredOrders, 'zuboc_admin_packages')}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Export as UTF-8 CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>CSV</span>
+            </button>
           </div>
         </div>
 

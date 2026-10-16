@@ -18,6 +18,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
 }) => {
   const [orderId, setOrderId] = useState('');
   const [courier, setCourier] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState<string>('Normal');
   const [awb, setAwb] = useState('');
   const [weight, setWeight] = useState('');
   const [sku, setSku] = useState('');
@@ -57,6 +58,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
     const newRecord: Partial<OrderRecord> = {
       orderId: cleanId,
       courier: courier.trim() || undefined,
+      deliveryMethod: deliveryMethod || 'Normal',
       awbNumber: awb.trim() || undefined,
       weight: weight.trim() || undefined,
       productSku: sku.trim() || undefined,
@@ -95,6 +97,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
           // reset form
           setOrderId('');
           setCourier('');
+          setDeliveryMethod('Normal');
           setAwb('');
           setWeight('');
           setSku('');
@@ -186,6 +189,22 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
                 </span>
               </div>
               <span className="text-[10px] text-stone-500 font-mono">Order Details</span>
+            </div>
+
+            {/* Delivery Method Dropdown */}
+            <div>
+              <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
+                Delivery Method:
+              </label>
+              <select
+                value={deliveryMethod}
+                onChange={(e) => setDeliveryMethod(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs font-bold rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-[#832f5e] bg-white text-slate-800"
+              >
+                <option value="Normal">Normal</option>
+                <option value="Express">Express</option>
+                <option value="Next day delivery (porter/SKS)">Next day delivery (porter/SKS)</option>
+              </select>
             </div>
 
             {/* Courier Partner Quick Selector */}

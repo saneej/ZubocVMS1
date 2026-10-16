@@ -150,6 +150,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   // Package & Shipment metadata
   const [awbInput, setAwbInput] = useState('');
   const [courierInput, setCourierInput] = useState('');
+  const [deliveryMethodInput, setDeliveryMethodInput] = useState<string>('Normal');
   const [weightInput, setWeightInput] = useState('');
   const [skuInput, setSkuInput] = useState('');
   const [customerInput, setCustomerInput] = useState('');
@@ -386,6 +387,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     setActiveOrderId(ord.orderId);
     setAwbInput(ord.awbNumber || '');
     setCourierInput(ord.courier || '');
+    setDeliveryMethodInput(ord.deliveryMethod || 'Normal');
     setWeightInput(ord.weight || '');
     setSkuInput(ord.productSku || '');
     setCustomerInput(ord.customerName || '');
@@ -417,6 +419,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     if (match) {
       if (match.awbNumber) setAwbInput(match.awbNumber);
       if (match.courier) setCourierInput(match.courier);
+      if (match.deliveryMethod) setDeliveryMethodInput(match.deliveryMethod);
       if (match.weight) setWeightInput(match.weight);
       if (match.productSku) setSkuInput(match.productSku);
       if (match.customerName) setCustomerInput(match.customerName);
@@ -618,6 +621,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       height,
       awbNumber: awbInput.trim() || undefined,
       courier: courierInput.trim() || undefined,
+      deliveryMethod: deliveryMethodInput.trim() || 'Normal',
       weight: weightInput.trim() || undefined,
       productSku: skuInput.trim() || undefined,
       customerName: customerInput.trim() || undefined,
@@ -646,6 +650,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
       photoDataUrl: photosToDispatch[0]?.dataUrl,
       awbNumber: awbInput.trim() || undefined,
       courier: courierInput.trim() || undefined,
+      deliveryMethod: deliveryMethodInput.trim() || 'Normal',
       weight: weightInput.trim() || undefined,
       productSku: skuInput.trim() || undefined,
       customerName: customerInput.trim() || undefined,
@@ -1039,6 +1044,22 @@ export const PackingStation: React.FC<PackingStationProps> = ({
 
                     {showPackageDetails && (
                       <div className="space-y-2.5 pt-1">
+                        {/* Delivery Method Selector */}
+                        <div>
+                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
+                            Delivery Method:
+                          </label>
+                          <select
+                            value={deliveryMethodInput}
+                            onChange={(e) => setDeliveryMethodInput(e.target.value)}
+                            className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none font-mono"
+                          >
+                            <option value="Normal">Normal</option>
+                            <option value="Express">Express</option>
+                            <option value="Next day delivery (porter/SKS)">Next day delivery (porter/SKS)</option>
+                          </select>
+                        </div>
+
                         {/* Courier Partner Quick Selector */}
                         <div>
                           <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">

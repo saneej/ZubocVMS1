@@ -56,6 +56,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDetectingChat, setIsDetectingChat] = useState(false);
+  const [detectStatus, setDetectStatus] = useState<string | null>(null);
+
+  const handleDetectChatId = async () => {
+    setIsDetectingChat(true);
+    setDetectStatus(null);
+    setErrorMessage(null);
+    try {
+      const tokenToUse = botToken || settings.telegramBotToken;
+      const res = await safeFetchJson('/api/telegram/detect-chat-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramBotToken: tokenToUse })
+      });
+
+      if (res && res.success && res.chatId) {
+        setChatId(res.chatId);
+        setDetectStatus(`Detected: "${res.chatTitle}" (${res.chatId})`);
+      } else {
+        setDetectStatus(res?.message || 'No recent messages found. Steps: 1) Add bot to group, 2) Send a message (e.g. "hello bot") in the group, 3) Click Auto-Detect again!');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to detect group Chat ID');
+    } finally {
+      setIsDetectingChat(false);
+    }
+  };
 
   // Profile State
   const [profileName, setProfileName] = useState(currentStaff.name || '');
@@ -490,18 +517,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                  <Hash className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Telegram Channel Chat ID</span>
+              <div className="space-y-1.5">
+                <label className="flex items-center justify-between font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                  <span className="flex items-center gap-1.5">
+                    <Hash className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Telegram Group / Channel Chat ID</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-normal lowercase">starts with -100 for groups</span>
                 </label>
-                <input
-                  type="text"
-                  value={chatId}
-                  onChange={(e) => setChatId(e.target.value)}
-                  placeholder="e.g. -1003940299676"
-                  className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatId}
+                    onChange={(e) => setChatId(e.target.value)}
+                    placeholder="e.g. -1003940299676"
+                    className="flex-1 bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all font-mono font-bold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleDetectChatId}
+                    disabled={isDetectingChat}
+                    className="px-3.5 py-2.5 bg-[#832f5e] hover:bg-[#6c234b] disabled:opacity-50 text-white rounded-xl font-bold text-xs cursor-pointer transition-colors shadow-2xs shrink-0 flex items-center gap-1.5"
+                    title="Automatically detect Chat ID from your Telegram bot updates"
+                  >
+                    <span>{isDetectingChat ? 'SEARCHING...' : '🔍 AUTO-DETECT GROUP ID'}</span>
+                  </button>
+                </div>
+
+                {detectStatus && (
+                  <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-[11px] font-mono leading-relaxed mt-1">
+                    {detectStatus}
+                  </div>
+                )}
+
+                {/* Instructions Box: How to switch to a Telegram Group */}
+                <div className="bg-stone-50 border border-stone-200 p-3 rounded-xl space-y-1.5 text-[11px] text-stone-700 font-sans mt-2">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5 font-mono text-xs">
+                    <span>💡 How to switch to a new Telegram Group:</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-600 font-mono text-[11px]">
+                    <li>Add your bot to your new Telegram Group as a member or Admin.</li>
+                    <li>Send a test message in the group (e.g. <code>hello bot</code> or <code>/start</code>).</li>
+                    <li>Click the <b>Auto-Detect Group ID</b> button above!</li>
+                  </ol>
+                </div>
               </div>
 
               <div className="space-y-1">
