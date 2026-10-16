@@ -157,9 +157,8 @@ function AppContent() {
           snapshot.forEach((doc) => {
             list.push(doc.data() as OrderRecord);
           });
-          if (list.length > 0) {
-            setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-          }
+          // Sync orders state with Firestore snapshot (including empty list when deleted in production)
+          setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         },
         (error) => {
           handleFirestoreError(error, OperationType.GET, ordersPath);

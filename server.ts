@@ -345,10 +345,11 @@ function cleanForFirestore(obj: any): any {
 }
 
 async function syncStaffsFromFirestore() {
-  if (!firestoreDb || firestoreQuotaExceeded) return;
+  if (!firestoreDb) return;
   try {
     const colRef = collection(firestoreDb, 'staffs');
     const snap = await getDocs(colRef);
+    firestoreQuotaExceeded = false;
     if (!snap.empty) {
       snap.forEach(d => {
         staffsStore[d.id] = d.data() as StaffMember;
@@ -371,10 +372,11 @@ async function syncStaffsFromFirestore() {
 }
 
 async function syncSettingsFromFirestore() {
-  if (!firestoreDb || firestoreQuotaExceeded) return;
+  if (!firestoreDb) return;
   try {
     const docRef = doc(firestoreDb, 'settings', 'config');
     const snap = await getDoc(docRef);
+    firestoreQuotaExceeded = false;
     if (snap.exists()) {
       const data = snap.data() as AppSettings;
       if (data.telegramBotToken) settings.telegramBotToken = sanitizeString(data.telegramBotToken);
@@ -389,6 +391,34 @@ async function syncSettingsFromFirestore() {
       console.error('Error syncing settings from Firestore:', e);
     }
   }
+}
+
+async function syncOrdersFromFirestore(): Promise<OrderRecord[]> {
+  if (firestoreDb) {
+    try {
+      const colRef = collection(firestoreDb, 'orders');
+      const snap = await getDocs(colRef);
+      firestoreQuotaExceeded = false;
+      const fsOrders: OrderRecord[] = [];
+      const newOrdersStore: Record<string, OrderRecord> = {};
+      snap.forEach(d => {
+        const o = d.data() as OrderRecord;
+        fsOrders.push(o);
+        newOrdersStore[o.orderId] = o;
+      });
+      ordersStore = newOrdersStore;
+      saveLocalBackup();
+      return fsOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e: any) {
+      if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+        firestoreQuotaExceeded = true;
+        console.warn('Firestore quota exceeded on orders fetch. Returning in-memory ordersStore fallback.');
+      } else {
+        console.error('Error syncing orders from Firestore:', e);
+      }
+    }
+  }
+  return Object.values(ordersStore).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 // Helper to safely escape strings for Telegram HTML parse_mode
@@ -408,6 +438,8 @@ function cleanTelegramCredential(str: string): string {
 }
 
 syncSettingsFromFirestore();
+syncStaffsFromFirestore();
+syncOrdersFromFirestore();
 
 // API Router supporting both /api/... and direct serverless paths
 const apiRouter = express.Router();
@@ -653,36 +685,27 @@ apiRouter.post('/auth/login', async (req, res) => {
 
 // Orders GET
 apiRouter.get('/orders', async (req, res) => {
+  const orders = await syncOrdersFromFirestore();
+  res.json(orders);
+});
+
+// Clear all orders (both local backup and Firestore)
+apiRouter.delete('/orders', async (req, res) => {
+  ordersStore = {};
+  saveLocalBackup();
+
   if (firestoreDb && !firestoreQuotaExceeded) {
     try {
       const colRef = collection(firestoreDb, 'orders');
       const snap = await getDocs(colRef);
-      const fsOrders: OrderRecord[] = [];
-      snap.forEach(d => {
-        fsOrders.push(d.data() as OrderRecord);
-      });
-      if (fsOrders.length > 0) {
-        fsOrders.forEach(o => {
-          ordersStore[o.orderId] = o;
-        });
-        saveLocalBackup();
-        return res.json(
-          fsOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        );
-      }
-    } catch (e: any) {
-      if (e?.message?.includes('Quota') || e?.message?.includes('quota')) {
-        firestoreQuotaExceeded = true;
-      } else {
-        console.error('Error fetching orders from Firestore:', e);
-      }
+      const deletePromises = snap.docs.map(d => deleteDoc(doc(firestoreDb, 'orders', d.id)));
+      await Promise.all(deletePromises);
+    } catch (e) {
+      console.error('Error clearing orders from Firestore:', e);
     }
   }
 
-  const orders = Object.values(ordersStore).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  res.json(orders);
+  res.json({ success: true, message: 'All orders cleared successfully' });
 });
 
 // Orders GET by ID
