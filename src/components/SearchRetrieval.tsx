@@ -446,60 +446,62 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       
       {/* Search & Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Search Bar */}
-          <div className="relative w-full sm:w-96">
-            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search Order ID, AWB, Customer..."
-              className="w-full bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/20"
-            />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Search Bar + Refresh */}
+          <div className="flex items-center gap-2 w-full md:w-80 lg:w-96">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search Order ID, AWB, Customer..."
+                className="w-full bg-slate-50 border border-slate-200 focus:border-[#832f5e] focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-[#832f5e]/20"
+              />
+            </div>
+            <button
+              onClick={onRefreshOrders}
+              className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer shrink-0"
+              title="Refresh orders list"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Export & Actions */}
-          <div className="flex items-center gap-2">
+          {/* Export & Actions Grid */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => setIsShopifyCsvModalOpen(true)}
-              className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
               title="Import orders from Shopify CSV export"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Import Shopify CSV</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Import Shopify CSV</span>
             </button>
 
             <button
               onClick={() => onOpenAddOrder ? onOpenAddOrder() : setIsAddOrderOpen(true)}
-              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
             >
-              <PackagePlus className="w-4 h-4" />
-              <span>Add Order</span>
+              <PackagePlus className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Add Order</span>
             </button>
 
             <button
               onClick={() => exportOrdersToPDF(filteredOrders, 'Order Fulfillment Report')}
-              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
               title="Download attractive PDF report"
             >
-              <Download className="w-4 h-4" />
-              <span>Export PDF</span>
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Export PDF</span>
             </button>
 
             <button
               onClick={handleExportExcel}
-              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Export Excel</span>
-            </button>
-
-            <button
-              onClick={onRefreshOrders}
-              className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4" />
+              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Export Excel</span>
             </button>
           </div>
         </div>
@@ -511,47 +513,73 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           existingOrderIds={orders.map(o => o.orderId)}
         />
 
-        {/* Fulfillment Summary & Filters */}
-        <div className="pt-2 border-t border-slate-100 space-y-3">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fulfillment:</span>
-              <div className="flex flex-wrap gap-1.5">
-                {['ALL', 'Pending', 'Packed', 'Shipped', 'Fulfilled', 'Delivered'].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setFulfillmentFilter(f)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
-                      fulfillmentFilter === f
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {f.toUpperCase()} ({f === 'ALL' ? orders.length : fulfillmentStats[f]})
-                  </button>
-                ))}
-              </div>
+        {/* Fulfillment Summary & Filter Pills Section */}
+        <div className="pt-3 border-t border-slate-100 space-y-3">
+          
+          {/* Fulfillment Status Row */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                Fulfillment Status
+              </span>
+              {fulfillmentFilter !== 'ALL' && (
+                <button
+                  onClick={() => setFulfillmentFilter('ALL')}
+                  className="text-[10px] text-[#832f5e] font-bold hover:underline cursor-pointer"
+                >
+                  Show All
+                </button>
+              )}
             </div>
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Telegram:</span>
-              <div className="flex flex-wrap gap-1.5">
-                {(['ALL', 'SUCCESS', 'FAILED', 'PENDING'] as const).map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setStatusFilter(st)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
-                      statusFilter === st
-                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
+              {['ALL', 'Pending', 'Packed', 'Shipped', 'Fulfilled', 'Delivered'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFulfillmentFilter(f)}
+                  className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                    fulfillmentFilter === f
+                      ? 'bg-[#832f5e] text-white border-[#832f5e] shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {f.toUpperCase()} ({f === 'ALL' ? orders.length : (fulfillmentStats[f] || 0)})
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Telegram Status Row */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                Telegram Dispatch Status
+              </span>
+              {statusFilter !== 'ALL' && (
+                <button
+                  onClick={() => setStatusFilter('ALL')}
+                  className="text-[10px] text-[#832f5e] font-bold hover:underline cursor-pointer"
+                >
+                  Show All
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
+              {(['ALL', 'SUCCESS', 'FAILED', 'PENDING'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                    statusFilter === st
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
 
