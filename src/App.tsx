@@ -67,11 +67,11 @@ function AppContent() {
   // Map path to active tab
   const getActiveTab = (path: string) => {
     if (path === '/station') return 'station';
-    if (path === '/orders' || path === '/search') return 'search';
+    if (path === '/orders' || path === '/search' || path === '/') return 'search';
     if (path === '/history') return 'history';
     if (path === '/admin') return 'admin';
     if (path.startsWith('/order/')) return 'search'; // Order detail counts as search context
-    return 'station';
+    return 'search';
   };
 
   const activeTab = getActiveTab(location.pathname);
@@ -262,7 +262,7 @@ function AppContent() {
         {/* Dynamic Page Views */}
         <main className="flex-1 pb-16">
           <Routes>
-            <Route path="/" element={<Navigate to="/station" replace />} />
+            <Route path="/" element={<Navigate to="/orders" replace />} />
             <Route path="/station" element={
               <PackingStation
                 currentStaff={currentStaff}
@@ -286,6 +286,7 @@ function AppContent() {
                 }}
                 onOpenPreEnter={() => setIsPreEnterOpen(true)}
                 currentStaffId={currentStaff?.id}
+                currentStaffName={currentStaff?.name}
               />
             } />
             <Route path="/search" element={<Navigate to="/orders" replace />} />
@@ -303,12 +304,14 @@ function AppContent() {
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffId={currentStaff?.id}
+                currentStaffName={currentStaff?.name}
               />
             } />
             <Route path="/order/:orderId" element={
               <OrderDetailsPage
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffId={currentStaff?.id}
+                currentStaffName={currentStaff?.name}
               />
             } />
             {/* Fallback to station */}
@@ -353,6 +356,7 @@ function AppContent() {
           fetchOrdersAPI();
         }}
         currentStaffId={currentStaff?.id}
+        currentStaffName={currentStaff?.name}
       />
 
     </div>

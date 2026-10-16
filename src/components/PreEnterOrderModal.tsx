@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, PackagePlus, AlertCircle, CheckCircle2, Box, Truck, Scale, Tag, FileText } from 'lucide-react';
+import { X, PackagePlus, AlertCircle, CheckCircle2, Box, Truck, Scale, Tag, FileText, Camera, Image as ImageIcon, Upload } from 'lucide-react';
 import { safeFetchJson } from '../utils/api';
 import { OrderRecord } from '../types';
 
@@ -8,13 +8,15 @@ interface PreEnterOrderModalProps {
   onClose: () => void;
   onSuccess?: (record: OrderRecord) => void;
   currentStaffId?: string;
+  currentStaffName?: string;
 }
 
 export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  currentStaffId = 'Admin-01'
+  currentStaffId = 'Admin-01',
+  currentStaffName = 'Admin'
 }) => {
   const [orderId, setOrderId] = useState('');
   const [courier, setCourier] = useState('');
@@ -84,7 +86,7 @@ export const PreEnterOrderModal: React.FC<PreEnterOrderModalProps> = ({
       notes: finalNotes || undefined,
       chatNotes: initialChatNote,
       remarks: remarks.trim() || undefined,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       stationId: 'Packing-01',
       recordingStatus: 'PENDING',
       uploadStatus: 'PENDING',

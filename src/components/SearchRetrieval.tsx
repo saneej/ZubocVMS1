@@ -1,10 +1,11 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
+import { uploadQueueManager } from '../utils/uploadQueue';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -14,6 +15,7 @@ interface SearchRetrievalProps {
   onStartPacking?: (order: OrderRecord) => void;
   onOpenPreEnter?: () => void;
   currentStaffId?: string;
+  currentStaffName?: string;
 }
 
 export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({ 
@@ -23,7 +25,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   onUpdateOrder,
   onStartPacking,
   onOpenPreEnter,
-  currentStaffId = 'Staff-01'
+  currentStaffId = 'Staff-01',
+  currentStaffName = 'Operator'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED' | 'PENDING'>('ALL');
@@ -50,7 +53,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }
     const orderRecord: OrderRecord = {
       orderId: newOrderId.trim().toUpperCase(),
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       stationId: "Order-Department",
       recordingStartedAt: new Date().toISOString(),
       durationSeconds: 0,
@@ -327,6 +330,55 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }).catch(() => {});
   };
 
+  const handleMarkAsPacked = async (order: OrderRecord, photoFile: File) => {
+    if (!onUpdateOrder) return;
+    
+    // Read file as Data URL for preview/upload
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string;
+      const nowIso = new Date().toISOString();
+      
+      const updated: OrderRecord = {
+        ...order,
+        recordingStatus: 'COMPLETED',
+        uploadStatus: 'PENDING',
+        evidenceType: 'PHOTO',
+        photoDataUrl: dataUrl,
+        fulfillmentStatus: 'Packed',
+        updatedAt: nowIso,
+        recordingStartedAt: nowIso
+      };
+
+      // Create a manual upload task for the queue
+      uploadQueueManager.addTask({
+        orderId: order.orderId,
+        staffId: currentStaffName,
+        stationId: order.stationId || 'Manual-Upload',
+        durationSeconds: 0,
+        evidenceType: 'PHOTO',
+        photoBlobs: [photoFile],
+        photoDataUrls: [dataUrl],
+        recordingDate: nowIso,
+        width: 0,
+        height: 0,
+        awbNumber: order.awbNumber,
+        courier: order.courier,
+        deliveryMethod: order.deliveryMethod,
+        weight: order.weight,
+        productSku: order.productSku,
+        customerName: order.customerName,
+        contactPerson: order.contactPerson,
+        contactPhone: order.contactPhone,
+        notes: order.notes
+      });
+
+      onUpdateOrder(updated);
+      alert(`Order ${order.orderId} marked as Packed with photo evidence.`);
+    };
+    reader.readAsDataURL(photoFile);
+  };
+
   const handleExportExcel = () => {
     exportOrdersToExcel(filteredOrders, 'zuboc_order_packings');
   };
@@ -337,6 +389,21 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 font-sans">
+      <input
+        type="file"
+        id="manual-photo-upload"
+        className="hidden"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && (window as any).pendingMarkAsPackedOrder) {
+            handleMarkAsPacked((window as any).pendingMarkAsPackedOrder, file);
+            (window as any).pendingMarkAsPackedOrder = null;
+            e.target.value = ''; // Reset input
+          }
+        }}
+      />
       
       {/* Search & Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -434,14 +501,27 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                           <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
                         {onStartPacking && (
-                          <button
-                            onClick={() => onStartPacking(order)}
-                            className="px-2 py-0.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Start packing this order"
-                          >
-                            <PackagePlus className="w-3 h-3" />
-                            <span>Start Packing</span>
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => onStartPacking(order)}
+                              className="px-2 py-1 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Start packing this order"
+                            >
+                              <Video className="w-3 h-3" />
+                              <span>Pack (Video)</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                (window as any).pendingMarkAsPackedOrder = order;
+                                document.getElementById('manual-photo-upload')?.click();
+                              }}
+                              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Mark as packed with photo only"
+                            >
+                              <Camera className="w-3 h-3" />
+                              <span>Pack (Photo)</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                       {order.awbNumber ? (

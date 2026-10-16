@@ -12,9 +12,10 @@ interface AdminDashboardProps {
   onOpenSettings: () => void;
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
   currentStaffId?: string;
+  currentStaffName?: string;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings, onOpenSettings, onUpdateOrder, currentStaffId = 'Admin-01' }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings, onOpenSettings, onUpdateOrder, currentStaffId = 'Admin-01', currentStaffName = 'Admin' }) => {
   const [isSendingDemo, setIsSendingDemo] = useState(false);
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,7 +26,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
     const newLogs = [...(order.auditLogs || [])];
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'QUICK_STATUS_UPDATE',
       details: `Fulfillment status changed from "${order.fulfillmentStatus || 'Pending'}" to "${newStatus}"`,
       type: 'CHANGE_LOG'
@@ -56,14 +57,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
     const newChatNote = {
       id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       text: text.trim(),
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       timestamp: nowIso
     };
 
     const newLogs = [...(order.auditLogs || [])];
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'ADD_CHAT_NOTE',
       details: `Quick note added from Admin: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
       type: 'EDIT_LOG'

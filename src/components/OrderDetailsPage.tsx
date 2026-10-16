@@ -17,17 +17,22 @@ import {
   Clock, 
   History,
   Edit3,
-  Zap
+  Zap,
+  Camera,
+  Video
 } from 'lucide-react';
+import { uploadQueueManager } from '../utils/uploadQueue';
 
 interface OrderDetailsPageProps {
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
   currentStaffId?: string;
+  currentStaffName?: string;
 }
 
 export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({ 
   onUpdateOrder, 
-  currentStaffId = 'Admin-01' 
+  currentStaffId = 'Admin-01',
+  currentStaffName = 'Operator'
 }) => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
@@ -86,6 +91,54 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     }).catch(() => {});
   };
 
+  const handleMarkAsPacked = async (photoFile: File) => {
+    if (!order || !onUpdateOrder) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string;
+      const nowIso = new Date().toISOString();
+      
+      const updated: OrderRecord = {
+        ...order,
+        recordingStatus: 'COMPLETED',
+        uploadStatus: 'PENDING',
+        evidenceType: 'PHOTO',
+        photoDataUrl: dataUrl,
+        fulfillmentStatus: 'Packed',
+        updatedAt: nowIso,
+        recordingStartedAt: nowIso
+      };
+
+      uploadQueueManager.addTask({
+        orderId: order.orderId,
+        staffId: currentStaffName,
+        stationId: order.stationId || 'Manual-Upload',
+        durationSeconds: 0,
+        evidenceType: 'PHOTO',
+        photoBlobs: [photoFile],
+        photoDataUrls: [dataUrl],
+        recordingDate: nowIso,
+        width: 0,
+        height: 0,
+        awbNumber: order.awbNumber,
+        courier: order.courier,
+        deliveryMethod: order.deliveryMethod,
+        weight: order.weight,
+        productSku: order.productSku,
+        customerName: order.customerName,
+        contactPerson: order.contactPerson,
+        contactPhone: order.contactPhone,
+        notes: order.notes
+      });
+
+      setOrder(updated);
+      onUpdateOrder(updated);
+      alert(`Order ${order.orderId} marked as Packed with photo evidence.`);
+    };
+    reader.readAsDataURL(photoFile);
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 font-mono">
@@ -116,6 +169,20 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 font-sans">
+      <input
+        type="file"
+        id="detail-photo-upload"
+        className="hidden"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleMarkAsPacked(file);
+            e.target.value = '';
+          }
+        }}
+      />
       
       {/* Breadcrumb / Nav */}
       <div className="flex items-center justify-between mb-2">
@@ -179,6 +246,23 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                 <option value="Fulfilled">Fulfilled</option>
                 <option value="Delivered">Delivered</option>
               </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/station')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-[#832f5e]/20 cursor-pointer"
+              >
+                <Video className="w-4 h-4" />
+                <span>PACK (VIDEO)</span>
+              </button>
+              <button
+                onClick={() => document.getElementById('detail-photo-upload')?.click()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-emerald-200 cursor-pointer"
+              >
+                <Camera className="w-4 h-4" />
+                <span>PACK (PHOTO)</span>
+              </button>
             </div>
 
             {order.telegramMessageLink && (
