@@ -755,21 +755,24 @@ apiRouter.post('/orders', async (req, res) => {
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
   const { orderId } = req.params;
-  let existing = ordersStore[orderId];
   
-  if (!existing && firestoreDb) {
+  // Always fetch latest from Firestore for the update to ensure persistence
+  let existing: OrderRecord | null = null;
+  if (firestoreDb) {
       try {
           const snap = await getDoc(doc(firestoreDb, 'orders', orderId));
           if (snap.exists()) {
               existing = snap.data() as OrderRecord;
-              ordersStore[orderId] = existing;
-              console.log('Fetched existing order from Firestore:', orderId, 'Status:', existing.fulfillmentStatus);
           }
       } catch (e) {
           console.error('Error fetching existing order for update:', e);
       }
-  } else if (existing) {
-      console.log('Using existing order from memory:', orderId, 'Status:', existing.fulfillmentStatus);
+  }
+  // Fallback to memory
+  if (!existing) existing = ordersStore[orderId];
+  
+  if (req.body.fulfillmentStatus === undefined) {
+      console.warn('POST /orders/:orderId received update WITHOUT fulfillmentStatus. Body:', JSON.stringify(req.body));
   }
 
   const now = new Date().toISOString();
@@ -780,8 +783,11 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
     updatedAt: now,
     createdAt: existing?.createdAt || req.body.createdAt || now
   };
+  
+  console.log('Final record to be saved:', JSON.stringify(record));
 
   const fulfillmentChanged = existing && existing.fulfillmentStatus !== record.fulfillmentStatus;
+  console.log(`Updating order ${orderId}: existing status=${existing?.fulfillmentStatus}, new status=${record.fulfillmentStatus}, changed=${fulfillmentChanged}`);
 
   ordersStore[orderId] = record;
   saveLocalBackup();

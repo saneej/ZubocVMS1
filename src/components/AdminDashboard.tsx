@@ -73,11 +73,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
     };
 
     onUpdateOrder(updated);
-    fetch("/api/telegram/update-caption", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated)
-    }).catch(() => {});
   };
 
   const totalOrders = orders.length;
