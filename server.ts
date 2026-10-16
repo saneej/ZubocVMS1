@@ -805,8 +805,9 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
   if (firestoreDb) {
     try {
       const cleaned = cleanForFirestore(record);
-      console.log('Writing to Firestore. Data:', JSON.stringify(cleaned));
+      console.log('Attempting Firestore update for:', orderId, 'Data:', JSON.stringify(cleaned));
       await setDoc(doc(firestoreDb, 'orders', orderId), cleaned, { merge: true });
+      console.log('Firestore update successful for:', orderId);
     } catch (e: any) {
       console.error('Error updating order record in Firestore:', e);
       return res.status(500).json({ error: 'Firestore update failed: ' + e.message });

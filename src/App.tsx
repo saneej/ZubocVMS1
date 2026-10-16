@@ -153,7 +153,9 @@ function AppContent() {
         (snapshot) => {
           const list: OrderRecord[] = [];
           snapshot.forEach((doc) => {
-            list.push(doc.data() as OrderRecord);
+            const data = doc.data() as OrderRecord;
+            console.log(`Firestore listener: Received order ${data.orderId} with status ${data.fulfillmentStatus}`);
+            list.push(data);
           });
           if (list.length > 0) {
             setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
