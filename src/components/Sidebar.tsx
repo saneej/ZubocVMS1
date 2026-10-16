@@ -3,7 +3,7 @@ import {
   Video, 
   Search, 
   History, 
-  Activity, 
+  BarChart3, 
   Settings, 
   X,
   Calculator
@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
     { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
     { id: 'history', label: 'Recording History', icon: History },
-    { id: 'admin', label: 'Admin Dashboard', icon: Activity },
+    { id: 'admin', label: 'Insights', icon: BarChart3 },
   ];
 
   return (

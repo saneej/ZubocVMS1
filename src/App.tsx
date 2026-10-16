@@ -72,7 +72,7 @@ function AppContent() {
     if (path === '/orders' || path === '/search' || path === '/') return 'search';
     if (path === '/calculator' || path === '/rate-calculator') return 'calculator';
     if (path === '/history') return 'history';
-    if (path === '/admin') return 'admin';
+    if (path === '/admin' || path === '/insights') return 'admin';
     if (path.startsWith('/order/')) return 'search'; // Order detail counts as search context
     return 'search';
   };
@@ -330,6 +330,16 @@ function AppContent() {
               />
             } />
             <Route path="/admin" element={
+              <AdminDashboard
+                orders={orders}
+                settings={settings}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onUpdateOrder={handleUpdateOrder}
+                currentStaffId={currentStaff?.id}
+                currentStaffName={currentStaff?.name}
+              />
+            } />
+            <Route path="/insights" element={
               <AdminDashboard
                 orders={orders}
                 settings={settings}

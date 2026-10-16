@@ -48,7 +48,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     station: 'Packing Station',
     search: 'Orders',
     history: 'Recording History',
-    admin: 'Admin Dashboard',
+    admin: 'Operations & Fulfillment Insights',
+    calculator: 'Shipping Rate Calculator',
   };
 
   const title = pageTitles[activeTab] || 'Dashboard';
