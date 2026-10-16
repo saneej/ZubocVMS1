@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header */}
         <div>
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => { setActiveTab('station'); setIsMobileOpen(false); }}>
+            <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => { setActiveTab('search'); setIsMobileOpen(false); }}>
               <img 
                 src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=500" 
                 alt="Zuboc Logo" 

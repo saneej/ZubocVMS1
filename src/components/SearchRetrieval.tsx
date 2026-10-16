@@ -25,11 +25,12 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   onUpdateOrder,
   onStartPacking,
   onOpenPreEnter,
-  currentStaffId = 'Staff-01',
+  currentStaffId = 'Operator-ID',
   currentStaffName = 'Operator'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED' | 'PENDING'>('ALL');
+  const [fulfillmentFilter, setFulfillmentFilter] = useState<string>('ALL');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
 
@@ -129,6 +130,21 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }
   }, [editOrderAmount, editShippingAmount]);
 
+  // Fulfillment status distribution for summary
+  const fulfillmentStats: Record<string, number> = {
+    'Pending': 0,
+    'Packed': 0,
+    'Shipped': 0,
+    'Fulfilled': 0,
+    'Delivered': 0
+  };
+  orders.forEach(o => {
+    const s = o.fulfillmentStatus || 'Pending';
+    if (fulfillmentStats[s] !== undefined) {
+      fulfillmentStats[s]++;
+    }
+  });
+
   const filteredOrders = orders.filter(order => {
     const q = searchTerm.toLowerCase();
     const matchesSearch = 
@@ -139,13 +155,17 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       (order.customerName && order.customerName.toLowerCase().includes(q)) ||
       (order.notes && order.notes.toLowerCase().includes(q)) ||
       order.staffId.toLowerCase().includes(q) ||
-      order.stationId.toLowerCase().includes(q);
+      (order.stationId && order.stationId.toLowerCase().includes(q));
 
-    const matchesStatus = 
+    const matchesUploadStatus = 
       statusFilter === 'ALL' || 
       order.uploadStatus === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    const matchesFulfillment = 
+      fulfillmentFilter === 'ALL' || 
+      (order.fulfillmentStatus || 'Pending') === fulfillmentFilter;
+
+    return matchesSearch && matchesUploadStatus && matchesFulfillment;
   });
 
   const handleDelete = async (orderId: string) => {
@@ -191,7 +211,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       if (oldVal !== newVal) {
         newLogs.push({
           timestamp: nowIso,
-          staffId: currentStaffId,
+          staffId: currentStaffName,
           action: `UPDATE_${fieldName.toUpperCase()}`,
           details: `${fieldName} changed from "${oldVal || 'None'}" to "${newVal || 'None'}"`,
           type: 'CHANGE_LOG'
@@ -219,7 +239,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'USER_EDIT_ORDER',
       details: `Order details edited and saved by staff ${currentStaffId}`,
       type: 'EDIT_LOG'
@@ -227,7 +247,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'USER_ACTION',
       details: `User action logged for order ${editingOrder.orderId}`,
       type: 'USER_LOG'
@@ -271,7 +291,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     const newLogs = [...(order.auditLogs || [])];
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'QUICK_STATUS_UPDATE',
       details: `Fulfillment status changed from "${order.fulfillmentStatus || 'Pending'}" to "${newStatus}"`,
       type: 'CHANGE_LOG'
@@ -302,14 +322,14 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     const newChatNote = {
       id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       text: text.trim(),
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       timestamp: nowIso
     };
 
     const newLogs = [...(order.auditLogs || [])];
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'ADD_CHAT_NOTE',
       details: `Quick note added via table: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
       type: 'EDIT_LOG'
@@ -415,63 +435,89 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       />
       
       {/* Search & Filter Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        
-        {/* Search Bar */}
-        <div className="relative w-full sm:w-96">
-          <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search Order ID, AWB, Customer..."
-            className="w-full bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/20"
-          />
-        </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-96">
+            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search Order ID, AWB, Customer..."
+              className="w-full bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+            />
+          </div>
 
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 text-xs font-mono w-full sm:w-auto">
-          {(['ALL', 'SUCCESS', 'FAILED', 'PENDING'] as const).map((st) => (
+          {/* Export & Actions */}
+          <div className="flex items-center gap-2">
             <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg border font-bold transition-all cursor-pointer ${
-                statusFilter === st
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-              }`}
+              onClick={() => onOpenPreEnter ? onOpenPreEnter() : setIsPreEnterOpen(true)}
+              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
-              {st}
+              <PackagePlus className="w-4 h-4" />
+              <span>New Order</span>
             </button>
-          ))}
 
-          <button
-            onClick={() => onOpenPreEnter ? onOpenPreEnter() : setIsPreEnterOpen(true)}
-            className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
-          >
-            <PackagePlus className="w-3.5 h-3.5" />
-            <span>Pre-Enter Order</span>
-          </button>
+            <button
+              onClick={handleExportExcel}
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Excel</span>
+            </button>
 
-          <button
-            onClick={handleExportExcel}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
-            title="Export complete order details to formatted Excel (.xlsx) file"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>EXPORT EXCEL</span>
-          </button>
-
-          <button
-            onClick={handleExportCSV}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-            title="Export as UTF-8 CSV"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>CSV</span>
-          </button>
+            <button
+              onClick={onRefreshOrders}
+              className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
+        {/* Fulfillment Summary & Filters */}
+        <div className="pt-2 border-t border-slate-100 space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fulfillment:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {['ALL', 'Pending', 'Packed', 'Shipped', 'Fulfilled', 'Delivered'].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFulfillmentFilter(f)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                      fulfillmentFilter === f
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {f.toUpperCase()} ({f === 'ALL' ? orders.length : fulfillmentStats[f]})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Telegram:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(['ALL', 'SUCCESS', 'FAILED', 'PENDING'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                      statusFilter === st
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Results Table */}
@@ -509,27 +555,41 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                           <span>{order.orderId}</span>
                           <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
-                        {onStartPacking && order.recordingStatus !== 'COMPLETED' && order.uploadStatus !== 'SUCCESS' && !order.telegramMessageLink && (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => onStartPacking(order)}
-                              className="px-2 py-1 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title="Start packing this order"
-                            >
-                              <Video className="w-3 h-3" />
-                              <span>Pack (Video)</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                (window as any).pendingMarkAsPackedOrder = order;
-                                document.getElementById('manual-media-upload')?.click();
-                              }}
-                              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title="Mark as packed with photo or video from files"
-                            >
-                              <Upload className="w-3 h-3" />
-                              <span>Pack (File)</span>
-                            </button>
+                        {onStartPacking && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {(order.fulfillmentStatus === 'Pending' && !order.telegramMessageLink && !order.videoUrl && (!order.photoUrls || order.photoUrls.length === 0)) && (
+                              <>
+                                <button
+                                  onClick={() => onStartPacking(order)}
+                                  className="px-2 py-1 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
+                                  title="Start packing this order"
+                                >
+                                  <Video className="w-3 h-3" />
+                                  <span>Video</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    (window as any).pendingMarkAsPackedOrder = order;
+                                    document.getElementById('manual-media-upload')?.click();
+                                  }}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 shadow-2xs"
+                                  title="Mark as packed with photo or video from files"
+                                >
+                                  <Upload className="w-3 h-3" />
+                                  <span>File</span>
+                                </button>
+                              </>
+                            )}
+                            {(order.fulfillmentStatus !== 'Packed' && order.fulfillmentStatus !== 'Shipped' && order.fulfillmentStatus !== 'Fulfilled' && order.fulfillmentStatus !== 'Delivered') && (
+                              <button
+                                onClick={() => handleQuickStatusUpdate(order, 'Packed')}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold cursor-pointer flex items-center gap-1 border border-slate-300"
+                                title="Mark as packed (Evidence is already in Telegram)"
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Already in TG</span>
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

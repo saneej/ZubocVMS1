@@ -32,7 +32,7 @@ interface OrderDetailsPageProps {
 
 export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({ 
   onUpdateOrder, 
-  currentStaffId = 'Admin-01',
+  currentStaffId = 'Operator-ID',
   currentStaffName = 'Operator'
 }) => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -70,7 +70,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     const newLogs = [...(order.auditLogs || [])];
     newLogs.push({
       timestamp: nowIso,
-      staffId: currentStaffId,
+      staffId: currentStaffName,
       action: 'QUICK_STATUS_UPDATE',
       details: `Fulfillment status changed from "${order.fulfillmentStatus || 'Pending'}" to "${newStatus}" via Order Page`,
       type: 'CHANGE_LOG'
@@ -259,7 +259,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
               </select>
             </div>
 
-            {order.recordingStatus !== 'COMPLETED' && order.uploadStatus !== 'SUCCESS' && !order.telegramMessageLink && (
+            {order.fulfillmentStatus === 'Pending' && !order.telegramMessageLink && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => navigate('/station')}
@@ -274,6 +274,13 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                 >
                   <Upload className="w-4 h-4" />
                   <span>PACK (FILE)</span>
+                </button>
+                <button
+                  onClick={() => handleStatusUpdate('Packed')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs border border-slate-300 transition-all cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>ALREADY IN TG</span>
                 </button>
               </div>
             )}
@@ -496,7 +503,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       const logs = [...(order.auditLogs || [])];
                       logs.push({
                         timestamp: newNote.timestamp,
-                        staffId: currentStaffId,
+                        staffId: currentStaffName,
                         action: 'ADD_CHAT_NOTE',
                         details: `Added new chat note: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
                         type: 'EDIT_LOG'

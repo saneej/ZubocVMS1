@@ -656,21 +656,6 @@ apiRouter.get('/orders/:orderId', async (req, res) => {
 // Create or update order record metadata
 apiRouter.post('/orders', async (req, res) => {
   const orderId = sanitizeString(req.body.orderId);
-  const staffId = sanitizeString(req.body.staffId);
-  const stationId = sanitizeString(req.body.stationId);
-  const durationSeconds = Number(req.body.durationSeconds) || 0;
-  const recordingStartedAt = req.body.recordingStartedAt;
-  const recordingStatus = req.body.recordingStatus;
-  const uploadStatus = req.body.uploadStatus;
-  const videoUrl = req.body.videoUrl;
-  const awbNumber = sanitizeString(req.body.awbNumber);
-  const courier = sanitizeString(req.body.courier);
-  const weight = sanitizeString(req.body.weight);
-  const productSku = sanitizeString(req.body.productSku);
-  const customerName = sanitizeString(req.body.customerName);
-  const itemCount = sanitizeString(req.body.itemCount);
-  const notes = sanitizeString(req.body.notes);
-
   if (!orderId) {
     return res.status(400).json({ error: 'orderId is required' });
   }
@@ -678,38 +663,13 @@ apiRouter.post('/orders', async (req, res) => {
   const now = new Date().toISOString();
   const existing = ordersStore[orderId];
 
+  // Merge with existing if present, otherwise start new
   const record: OrderRecord = {
-    orderId,
-    staffId: staffId || 'Staff-01',
-    stationId: stationId || settings.stationId || 'Packing-01',
-    recordingStartedAt: recordingStartedAt || existing?.recordingStartedAt || now,
-    recordingCompletedAt: now,
-    durationSeconds: Number(durationSeconds) || 0,
-    recordingStatus: recordingStatus || existing?.recordingStatus || 'COMPLETED',
-    uploadStatus: uploadStatus || existing?.uploadStatus || 'PENDING',
-    telegramChatId: existing?.telegramChatId || '',
-    telegramMessageId: existing?.telegramMessageId || '',
-    telegramFileId: existing?.telegramFileId || '',
-    telegramMessageLink: existing?.telegramMessageLink || '',
-    videoUrl: videoUrl || existing?.videoUrl || '',
-    awbNumber: awbNumber || existing?.awbNumber || '',
-    courier: courier || existing?.courier || '',
-    deliveryMethod: req.body.deliveryMethod || existing?.deliveryMethod || 'Normal',
-    weight: weight || existing?.weight || '',
-    productSku: productSku || existing?.productSku || '',
-    customerName: customerName || existing?.customerName || '',
-    contactPerson: sanitizeString(req.body.contactPerson) || existing?.contactPerson || '',
-    contactPhone: sanitizeString(req.body.contactPhone) || existing?.contactPhone || '',
-    orderReceivedDate: req.body.orderReceivedDate || existing?.orderReceivedDate || '',
-    dispatchDate: req.body.dispatchDate || existing?.dispatchDate || '',
-    orderAmount: sanitizeString(req.body.orderAmount) || existing?.orderAmount || '',
-    shippingAmount: sanitizeString(req.body.shippingAmount) || existing?.shippingAmount || '',
-    orderTotal: sanitizeString(req.body.orderTotal) || existing?.orderTotal || '',
-    deliveredDate: req.body.deliveredDate || existing?.deliveredDate || '',
-    itemCount: itemCount || existing?.itemCount || '',
-    notes: notes || existing?.notes || '',
-    createdAt: existing?.createdAt || now,
-    updatedAt: now
+    ...(existing || {}),
+    ...req.body,
+    orderId, // Ensure ID is preserved
+    updatedAt: now,
+    createdAt: existing?.createdAt || now
   };
 
   ordersStore[orderId] = record;
@@ -720,6 +680,34 @@ apiRouter.post('/orders', async (req, res) => {
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
     } catch (e) {
       console.error('Error writing order record to Firestore:', e);
+    }
+  }
+
+  res.json({ success: true, record });
+});
+
+// Update specific order
+apiRouter.post('/orders/:orderId', async (req, res) => {
+  const { orderId } = req.params;
+  const now = new Date().toISOString();
+  const existing = ordersStore[orderId];
+
+  const record: OrderRecord = {
+    ...(existing || {}),
+    ...req.body,
+    orderId,
+    updatedAt: now,
+    createdAt: existing?.createdAt || req.body.createdAt || now
+  };
+
+  ordersStore[orderId] = record;
+  saveLocalBackup();
+
+  if (firestoreDb) {
+    try {
+      await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
+    } catch (e) {
+      console.error('Error updating order record in Firestore:', e);
     }
   }
 
@@ -797,7 +785,7 @@ apiRouter.post('/telegram/upload', (req, res, next) => {
     if (!record) {
       record = {
         orderId,
-        staffId: staffId || 'Staff-01',
+        staffId: staffId || 'Operator',
         stationId: stationId || settings.stationId || 'Packing-01',
         recordingStartedAt: now,
         recordingCompletedAt: now,

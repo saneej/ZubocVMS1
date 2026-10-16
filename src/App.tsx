@@ -185,17 +185,22 @@ function AppContent() {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
+    // Optimistic update
+    setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
+    
     try {
       const res = await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
-      if (res) {
-        setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
+      if (!res || !res.success) {
+        throw new Error('Failed to update order on server');
       }
     } catch (err) {
       console.error('Error updating order:', err);
+      // Revert on failure by re-fetching
+      fetchOrdersAPI();
     }
   };
 
@@ -314,8 +319,8 @@ function AppContent() {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            {/* Fallback to station */}
-            <Route path="*" element={<Navigate to="/station" replace />} />
+            {/* Fallback to orders */}
+            <Route path="*" element={<Navigate to="/orders" replace />} />
           </Routes>
         </main>
 

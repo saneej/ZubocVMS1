@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet, Zap, FileText, Eye } from 'lucide-react';
+import { Send, CheckCircle2, BarChart3, Settings, ShieldCheck, Truck, Scale, Tag, ExternalLink, Package, Search, Download, FileSpreadsheet, Zap, FileText, Eye, PackageCheck } from 'lucide-react';
 import { OrderRecord, AppSettings } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { Link } from 'react-router-dom';
@@ -109,6 +109,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
       (o.notes && o.notes.toLowerCase().includes(q)) ||
       o.staffId.toLowerCase().includes(q)
     );
+  });
+
+  // Fulfillment status distribution
+  const fulfillmentStats: Record<string, number> = {
+    'Pending': 0,
+    'Packed': 0,
+    'Shipped': 0,
+    'Fulfilled': 0,
+    'Delivered': 0
+  };
+  orders.forEach(o => {
+    const s = o.fulfillmentStatus || 'Pending';
+    fulfillmentStats[s] = (fulfillmentStats[s] || 0) + 1;
   });
 
   const handleSendDemoMessage = async () => {
@@ -240,6 +253,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders, settings
           </div>
         </div>
       )}
+
+      {/* Fulfillment Status Breakdown */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2.5 font-mono text-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 className="font-extrabold text-slate-800 uppercase flex items-center gap-2">
+            <PackageCheck className="w-4 h-4 text-[#832f5e]" />
+            <span>Fulfillment Pipeline Status</span>
+          </h3>
+          <span className="text-slate-400 text-[11px]">Real-time logistics tracking</span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          {Object.entries(fulfillmentStats).map(([status, count]) => (
+            <div 
+              key={status} 
+              className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 transition-all ${
+                status === 'Delivered' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-bold' :
+                status === 'Shipped' ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' :
+                status === 'Fulfilled' ? 'bg-purple-50 border-purple-200 text-purple-900 font-bold' :
+                status === 'Packed' ? 'bg-amber-50 border-amber-200 text-amber-900 font-bold' :
+                'bg-slate-50 border-slate-200 text-slate-600'
+              }`}
+            >
+              <span>{status}</span>
+              <span className="bg-white px-1.5 py-0.2 rounded-full text-[10px] font-extrabold border border-slate-200 text-slate-800">
+                {count}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Package Details Store Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden font-mono">
