@@ -342,7 +342,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
                   type="text"
                   value={customer}
                   onChange={(e) => setCustomer(e.target.value)}
-                  placeholder="e.g. Rajesh • Mumbai"
+                  placeholder="e.g. Saneej - Valanchery"
                   className="w-full bg-white border border-stone-200 focus:border-[#832f5e] rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
                 />
               </div>
@@ -355,7 +355,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
                   type="text"
                   value={contactPerson}
                   onChange={(e) => setContactPerson(e.target.value)}
-                  placeholder="e.g. Amit Sharma"
+                  placeholder="e.g. Saneej"
                   className="w-full bg-white border border-stone-200 focus:border-[#832f5e] rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
                 />
               </div>

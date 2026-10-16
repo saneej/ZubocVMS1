@@ -5,6 +5,7 @@ import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Sc
 import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
+import { exportOrdersToPDF, exportSingleOrderPDF } from '../utils/pdfExport';
 import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
 import { watermarkPhoto } from '../utils/watermark';
@@ -478,6 +479,15 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
             </button>
 
             <button
+              onClick={() => exportOrdersToPDF(filteredOrders, 'Order Fulfillment Report')}
+              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              title="Download attractive PDF report"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export PDF</span>
+            </button>
+
+            <button
               onClick={handleExportExcel}
               className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
@@ -712,6 +722,15 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
                     <td className="p-3 text-right space-x-1.5 font-mono whitespace-nowrap">
                       <button
+                        onClick={() => exportSingleOrderPDF(order)}
+                        className="inline-flex items-center gap-1 text-[#832f5e] hover:text-[#6c234b] font-bold px-2 py-1 bg-[#832f5e]/10 hover:bg-[#832f5e]/20 rounded-lg border border-[#832f5e]/20 cursor-pointer"
+                        title="Download Dispatch & Audit Slip PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>PDF Slip</span>
+                      </button>
+
+                      <button
                         onClick={() => openEditModal(order)}
                         className="inline-flex items-center gap-1 text-slate-700 hover:text-blue-600 font-bold px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 cursor-pointer"
                         title="Edit details & view logs"
@@ -839,6 +858,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       type="text"
                       value={editCustomer}
                       onChange={(e) => setEditCustomer(e.target.value)}
+                      placeholder="e.g. Saneej - Valanchery"
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
                   </div>
@@ -850,6 +870,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       type="text"
                       value={editContactPerson}
                       onChange={(e) => setEditContactPerson(e.target.value)}
+                      placeholder="e.g. Saneej"
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
                   </div>

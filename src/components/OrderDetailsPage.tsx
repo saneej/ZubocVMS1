@@ -22,11 +22,13 @@ import {
   Check,
   X,
   Save,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
 import { watermarkPhoto } from '../utils/watermark';
+import { exportSingleOrderPDF } from '../utils/pdfExport';
 
 interface OrderDetailsPageProps {
   orders?: OrderRecord[];
@@ -308,6 +310,15 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
           }`}>
             Upload: {order.uploadStatus}
           </span>
+
+          <button
+            onClick={() => exportSingleOrderPDF(order)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+            title="Download Dispatch & Packing Certificate PDF"
+          >
+            <Download className="w-4 h-4" />
+            <span>PDF Slip</span>
+          </button>
 
           {!isEditingAll ? (
             <button
@@ -696,7 +707,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                           type="text"
                           value={formData.customerName || ''}
                           onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                          placeholder="e.g. Rajesh • Mumbai"
+                          placeholder="e.g. Saneej - Valanchery"
                           className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
                         />
                       </div>
@@ -707,7 +718,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                           type="text"
                           value={formData.contactPerson || ''}
                           onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                          placeholder="e.g. Amit Sharma"
+                          placeholder="e.g. Saneej"
                           className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
                         />
                       </div>

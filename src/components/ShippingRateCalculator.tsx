@@ -18,7 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   Plane,
-  Mail
+  Mail,
+  Download
 } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { 
@@ -27,6 +28,7 @@ import {
   CarrierCalculationResult, 
   evaluateAllCarriers 
 } from '../utils/carriersConfig';
+import { exportShippingQuotePDF } from '../utils/pdfExport';
 
 interface ShippingRateCalculatorProps {
   orders?: OrderRecord[];
@@ -328,6 +330,27 @@ Estimated Transit: ${selectedResult.transitTime}
     navigator.clipboard.writeText(textQuote);
     setCopiedQuote(true);
     setTimeout(() => setCopiedQuote(false), 2500);
+  };
+
+  // Export Shipping Quote PDF
+  const handleDownloadPdfQuote = () => {
+    if (!selectedResult) return;
+    const { cityGuess } = resolveZoneFromPincode(pincode, originPincode);
+    exportShippingQuotePDF({
+      originPincode,
+      destPincode: pincode,
+      cityGuess: selectedCityOverride !== 'AUTO' ? selectedCityOverride : cityGuess,
+      zoneName: activeZone.name,
+      deadWeightKg,
+      volumetricWeightKg,
+      chargeableWeightKg: selectedResult.chargedWeightKg,
+      dimensions: {
+        length: parseFloat(lengthCm) || 0,
+        width: parseFloat(widthCm) || 0,
+        height: parseFloat(heightCm) || 0
+      },
+      carriers: carrierResults
+    });
   };
 
   // Attach Quote to Order
@@ -972,6 +995,14 @@ Estimated Transit: ${selectedResult.transitTime}
               >
                 {copiedQuote ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedQuote ? 'Quote Copied to Clipboard!' : 'Copy Formatted Text Quote'}</span>
+              </button>
+
+              <button
+                onClick={handleDownloadPdfQuote}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>Download PDF Quote</span>
               </button>
 
               {selectedPresetOrderId && onUpdateOrder && (

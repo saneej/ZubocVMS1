@@ -31,6 +31,7 @@ import { safeFetchJson } from '../utils/api';
 import { Link } from 'react-router-dom';
 import { formatIST } from '../utils/time';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
+import { exportOrdersToPDF } from '../utils/pdfExport';
 import { ImportShopifyCsvModal } from './ImportShopifyCsvModal';
 
 interface AdminDashboardProps {
@@ -324,6 +325,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <Send className="w-3.5 h-3.5 text-[#832f5e]" />
             <span>{isSendingDemo ? 'Pinging...' : 'TEST BOT'}</span>
+          </button>
+
+          <button
+            onClick={() => exportOrdersToPDF(filteredAndSortedOrders, 'Fulfillment & Operations Report')}
+            className="px-3.5 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            title="Download executive PDF manifest report"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>EXPORT PDF</span>
           </button>
 
           <button
