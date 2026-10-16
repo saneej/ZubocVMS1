@@ -14,264 +14,80 @@ import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { ProductionDeck } from './components/ProductionDeck';
 import { OrderRecord, StaffMember, AppSettings } from './types';
-import { collection, onSnapshot, query, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
 import { cleanForFirestore } from './utils/firestoreHelper';
 import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
 import { INITIAL_STAFFS } from './utils/initialStaffs';
 
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-  };
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-const DEFAULT_STAFF: StaffMember = {
-  id: 'Admin-01',
-  name: 'David Admin',
-  role: 'ADMIN',
-  stationId: 'Packing-HQ'
-};
-
-function AppContent() {
+const AppContent: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck'>('station');
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // Map path to active tab
-  const getActiveTab = (path: string): 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' => {
-    if (path === '/deck' || path === '/production-deck' || path === '/tv-dashboard' || path === '/production') return 'deck';
-    if (path === '/station') return 'station';
-    if (path === '/orders' || path === '/search' || path === '/') return 'search';
-    if (path === '/calculator' || path === '/rate-calculator') return 'calculator';
-    if (path === '/history') return 'history';
-    if (path === '/admin' || path === '/insights') return 'admin';
-    if (path.startsWith('/order/')) return 'search'; // Order detail counts as search context
-    return 'search';
-  };
 
-  const activeTab = getActiveTab(location.pathname);
-  
-  // Authentication State
-  const [currentStaff, setCurrentStaff] = useState<StaffMember>(() => {
-    try {
-      const saved = localStorage.getItem('zuboc_auth_user');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_STAFF;
-  });
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.includes('/production-deck')) setActiveTab('deck');
+    else if (path.includes('/station')) setActiveTab('station');
+    else if (path.includes('/calculator')) setActiveTab('calculator');
+    else if (path.includes('/admin') || path.includes('/insights')) setActiveTab('admin');
+    else if (path.includes('/history')) setActiveTab('history');
+    else setActiveTab('search');
+  }, [location]);
 
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return Boolean(localStorage.getItem('zuboc_auth_user'));
-  });
-
-  const [staffList, setStaffList] = useState<StaffMember[]>(() => {
-    try {
-      const cached = localStorage.getItem('zuboc_staffs_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_STAFFS;
-  });
-
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFFS);
+  const [currentStaff, setCurrentStaff] = useState<StaffMember>(INITIAL_STAFFS[0]);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isAddOrderOpen, setIsAddOrderOpen] = useState<boolean>(false);
+  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
+  const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
+  const [isFirestoreQuotaExceeded, setIsFirestoreQuotaExceeded] = useState<boolean>(false);
   const [settings, setSettings] = useState<AppSettings>({
+    stationId: 'Packing-01',
+    maxDailyDispatches: 8,
     telegramBotToken: '',
     telegramChatId: '',
-    hasToken: false,
-    autoUpload: true,
-    stationId: 'Packing-01'
+    autoUpload: false
   });
-
-  const [orders, setOrders] = useState<OrderRecord[]>(() => {
-    try {
-      const cached = localStorage.getItem('zuboc_orders_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading cached orders from localStorage:', e);
-    }
-    return INITIAL_FALLBACK_ORDERS;
-  });
-
-  const [isFirestoreQuotaExceeded, setIsFirestoreQuotaExceeded] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
-  const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Auto-sync orders state into localStorage on any change
-  useEffect(() => {
-    if (orders && orders.length > 0) {
-      try {
-        localStorage.setItem('zuboc_orders_cache', JSON.stringify(orders));
-      } catch (e) {
-        console.warn('Error saving orders to localStorage:', e);
-      }
-    }
-  }, [orders]);
 
   const fetchOrdersAPI = async () => {
     try {
-      const data = await safeFetchJson('/api/orders');
-      if (Array.isArray(data) && data.length > 0) {
-        setOrders(prev => {
-          const map = new Map<string, OrderRecord>();
-          // Seed with incoming API orders
-          data.forEach(o => {
-            if (o && o.orderId) map.set(o.orderId, o);
-          });
-          // Preserve any local orders and edits that are newer
-          prev.forEach(localOrd => {
-            if (!localOrd || !localOrd.orderId) return;
-            const remoteOrd = map.get(localOrd.orderId);
-            if (!remoteOrd) {
-              map.set(localOrd.orderId, localOrd);
-            } else {
-              const localTime = new Date(localOrd.updatedAt || localOrd.createdAt || 0).getTime();
-              const remoteTime = new Date(remoteOrd.updatedAt || remoteOrd.createdAt || 0).getTime();
-              if (localTime >= remoteTime) {
-                map.set(localOrd.orderId, { ...remoteOrd, ...localOrd });
-              }
-            }
-          });
-          const merged = Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          try {
-            localStorage.setItem('zuboc_orders_cache', JSON.stringify(merged));
-          } catch {}
-          return merged;
-        });
+      const response = await safeFetchJson('/api/orders');
+      if (response && Array.isArray(response)) {
+        setOrders(response);
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(response));
       }
-    } catch (err) {
-      console.error('Error fetching orders via API:', err);
-    }
-  };
-
-  const fetchSettingsAPI = async () => {
-    try {
-      const data = await safeFetchJson('/api/settings');
-      if (data) {
-        setSettings(data);
-      }
-    } catch (err) {
-      console.error('Error fetching settings via API:', err);
-    }
+    } catch {}
   };
 
   const fetchStaffsAPI = async () => {
     try {
-      const data = await safeFetchJson('/api/staffs');
-      if (Array.isArray(data) && data.length > 0) {
-        setStaffList(prev => {
-          const map = new Map<string, StaffMember>();
-          INITIAL_STAFFS.forEach(s => map.set(s.id.toLowerCase(), s));
-          prev.forEach(s => map.set(s.id.toLowerCase(), s));
-          data.forEach(s => map.set(s.id.toLowerCase(), s));
-          const list = Array.from(map.values());
-          try {
-            localStorage.setItem('zuboc_staffs_cache', JSON.stringify(list));
-          } catch {}
-          return list;
-        });
+      const response = await safeFetchJson('/api/staffs');
+      if (response && Array.isArray(response)) {
+        setStaffList(response);
       }
-    } catch (err) {
-      console.warn('Error fetching staffs via API:', err);
-    }
+    } catch {}
   };
 
   useEffect(() => {
-    Promise.all([fetchOrdersAPI(), fetchSettingsAPI(), fetchStaffsAPI()]).finally(() => {
-      setIsLoading(false);
-    });
-
-    // Real-time listener for Firestore orders
-    /*
-    const ordersPath = 'orders';
-    try {
-      const q = query(collection(db, ordersPath));
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const list: OrderRecord[] = [];
-          snapshot.forEach((doc) => {
-            list.push(doc.data() as OrderRecord);
-          });
-          if (list.length > 0) {
-            setOrders(prev => {
-              const map = new Map<string, OrderRecord>();
-              list.forEach(o => map.set(o.orderId, o));
-              // Merge local orders to keep offline edits
-              prev.forEach(localOrd => {
-                const remote = map.get(localOrd.orderId);
-                if (!remote) {
-                  map.set(localOrd.orderId, localOrd);
-                } else {
-                  const localTime = new Date(localOrd.updatedAt || 0).getTime();
-                  const remoteTime = new Date(remote.updatedAt || 0).getTime();
-                  if (localTime >= remoteTime) {
-                    map.set(localOrd.orderId, { ...remote, ...localOrd });
-                  }
-                }
-              });
-              const merged = Array.from(map.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-              try {
-                localStorage.setItem('zuboc_orders_cache', JSON.stringify(merged));
-              } catch {}
-              return merged;
-            });
-          }
-        },
-        (error: any) => {
-          if (error?.message?.includes('Quota') || error?.code === 'resource-exhausted') {
-            setIsFirestoreQuotaExceeded(true);
-            console.warn('Firestore daily read quota limit reached. Using persistent local storage & server backup.');
-          } else {
-            console.warn('Firestore subscription status:', error?.message);
-          }
+    const init = async () => {
+      try {
+        const cachedUser = localStorage.getItem('zuboc_auth_user');
+        if (cachedUser) {
+          setCurrentStaff(JSON.parse(cachedUser));
+          setIsLoggedIn(true);
         }
-      );
-      return () => unsubscribe();
-    } catch (err) {
-      console.warn('Realtime Firestore subscription deferred to server API.');
-    }
-    */
+        await fetchOrdersAPI();
+        await fetchStaffsAPI();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    init();
   }, []);
 
   const handleLoginSuccess = (staff: StaffMember) => {
@@ -298,7 +114,6 @@ function AppContent() {
       const docRef = doc(db, 'orders', newRecord.orderId);
       await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
     } catch (fsErr: any) {
-      console.warn('Firestore client write on order completed:', fsErr?.message || fsErr);
       if (fsErr?.message?.includes('Quota') || fsErr?.code === 'resource-exhausted') {
         setIsFirestoreQuotaExceeded(true);
       }
@@ -314,9 +129,6 @@ function AppContent() {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
-    console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
-    
-    // 1. Immediate local state & localStorage persistence (Zero revert guarantee)
     setOrders(prev => {
       const next = prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o);
       try {
@@ -325,28 +137,22 @@ function AppContent() {
       return next;
     });
 
-    // 2. Direct client-side Firestore write
     try {
       const docRef = doc(db, 'orders', updatedOrder.orderId);
       await setDoc(docRef, cleanForFirestore(updatedOrder), { merge: true });
-      console.log('Firestore write succeeded for order:', updatedOrder.orderId);
     } catch (fsErr: any) {
-      console.warn('Firestore write failed/offline (using local storage & server):', fsErr?.message || fsErr);
       if (fsErr?.message?.includes('Quota') || fsErr?.code === 'resource-exhausted') {
         setIsFirestoreQuotaExceeded(true);
       }
     }
 
-    // 3. Secondary API write for Node Express server if running
     try {
       await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
-    } catch (apiErr) {
-      console.warn('Server API order update skipped/deferred:', apiErr);
-    }
+    } catch (apiErr) {}
   };
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -359,14 +165,10 @@ function AppContent() {
     });
     try {
       await deleteDoc(doc(db, 'orders', orderId));
-    } catch (fsErr: any) {
-      console.warn('Firestore client delete error:', fsErr?.message || fsErr);
-    }
+    } catch (fsErr: any) {}
     try {
       await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
-    } catch (apiErr) {
-      console.warn('Server API delete deferred');
-    }
+    } catch (apiErr) {}
   };
 
   if (isLoading) {
@@ -378,15 +180,12 @@ function AppContent() {
     );
   }
 
-  // IF NOT LOGGED IN, RENDER LOGIN PAGE
   if (!isLoggedIn) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
-      
-      {/* Persistent Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={(tab) => navigate(tab === 'search' ? '/orders' : tab === 'deck' ? '/production-deck' : `/${tab}`)}
@@ -402,11 +201,7 @@ function AppContent() {
         staffList={staffList}
         onLogout={handleLogout}
       />
-
-      {/* Main Content Area */}
       <div className="lg:pl-64 flex-1 flex flex-col min-h-screen">
-        
-        {/* Top Header */}
         <TopHeader
           activeTab={activeTab}
           currentStaff={currentStaff}
@@ -418,36 +213,12 @@ function AppContent() {
           onOpenAddOrder={() => setIsAddOrderOpen(true)}
           onOpenDeck={() => navigate('/production-deck')}
         />
-
         {isFirestoreQuotaExceeded && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-xs text-amber-800 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-amber-900 bg-amber-200/60 px-1.5 py-0.5 rounded text-[11px] uppercase tracking-wide">Backup & Cache Mode</span>
-              <span>
-                Firestore daily read quota limit reached for today. Orders & edits are actively saved in persistent Local Storage & Zuboc server backup. Free quota resets tomorrow.
-              </span>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <a
-                href="https://console.firebase.google.com/project/gen-lang-client-0834100727/firestore/databases/ai-studio-packvisionvms-e5327fc1-c93a-4e08-b2b9-5787bd242adc/data?openUpgradeDialog=true"
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-amber-900 underline hover:text-amber-950"
-              >
-                Manage / Upgrade Quota &rarr;
-              </a>
-              <button
-                onClick={() => setIsFirestoreQuotaExceeded(false)}
-                className="text-amber-600 hover:text-amber-900 font-bold ml-2 text-sm px-1 cursor-pointer"
-                title="Dismiss"
-              >
-                &times;
-              </button>
-            </div>
+            <span>Firestore daily read quota limit reached. Backup & Cache Mode Active.</span>
+            <button onClick={() => setIsFirestoreQuotaExceeded(false)} className="text-amber-600 font-bold">&times;</button>
           </div>
         )}
-
-        {/* Dynamic Page Views */}
         <main className="flex-1 pb-16">
           <Routes>
             <Route path="/" element={<Navigate to="/orders" replace />} />
@@ -477,7 +248,6 @@ function AppContent() {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/search" element={<Navigate to="/orders" replace />} />
             <Route path="/history" element={
               <RecordingHistory
                 orders={orders}
@@ -495,34 +265,6 @@ function AppContent() {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/insights" element={
-              <AdminDashboard
-                orders={orders}
-                settings={settings}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                onUpdateOrder={handleUpdateOrder}
-                currentStaffId={currentStaff?.id}
-                currentStaffName={currentStaff?.name}
-              />
-            } />
-            <Route path="/order/:orderId" element={
-              <OrderDetailsPage
-                orders={orders}
-                onUpdateOrder={handleUpdateOrder}
-                currentStaffId={currentStaff?.id}
-                currentStaffName={currentStaff?.name}
-              />
-            } />
-            <Route path="/calculator" element={
-              <ShippingRateCalculator
-                orders={orders}
-                onUpdateOrder={handleUpdateOrder}
-                currentStaffName={currentStaff?.name}
-              />
-            } />
-            <Route path="/rate-calculator" element={<Navigate to="/calculator" replace />} />
-            
-            {/* Zuboc Official Production Deck & Live Schedule TV Dashboard */}
             <Route path="/production-deck" element={
               <ProductionDeck
                 orders={orders}
@@ -536,29 +278,11 @@ function AppContent() {
                 }}
               />
             } />
-            <Route path="/deck" element={<Navigate to="/production-deck" replace />} />
-            <Route path="/tv-dashboard" element={<Navigate to="/production-deck" replace />} />
-            <Route path="/production" element={<Navigate to="/production-deck" replace />} />
-
-            {/* Fallback to orders */}
             <Route path="*" element={<Navigate to="/orders" replace />} />
           </Routes>
         </main>
-
         <UploadQueueBanner />
-
-        <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
-          <div>Zuboc VMS — Enterprise Packing & Verification Portal</div>
-          <div className="flex items-center gap-2 text-slate-600">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>OPERATOR: {currentStaff.name} ({currentStaff.role})</span>
-            <span className="text-slate-300">|</span>
-            <span>STATION: {settings.stationId || 'Packing-01'}</span>
-          </div>
-        </footer>
-
       </div>
-
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -571,22 +295,19 @@ function AppContent() {
           localStorage.setItem('zuboc_auth_user', JSON.stringify(st));
         }}
       />
-
       <AddOrderModal
         isOpen={isAddOrderOpen}
         onClose={() => setIsAddOrderOpen(false)}
         onSuccess={(rec) => {
           handleOrderCompleted(rec);
-          // setSelectedOrderForPacking(rec); // Removed redirect
           fetchOrdersAPI();
         }}
         currentStaffId={currentStaff?.id}
         currentStaffName={currentStaff?.name}
       />
-
     </div>
   );
-}
+};
 
 export default function App() {
   return (
