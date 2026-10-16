@@ -5,11 +5,9 @@ import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Sc
 import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
-import { exportOrdersToPDF, exportSingleOrderPDF } from '../utils/pdfExport';
 import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
 import { watermarkPhoto } from '../utils/watermark';
-import { ImportShopifyCsvModal } from './ImportShopifyCsvModal';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -39,7 +37,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
 
   const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
-  const [isShopifyCsvModalOpen, setIsShopifyCsvModalOpen] = useState(false);
   const [newOrderId, setNewOrderId] = useState("");
   const [newCustomer, setNewCustomer] = useState("");
   const [newAwb, setNewAwb] = useState("");
@@ -78,9 +75,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       updatedAt: new Date().toISOString()
     };
     try {
-      if (onUpdateOrder) {
-        onUpdateOrder(orderRecord);
-      }
       const res = await safeFetchJson("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -449,140 +443,87 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       
       {/* Search & Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Bar + Refresh */}
-          <div className="flex items-center gap-2 w-full md:w-80 lg:w-96">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search Order ID, AWB, Customer..."
-                className="w-full bg-slate-50 border border-slate-200 focus:border-[#832f5e] focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-[#832f5e]/20"
-              />
-            </div>
-            <button
-              onClick={onRefreshOrders}
-              className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer shrink-0"
-              title="Refresh orders list"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-96">
+            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search Order ID, AWB, Customer..."
+              className="w-full bg-slate-50 border border-slate-200 focus:border-blue-600 focus:bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+            />
           </div>
 
-          {/* Export & Actions Grid */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
-            <button
-              onClick={() => setIsShopifyCsvModalOpen(true)}
-              className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-              title="Import orders from Shopify CSV export"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Import Shopify CSV</span>
-            </button>
-
+          {/* Export & Actions */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => onOpenAddOrder ? onOpenAddOrder() : setIsAddOrderOpen(true)}
-              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
-              <PackagePlus className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Add Order</span>
-            </button>
-
-            <button
-              onClick={() => exportOrdersToPDF(filteredOrders, 'Order Fulfillment Report')}
-              className="px-3 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-              title="Download attractive PDF report"
-            >
-              <Download className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Export PDF</span>
+              <PackagePlus className="w-4 h-4" />
+              <span>Add Order</span>
             </button>
 
             <button
               onClick={handleExportExcel}
-              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+              className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Export Excel</span>
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Excel</span>
+            </button>
+
+            <button
+              onClick={onRefreshOrders}
+              className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <ImportShopifyCsvModal
-          isOpen={isShopifyCsvModalOpen}
-          onClose={() => setIsShopifyCsvModalOpen(false)}
-          onSuccess={() => onRefreshOrders()}
-          existingOrderIds={orders.map(o => o.orderId)}
-        />
-
-        {/* Fulfillment Summary & Filter Pills Section */}
-        <div className="pt-3 border-t border-slate-100 space-y-3">
-          
-          {/* Fulfillment Status Row */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                Fulfillment Status
-              </span>
-              {fulfillmentFilter !== 'ALL' && (
-                <button
-                  onClick={() => setFulfillmentFilter('ALL')}
-                  className="text-[10px] text-[#832f5e] font-bold hover:underline cursor-pointer"
-                >
-                  Show All
-                </button>
-              )}
+        {/* Fulfillment Summary & Filters */}
+        <div className="pt-2 border-t border-slate-100 space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fulfillment:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {['ALL', 'Pending', 'Packed', 'Shipped', 'Fulfilled', 'Delivered'].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFulfillmentFilter(f)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                      fulfillmentFilter === f
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {f.toUpperCase()} ({f === 'ALL' ? orders.length : fulfillmentStats[f]})
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
-              {['ALL', 'Pending', 'Packed', 'Shipped', 'Fulfilled', 'Delivered'].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFulfillmentFilter(f)}
-                  className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
-                    fulfillmentFilter === f
-                      ? 'bg-[#832f5e] text-white border-[#832f5e] shadow-xs'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {f.toUpperCase()} ({f === 'ALL' ? orders.length : (fulfillmentStats[f] || 0)})
-                </button>
-              ))}
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Telegram:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(['ALL', 'SUCCESS', 'FAILED', 'PENDING'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer ${
+                      statusFilter === st
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-
-          {/* Telegram Status Row */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
-                Telegram Dispatch Status
-              </span>
-              {statusFilter !== 'ALL' && (
-                <button
-                  onClick={() => setStatusFilter('ALL')}
-                  className="text-[10px] text-[#832f5e] font-bold hover:underline cursor-pointer"
-                >
-                  Show All
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
-              {(['ALL', 'SUCCESS', 'FAILED', 'PENDING'] as const).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
-                    statusFilter === st
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
-
         </div>
       </div>
 
@@ -753,15 +694,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
                     <td className="p-3 text-right space-x-1.5 font-mono whitespace-nowrap">
                       <button
-                        onClick={() => exportSingleOrderPDF(order)}
-                        className="inline-flex items-center gap-1 text-[#832f5e] hover:text-[#6c234b] font-bold px-2 py-1 bg-[#832f5e]/10 hover:bg-[#832f5e]/20 rounded-lg border border-[#832f5e]/20 cursor-pointer"
-                        title="Download Dispatch & Audit Slip PDF"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>PDF Slip</span>
-                      </button>
-
-                      <button
                         onClick={() => openEditModal(order)}
                         className="inline-flex items-center gap-1 text-slate-700 hover:text-blue-600 font-bold px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 cursor-pointer"
                         title="Edit details & view logs"
@@ -889,7 +821,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       type="text"
                       value={editCustomer}
                       onChange={(e) => setEditCustomer(e.target.value)}
-                      placeholder="e.g. Saneej - Valanchery"
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
                   </div>
@@ -901,7 +832,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       type="text"
                       value={editContactPerson}
                       onChange={(e) => setEditContactPerson(e.target.value)}
-                      placeholder="e.g. Saneej"
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
                   </div>

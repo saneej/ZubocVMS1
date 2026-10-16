@@ -51,7 +51,8 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.warn('Firestore Operation Notice (Fallback active):', JSON.stringify(errInfo));
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 const DEFAULT_STAFF: StaffMember = {
@@ -146,7 +147,7 @@ function AppContent() {
       setIsLoading(false);
     });
 
-    // Real-time listener for Firestore orders with REST fallback
+    // Real-time listener for Firestore orders
     const ordersPath = 'orders';
     try {
       const q = query(collection(db, ordersPath));
@@ -157,18 +158,17 @@ function AppContent() {
           snapshot.forEach((doc) => {
             list.push(doc.data() as OrderRecord);
           });
-          // Sync orders state with Firestore snapshot (including empty list when deleted in production)
-          setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+          if (list.length > 0) {
+            setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+          }
         },
         (error) => {
           handleFirestoreError(error, OperationType.GET, ordersPath);
-          fetchOrdersAPI();
         }
       );
       return () => unsubscribe();
     } catch (err) {
-      console.warn('Realtime Firestore subscription deferred to server API:', err);
-      fetchOrdersAPI();
+      console.warn('Realtime Firestore subscription deferred to server API.');
     }
   }, []);
 
@@ -191,32 +191,20 @@ function AppContent() {
     } catch (fsErr) {
       console.error('Firestore client write error on order completed:', fsErr);
     }
-    try {
-      await safeFetchJson(`/api/orders/${encodeURIComponent(newRecord.orderId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRecord)
-      });
-    } catch (apiErr) {
-      console.warn('Server API write deferred on order completed:', apiErr);
-    }
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
     console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
-    // Optimistic state update (update existing or prepend new)
-    setOrders(prev => {
-      const exists = prev.some(o => o.orderId === updatedOrder.orderId);
-      if (exists) {
-        return prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o);
-      }
-      return [updatedOrder, ...prev];
-    });
+    // Optimistic update
+    setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
+    
+    let fsSaved = false;
 
     // Direct client-side Firestore write (Primary for production)
     try {
       const docRef = doc(db, 'orders', updatedOrder.orderId);
       await setDoc(docRef, cleanForFirestore(updatedOrder), { merge: true });
+      fsSaved = true;
       console.log('Firestore write succeeded for order:', updatedOrder.orderId);
     } catch (fsErr) {
       console.error('Firestore client write error:', fsErr);
@@ -225,15 +213,18 @@ function AppContent() {
       } catch {}
     }
 
-    // Secondary API write for Node Express server
+    // Secondary API write for Node Express server if running
     try {
-      await safeFetchJson(`/api/orders/${encodeURIComponent(updatedOrder.orderId)}`, {
+      await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
     } catch (apiErr) {
-      console.warn('Server API order update skipped/deferred:', apiErr);
+      console.warn('Server API order update skipped/deferred (using Firestore directly):', apiErr);
+      if (!fsSaved) {
+        fetchOrdersAPI();
+      }
     }
   };
 
@@ -245,7 +236,7 @@ function AppContent() {
       console.error('Firestore client delete error:', fsErr);
     }
     try {
-      await safeFetchJson(`/api/orders/${encodeURIComponent(orderId)}`, { method: 'DELETE' });
+      await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
     } catch (apiErr) {
       console.warn('Server API delete deferred');
     }

@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div>
               <div className="font-extrabold text-base tracking-wider text-white flex items-center gap-2 font-mono">
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-emerald-400 font-black">ZUBOC</span>
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-emerald-400 font-black">PACKVISION</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold tracking-widest">
                   VMS v2.4
                 </span>
