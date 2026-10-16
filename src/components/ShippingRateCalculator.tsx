@@ -46,98 +46,143 @@ export interface ZoneInfo {
 export const ZONES_CONFIG: Record<number, ZoneInfo> = {
   1: {
     id: 1,
-    name: 'Zone 1: Local / Intra-NCR',
-    code: 'NCR',
-    description: 'Delhi, Faridabad, Gurgaon, Noida, Ghaziabad',
-    sampleCities: ['Delhi', 'Faridabad', 'Gurgaon', 'Noida', 'Ghaziabad']
+    name: 'Zone 1: Local / Intra-Kerala',
+    code: 'KERALA',
+    description: 'Malappuram (676505), Kozhikode, Kochi, Trivandrum, Thrissur, Kannur, Palakkad',
+    sampleCities: ['Malappuram', 'Kozhikode', 'Kochi', 'Trivandrum', 'Thrissur', 'Kannur']
   },
   2: {
     id: 2,
-    name: 'Zone 2: Regional / North',
-    code: 'NORTH',
-    description: 'Chandigarh, Punjab, Haryana, Rajasthan, Western UP, Uttarakhand',
-    sampleCities: ['Chandigarh', 'Moradabad', 'Jaipur', 'Ludhiana', 'Lucknow', 'Dehradun']
+    name: 'Zone 2: Regional / South Tier 1 & 2',
+    code: 'SOUTH',
+    description: 'Coimbatore, Mysore, Madurai, Mangalore, Vijayawada, Rural TN/KA/AP/TS',
+    sampleCities: ['Coimbatore', 'Mysore', 'Madurai', 'Mangalore', 'Vijayawada']
   },
   3: {
     id: 3,
     name: 'Zone 3: Metro to Metro',
     code: 'METRO',
-    description: 'Tier-1 Metros: Chennai, Hyderabad, Kolkata, Mumbai, Bengaluru, Pune, Ahmedabad',
-    sampleCities: ['Chennai', 'Hyderabad', 'Kolkata', 'Mumbai', 'Bengaluru', 'Pune', 'Ahmedabad']
+    description: 'Tier-1 Metros: Chennai, Bengaluru, Hyderabad, Mumbai, Delhi NCR, Kolkata, Pune, Ahmedabad',
+    sampleCities: ['Chennai', 'Bengaluru', 'Hyderabad', 'Mumbai', 'Delhi', 'Kolkata']
   },
   4: {
     id: 4,
     name: 'Zone 4: Rest of India (ROI)',
     code: 'ROI',
-    description: 'Tier-2/3 Cities & Rural MP, Bihar, Odisha, Kerala, AP, Rural TN, Gujarat',
-    sampleCities: ['Bhopal', 'Patna', 'Bhubaneswar', 'Kochi', 'Vizag', 'Coimbatore', 'Indore']
+    description: 'Maharashtra, Gujarat, MP, Rajasthan, UP, Bihar, WB, Odisha, Punjab, Haryana',
+    sampleCities: ['Faridabad', 'Bhopal', 'Patna', 'Bhubaneswar', 'Jaipur', 'Lucknow']
   },
   5: {
     id: 5,
     name: 'Zone 5: Special / Remote Air',
     code: 'REMOTE',
-    description: 'J&K, Ladakh, North-East States, Sikkim, Andaman & Nicobar, Lakshadweep',
-    sampleCities: ['Srinagar', 'Guwahati', 'Imphal', 'Gangtok', 'Port Blair', 'Agartala', 'Leh']
+    description: 'Jammu & Kashmir, Ladakh, North-East States, Sikkim, Andaman & Nicobar, Lakshadweep',
+    sampleCities: ['Srinagar', 'Guwahati', 'Imphal', 'Gangtok', 'Port Blair', 'Kavaratti']
   }
 };
 
-// Auto-resolve Zone from 6-digit Indian Pincode
-export function resolveZoneFromPincode(pincode: string): { zoneId: number; cityGuess: string } {
+export function getZonesConfig(originPincode: string = '676505'): Record<number, ZoneInfo> {
+  const cleanOrigin = originPincode.trim().replace(/\D/g, '');
+  const isKerala = cleanOrigin.startsWith('67') || cleanOrigin.startsWith('68') || cleanOrigin.startsWith('69');
+
+  if (isKerala) {
+    return ZONES_CONFIG;
+  }
+
+  // Fallback for Delhi / NCR
+  if (cleanOrigin.startsWith('11') || cleanOrigin.startsWith('12') || cleanOrigin.startsWith('13') || cleanOrigin.startsWith('20')) {
+    return {
+      1: { id: 1, name: 'Zone 1: Local / Intra-NCR', code: 'NCR', description: 'Delhi, Faridabad, Gurgaon, Noida, Ghaziabad', sampleCities: ['Delhi', 'Faridabad', 'Gurgaon', 'Noida'] },
+      2: { id: 2, name: 'Zone 2: Regional / North', code: 'NORTH', description: 'Chandigarh, Punjab, Haryana, Rajasthan, UP', sampleCities: ['Chandigarh', 'Moradabad', 'Jaipur'] },
+      3: ZONES_CONFIG[3],
+      4: ZONES_CONFIG[4],
+      5: ZONES_CONFIG[5]
+    };
+  }
+
+  return ZONES_CONFIG;
+}
+
+// Auto-resolve Zone from 6-digit Indian Pincode relative to Origin
+export function resolveZoneFromPincode(pincode: string, originPincode: string = '676505'): { zoneId: number; cityGuess: string } {
   const cleanPin = pincode.trim().replace(/\D/g, '');
+  const cleanOrigin = originPincode.trim().replace(/\D/g, '');
   if (cleanPin.length < 3) return { zoneId: 4, cityGuess: 'Rest of India' };
 
+  const isOriginKerala = cleanOrigin.startsWith('67') || cleanOrigin.startsWith('68') || cleanOrigin.startsWith('69') || cleanOrigin === '';
+
+  if (isOriginKerala) {
+    // Zone 1: Intra-Kerala
+    if (cleanPin.startsWith('67') || cleanPin.startsWith('68') || cleanPin.startsWith('69')) {
+      let guess = 'Kerala Intra-State';
+      if (cleanPin.startsWith('676')) guess = 'Malappuram (Origin District)';
+      if (cleanPin.startsWith('673')) guess = 'Kozhikode';
+      if (cleanPin.startsWith('682')) guess = 'Kochi / Ernakulam';
+      if (cleanPin.startsWith('695')) guess = 'Trivandrum';
+      if (cleanPin.startsWith('680')) guess = 'Thrissur';
+      if (cleanPin.startsWith('670')) guess = 'Kannur';
+      return { zoneId: 1, cityGuess: guess };
+    }
+
+    // Zone 5: Remote / Air
+    if (
+      cleanPin.startsWith('190') || cleanPin.startsWith('191') || cleanPin.startsWith('192') || cleanPin.startsWith('193') || cleanPin.startsWith('194') ||
+      cleanPin.startsWith('78') || cleanPin.startsWith('79') ||
+      cleanPin.startsWith('737') || cleanPin.startsWith('744') || cleanPin.startsWith('6825')
+    ) {
+      let guess = 'Special / Remote Region';
+      if (cleanPin.startsWith('19')) guess = 'Jammu & Kashmir / Ladakh';
+      if (cleanPin.startsWith('78') || cleanPin.startsWith('79')) guess = 'North-East Region';
+      if (cleanPin.startsWith('744')) guess = 'Andaman & Nicobar';
+      if (cleanPin.startsWith('6825')) guess = 'Lakshadweep Islands';
+      return { zoneId: 5, cityGuess: guess };
+    }
+
+    // Zone 3: Tier-1 Metros
+    if (
+      cleanPin.startsWith('400') || cleanPin.startsWith('401') || cleanPin.startsWith('402') || cleanPin.startsWith('403') || cleanPin.startsWith('404') ||
+      cleanPin.startsWith('600') || cleanPin.startsWith('601') || cleanPin.startsWith('602') || cleanPin.startsWith('603') ||
+      cleanPin.startsWith('500') || cleanPin.startsWith('501') || cleanPin.startsWith('502') || cleanPin.startsWith('503') ||
+      cleanPin.startsWith('700') || cleanPin.startsWith('701') || cleanPin.startsWith('702') || cleanPin.startsWith('703') ||
+      cleanPin.startsWith('560') || cleanPin.startsWith('561') || cleanPin.startsWith('562') ||
+      cleanPin.startsWith('411') || cleanPin.startsWith('380') || cleanPin.startsWith('110')
+    ) {
+      let guess = 'Tier-1 Metro';
+      if (cleanPin.startsWith('60')) guess = 'Chennai Metro';
+      if (cleanPin.startsWith('56')) guess = 'Bengaluru Metro';
+      if (cleanPin.startsWith('50')) guess = 'Hyderabad Metro';
+      if (cleanPin.startsWith('40')) guess = 'Mumbai Metro';
+      if (cleanPin.startsWith('110')) guess = 'Delhi NCR Metro';
+      if (cleanPin.startsWith('70')) guess = 'Kolkata Metro';
+      if (cleanPin.startsWith('411')) guess = 'Pune Metro';
+      if (cleanPin.startsWith('380')) guess = 'Ahmedabad Metro';
+      return { zoneId: 3, cityGuess: guess };
+    }
+
+    // Zone 2: South Regional (TN, KA, AP, TS)
+    if (
+      cleanPin.startsWith('60') || cleanPin.startsWith('61') || cleanPin.startsWith('62') || cleanPin.startsWith('63') || cleanPin.startsWith('64') ||
+      cleanPin.startsWith('56') || cleanPin.startsWith('57') || cleanPin.startsWith('58') || cleanPin.startsWith('59') ||
+      cleanPin.startsWith('50') || cleanPin.startsWith('51') || cleanPin.startsWith('52') || cleanPin.startsWith('53')
+    ) {
+      let guess = 'South Regional';
+      if (cleanPin.startsWith('641')) guess = 'Coimbatore (TN)';
+      if (cleanPin.startsWith('570')) guess = 'Mysore (KA)';
+      if (cleanPin.startsWith('520')) guess = 'Vijayawada (AP)';
+      return { zoneId: 2, cityGuess: guess };
+    }
+
+    return { zoneId: 4, cityGuess: 'Rest of India' };
+  }
+
+  // Delhi NCR Origin
   if (cleanPin.startsWith('110') || cleanPin.startsWith('121') || cleanPin.startsWith('122') || cleanPin.startsWith('2013')) {
-    let guess = 'Delhi NCR';
-    if (cleanPin.startsWith('121')) guess = 'Faridabad';
-    if (cleanPin.startsWith('122')) guess = 'Gurgaon';
-    if (cleanPin.startsWith('2013')) guess = 'Noida / Ghaziabad';
-    return { zoneId: 1, cityGuess: guess };
+    return { zoneId: 1, cityGuess: 'Delhi NCR' };
   }
-
   if (
-    cleanPin.startsWith('190') || cleanPin.startsWith('191') || cleanPin.startsWith('192') || cleanPin.startsWith('193') || cleanPin.startsWith('194') ||
-    cleanPin.startsWith('78') || cleanPin.startsWith('79') ||
-    cleanPin.startsWith('737') ||
-    cleanPin.startsWith('744') ||
-    cleanPin.startsWith('6825')
+    cleanPin.startsWith('190') || cleanPin.startsWith('191') || cleanPin.startsWith('78') || cleanPin.startsWith('79') || cleanPin.startsWith('744')
   ) {
-    let guess = 'Special / Remote Region';
-    if (cleanPin.startsWith('19')) guess = 'Jammu & Kashmir / Ladakh';
-    if (cleanPin.startsWith('78') || cleanPin.startsWith('79')) guess = 'North-East Region';
-    if (cleanPin.startsWith('744')) guess = 'Andaman & Nicobar';
-    return { zoneId: 5, cityGuess: guess };
-  }
-
-  if (
-    cleanPin.startsWith('400') || cleanPin.startsWith('401') || cleanPin.startsWith('402') || cleanPin.startsWith('403') || cleanPin.startsWith('404') ||
-    cleanPin.startsWith('600') || cleanPin.startsWith('601') || cleanPin.startsWith('602') || cleanPin.startsWith('603') ||
-    cleanPin.startsWith('500') || cleanPin.startsWith('501') || cleanPin.startsWith('502') || cleanPin.startsWith('503') ||
-    cleanPin.startsWith('700') || cleanPin.startsWith('701') || cleanPin.startsWith('702') || cleanPin.startsWith('703') ||
-    cleanPin.startsWith('560') || cleanPin.startsWith('561') || cleanPin.startsWith('562') ||
-    cleanPin.startsWith('411') ||
-    cleanPin.startsWith('380')
-  ) {
-    let guess = 'Tier-1 Metro';
-    if (cleanPin.startsWith('40')) guess = 'Mumbai Metro';
-    if (cleanPin.startsWith('60')) guess = 'Chennai Metro';
-    if (cleanPin.startsWith('50')) guess = 'Hyderabad Metro';
-    if (cleanPin.startsWith('70')) guess = 'Kolkata Metro';
-    if (cleanPin.startsWith('56')) guess = 'Bengaluru Metro';
-    if (cleanPin.startsWith('411')) guess = 'Pune Metro';
-    if (cleanPin.startsWith('380')) guess = 'Ahmedabad Metro';
-    return { zoneId: 3, cityGuess: guess };
-  }
-
-  if (
-    cleanPin.startsWith('12') || cleanPin.startsWith('13') || cleanPin.startsWith('14') || cleanPin.startsWith('15') || cleanPin.startsWith('16') ||
-    cleanPin.startsWith('24') || cleanPin.startsWith('25') || cleanPin.startsWith('26') ||
-    cleanPin.startsWith('30') || cleanPin.startsWith('31') || cleanPin.startsWith('32') || cleanPin.startsWith('33') || cleanPin.startsWith('34')
-  ) {
-    let guess = 'North Regional';
-    if (cleanPin.startsWith('16')) guess = 'Chandigarh';
-    if (cleanPin.startsWith('244')) guess = 'Moradabad';
-    if (cleanPin.startsWith('302')) guess = 'Jaipur';
-    return { zoneId: 2, cityGuess: guess };
+    return { zoneId: 5, cityGuess: 'Remote Region' };
   }
 
   return { zoneId: 4, cityGuess: 'Rest of India' };
@@ -149,7 +194,8 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
   currentStaffName = 'Logistics Manager'
 }) => {
   // 1. Origin & Destination Inputs
-  const [origin, setOrigin] = useState('Delhi Warehouse (110001)');
+  const [originPincode, setOriginPincode] = useState('676505');
+  const [origin, setOrigin] = useState('Malappuram Warehouse (676505)');
   const [pincode, setPincode] = useState('600001'); // Default Chennai
   const [selectedCityOverride, setSelectedCityOverride] = useState<string>('AUTO');
   const [selectedZoneId, setSelectedZoneId] = useState<number>(3);
@@ -168,10 +214,11 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
   const [selectedCarrierId, setSelectedCarrierId] = useState<string>('delhivery_surface');
   const [expandedCarrierId, setExpandedCarrierId] = useState<string | null>(null);
 
-  // 5. Preset Order & Feedback
+  // 5. Preset Order, Feedback & Sales Report Audit
   const [selectedPresetOrderId, setSelectedPresetOrderId] = useState<string>('');
   const [copiedQuote, setCopiedQuote] = useState(false);
   const [savedToOrderMsg, setSavedToOrderMsg] = useState<string | null>(null);
+  const [showAuditTable, setShowAuditTable] = useState(false);
 
   // Pincode Validation
   const isValidPincode = useMemo(() => {
@@ -182,20 +229,22 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
   useEffect(() => {
     if (selectedCityOverride !== 'AUTO') {
       const cityZoneMap: Record<string, number> = {
-        'Faridabad': 1, 'Gurgaon': 1, 'Noida': 1, 'Ghaziabad': 1, 'Delhi': 1,
-        'Chandigarh': 2, 'Moradabad': 2, 'Ludhiana': 2, 'Jaipur': 2, 'Lucknow': 2,
+        'Malappuram': 1, 'Kozhikode': 1, 'Kochi': 1, 'Trivandrum': 1, 'Thrissur': 1, 'Kannur': 1,
+        'Coimbatore': 2, 'Mysore': 2, 'Madurai': 2, 'Mangalore': 2, 'Vijayawada': 2,
+        'Faridabad': 4, 'Gurgaon': 4, 'Noida': 4, 'Delhi': 3,
+        'Chandigarh': 4, 'Moradabad': 4, 'Ludhiana': 4, 'Jaipur': 4, 'Lucknow': 4,
         'Chennai': 3, 'Hyderabad': 3, 'Kolkata': 3, 'Mumbai': 3, 'Bengaluru': 3, 'Pune': 3, 'Ahmedabad': 3,
-        'Bhopal': 4, 'Patna': 4, 'Bhubaneswar': 4, 'Kochi': 4, 'Vizag': 4,
+        'Bhopal': 4, 'Patna': 4, 'Bhubaneswar': 4, 'Vizag': 2,
         'Srinagar': 5, 'Guwahati': 5, 'Port Blair': 5, 'Imphal': 5
       };
       if (cityZoneMap[selectedCityOverride]) {
         setSelectedZoneId(cityZoneMap[selectedCityOverride]);
       }
     } else if (isValidPincode) {
-      const { zoneId } = resolveZoneFromPincode(pincode);
+      const { zoneId } = resolveZoneFromPincode(pincode, originPincode);
       setSelectedZoneId(zoneId);
     }
-  }, [pincode, selectedCityOverride, isValidPincode]);
+  }, [pincode, originPincode, selectedCityOverride, isValidPincode]);
 
   // Handle Preset Order Selection
   const handleSelectPresetOrder = (ordId: string) => {
@@ -217,7 +266,7 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
       if (ord.customerName) {
         if (ord.customerName.toLowerCase().includes('chennai')) { setPincode('600001'); setSelectedCityOverride('Chennai'); }
         if (ord.customerName.toLowerCase().includes('mumbai')) { setPincode('400001'); setSelectedCityOverride('Mumbai'); }
-        if (ord.customerName.toLowerCase().includes('faridabad')) { setPincode('121001'); setSelectedCityOverride('Faridabad'); }
+        if (ord.customerName.toLowerCase().includes('kochi') || ord.customerName.toLowerCase().includes('kerala')) { setPincode('682001'); setSelectedCityOverride('Kochi'); }
       }
     }
   };
@@ -251,13 +300,15 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
     return carrierResults.find(r => r.carrier.id === selectedCarrierId) || carrierResults[0];
   }, [carrierResults, selectedCarrierId]);
 
-  const activeZone = ZONES_CONFIG[selectedZoneId] || ZONES_CONFIG[3];
+  const activeZonesConfig = useMemo(() => getZonesConfig(originPincode), [originPincode]);
+  const activeZone = activeZonesConfig[selectedZoneId] || activeZonesConfig[3];
 
   // Copy Formatted Text Quote
   const handleCopyQuote = () => {
     if (!selectedResult) return;
     const textQuote = `📦 *LOGISTICS QUOTE: ${selectedResult.carrier.name.toUpperCase()}*
 ────────────────────────────
+Origin: ${originPincode} (Malappuram / Kerala)
 Destination: ${isValidPincode ? pincode : 'India'} (${activeZone.name})
 Carrier Service: ${selectedResult.carrier.name} (${selectedResult.carrier.type})
 Chargeable Weight: ${selectedResult.chargedWeightKg} kg (${isVolumetricGoverning ? 'Volumetric' : 'Actual Dead Weight'})
@@ -290,7 +341,7 @@ Estimated Transit: ${selectedResult.transitTime}
       timestamp: new Date().toISOString(),
       staffId: currentStaffName,
       action: 'ATTACHED_CARRIER_QUOTE',
-      details: `Selected ${selectedResult.carrier.name} quote ₹${selectedResult.totalPayable} (${selectedResult.chargedWeightKg}kg to ${activeZone.code})`,
+      details: `Selected ${selectedResult.carrier.name} quote ₹${selectedResult.totalPayable} (${selectedResult.chargedWeightKg}kg from ${originPincode} to ${activeZone.code})`,
       type: 'EDIT_LOG'
     });
 
@@ -330,7 +381,7 @@ Estimated Transit: ${selectedResult.transitTime}
               </div>
               <div>
                 <h1 className="text-2xl font-black text-slate-900 font-sans">Shipping Charge Calculator</h1>
-                <p className="text-slate-500 text-xs font-medium">Multi-Carrier Comparison & Zone Engine for Indian Domestic Logistics</p>
+                <p className="text-slate-500 text-xs font-medium">Origin PIN: <strong className="text-[#832f5e] font-mono">{originPincode}</strong> (Malappuram / Kerala Warehouse)</p>
               </div>
             </div>
           </div>
@@ -356,19 +407,83 @@ Estimated Transit: ${selectedResult.transitTime}
         </div>
       </div>
 
-      {/* Loss Prevention Alert Banner */}
-      <div className="bg-amber-50/70 border border-amber-200/80 rounded-3xl p-4 shadow-2xs">
-        <div className="flex items-center justify-between gap-3">
+      {/* Calibrated Sales Report Banner & Benchmark Audit */}
+      <div className="bg-amber-50/80 border border-amber-200 rounded-3xl p-4 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
             <p className="text-xs text-amber-900 font-medium leading-relaxed">
-              <strong className="font-extrabold uppercase">Multi-Carrier Rating Matrix:</strong> Evaluates exact slab pricing, docket fees (₹0–₹50), FSC % & GST (18%) across Delhivery, Blue Dart, DTDC, and India Post.
+              <strong className="font-extrabold uppercase">Calibrated May-Aug Dispatch Rates (Origin PIN {originPincode}):</strong> Rates are calibrated against historical May, June, July, and August sales report invoice data across BlueDart, Delhivery, DTDC, Trackon & Speed & Safe.
             </p>
           </div>
-          <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full uppercase font-mono shrink-0">
-            Airtight Rates
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowAuditTable(!showAuditTable)}
+            className="text-[10px] font-extrabold text-amber-900 bg-amber-200/80 hover:bg-amber-200 border border-amber-300 px-3 py-1.5 rounded-xl uppercase font-mono shrink-0 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>{showAuditTable ? 'Hide May-Aug Sales Rates' : 'View May-Aug Calibrated Rates'}</span>
+          </button>
         </div>
+
+        {showAuditTable && (
+          <div className="pt-3 border-t border-amber-200/80 overflow-x-auto">
+            <table className="w-full text-left text-[11px] font-mono border-collapse">
+              <thead>
+                <tr className="border-b border-amber-300 text-amber-900 font-bold uppercase text-[10px] bg-amber-100/50">
+                  <th className="py-1.5 px-2.5">Carrier & Service</th>
+                  <th className="py-1.5 px-2.5">Kerala (Zone 1)</th>
+                  <th className="py-1.5 px-2.5">South (Zone 2)</th>
+                  <th className="py-1.5 px-2.5">Metro (Zone 3)</th>
+                  <th className="py-1.5 px-2.5">ROI (Zone 4)</th>
+                  <th className="py-1.5 px-2.5">Remote/Air (Zone 5)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-200/60 text-amber-950">
+                <tr>
+                  <td className="py-2 px-2.5 font-bold">BlueDart Surface (0.5kg Base)</td>
+                  <td className="py-2 px-2.5">₹82.31 incl GST</td>
+                  <td className="py-2 px-2.5">₹82.31 incl GST</td>
+                  <td className="py-2 px-2.5">₹97.28 incl GST</td>
+                  <td className="py-2 px-2.5">₹97.28 incl GST</td>
+                  <td className="py-2 px-2.5">₹116.52 incl GST</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 font-bold">BlueDart Express (Air 0.5kg)</td>
+                  <td className="py-2 px-2.5">₹58.32 incl GST</td>
+                  <td className="py-2 px-2.5">₹116.64 incl GST</td>
+                  <td className="py-2 px-2.5">₹174.96 incl GST</td>
+                  <td className="py-2 px-2.5">₹235.19 incl GST</td>
+                  <td className="py-2 px-2.5">₹271.40 incl GST</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 font-bold">Delhivery Surface (0.5kg Base)</td>
+                  <td className="py-2 px-2.5">₹37.17 incl GST</td>
+                  <td className="py-2 px-2.5">₹81.77 incl GST</td>
+                  <td className="py-2 px-2.5">₹127.44 incl GST</td>
+                  <td className="py-2 px-2.5">₹142.20 incl GST</td>
+                  <td className="py-2 px-2.5">₹205.32 incl GST</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 font-bold">DTDC Ground (1.0kg Flat)</td>
+                  <td className="py-2 px-2.5">₹70.00 flat</td>
+                  <td className="py-2 px-2.5">₹100.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹150.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹200.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹300.00 incl GST</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-2.5 font-bold">Trackon Air & Cargo (1.0kg)</td>
+                  <td className="py-2 px-2.5">₹220.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹220.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹308.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹337.00 incl GST</td>
+                  <td className="py-2 px-2.5">₹455.00 incl GST</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Main Two-Column Layout */}
@@ -385,24 +500,33 @@ Estimated Transit: ${selectedResult.transitTime}
                 1. Geographic Routing & Destination Zone
               </h2>
               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase font-mono">
-                6-Digit PIN Lookup
+                Origin: {originPincode}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Origin (Dispatch Warehouse)
+                  Origin PIN Code (Dispatch Center)
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    value={origin}
-                    onChange={(e) => setOrigin(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-bold focus:outline-none"
+                    maxLength={6}
+                    value={originPincode}
+                    onChange={(e) => {
+                      const newPin = e.target.value;
+                      setOriginPincode(newPin);
+                      setOrigin(`Warehouse (${newPin})`);
+                    }}
+                    placeholder="676505"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#832f5e]/20"
                   />
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-3" />
                 </div>
+                <span className="text-[10px] text-emerald-700 font-semibold mt-1 block">
+                  📍 Malappuram / Kerala Origin ({originPincode})
+                </span>
               </div>
 
               <div>
@@ -449,35 +573,39 @@ Estimated Transit: ${selectedResult.transitTime}
                 onChange={(e) => setSelectedCityOverride(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
-                <option value="AUTO">-- Auto-Resolve From PIN Code ({pincode}) --</option>
-                <optgroup label="Zone 1 (Local / Intra-NCR)">
-                  <option value="Faridabad">Faridabad (Zone 1)</option>
-                  <option value="Gurgaon">Gurgaon (Zone 1)</option>
-                  <option value="Noida">Noida / Ghaziabad (Zone 1)</option>
-                  <option value="Delhi">Delhi City (Zone 1)</option>
+                <option value="AUTO">-- Auto-Resolve From Destination PIN ({pincode}) --</option>
+                <optgroup label="Zone 1 (Local / Intra-Kerala)">
+                  <option value="Malappuram">Malappuram (Zone 1 - Origin District)</option>
+                  <option value="Kozhikode">Kozhikode (Zone 1)</option>
+                  <option value="Kochi">Kochi / Ernakulam (Zone 1)</option>
+                  <option value="Trivandrum">Trivandrum (Zone 1)</option>
+                  <option value="Thrissur">Thrissur (Zone 1)</option>
+                  <option value="Kannur">Kannur (Zone 1)</option>
                 </optgroup>
-                <optgroup label="Zone 2 (Regional / North)">
-                  <option value="Chandigarh">Chandigarh (Zone 2)</option>
-                  <option value="Moradabad">Moradabad (Zone 2)</option>
-                  <option value="Jaipur">Jaipur (Zone 2)</option>
-                  <option value="Ludhiana">Ludhiana (Zone 2)</option>
-                  <option value="Lucknow">Lucknow (Zone 2)</option>
+                <optgroup label="Zone 2 (Regional / South Tier 1 & 2)">
+                  <option value="Coimbatore">Coimbatore / TN (Zone 2)</option>
+                  <option value="Mysore">Mysore / KA (Zone 2)</option>
+                  <option value="Madurai">Madurai / TN (Zone 2)</option>
+                  <option value="Mangalore">Mangalore / KA (Zone 2)</option>
+                  <option value="Vijayawada">Vijayawada / AP (Zone 2)</option>
                 </optgroup>
                 <optgroup label="Zone 3 (Metro to Metro)">
                   <option value="Chennai">Chennai Metro (Zone 3)</option>
-                  <option value="Hyderabad">Hyderabad Metro (Zone 3)</option>
-                  <option value="Kolkata">Kolkata Metro (Zone 3)</option>
-                  <option value="Mumbai">Mumbai Metro (Zone 3)</option>
                   <option value="Bengaluru">Bengaluru Metro (Zone 3)</option>
+                  <option value="Hyderabad">Hyderabad Metro (Zone 3)</option>
+                  <option value="Mumbai">Mumbai Metro (Zone 3)</option>
+                  <option value="Delhi">Delhi NCR Metro (Zone 3)</option>
+                  <option value="Kolkata">Kolkata Metro (Zone 3)</option>
                   <option value="Pune">Pune Metro (Zone 3)</option>
                   <option value="Ahmedabad">Ahmedabad Metro (Zone 3)</option>
                 </optgroup>
                 <optgroup label="Zone 4 (Rest of India)">
+                  <option value="Faridabad">Faridabad / Haryana (Zone 4)</option>
                   <option value="Bhopal">Bhopal / MP (Zone 4)</option>
                   <option value="Patna">Patna / Bihar (Zone 4)</option>
                   <option value="Bhubaneswar">Bhubaneswar / Odisha (Zone 4)</option>
-                  <option value="Kochi">Kochi / Kerala (Zone 4)</option>
-                  <option value="Vizag">Vizag / AP (Zone 4)</option>
+                  <option value="Jaipur">Jaipur / Rajasthan (Zone 4)</option>
+                  <option value="Lucknow">Lucknow / UP (Zone 4)</option>
                 </optgroup>
                 <optgroup label="Zone 5 (Special / Remote)">
                   <option value="Srinagar">Srinagar / J&K (Zone 5)</option>
