@@ -278,6 +278,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     };
 
     onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
     setEditingOrder(null);
   };
 
@@ -334,6 +339,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     };
 
     onUpdateOrder(updated);
+    fetch("/api/telegram/update-caption", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated)
+    }).catch(() => {});
   };
 
   const handleMarkAsPacked = async (order: OrderRecord, mediaFile: File) => {

@@ -50,6 +50,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
 }
 
 const DEFAULT_STAFF: StaffMember = {
@@ -152,9 +153,7 @@ function AppContent() {
         (snapshot) => {
           const list: OrderRecord[] = [];
           snapshot.forEach((doc) => {
-            const data = doc.data() as OrderRecord;
-            console.log(`Firestore listener: Received order ${data.orderId} with status ${data.fulfillmentStatus}`);
-            list.push(data);
+            list.push(doc.data() as OrderRecord);
           });
           if (list.length > 0) {
             setOrders(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
@@ -186,6 +185,7 @@ function AppContent() {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
+    console.log('App: handleUpdateOrder called for', updatedOrder.orderId, 'Status:', updatedOrder.fulfillmentStatus);
     // Optimistic update
     setOrders(prev => prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o));
     
@@ -197,9 +197,6 @@ function AppContent() {
       });
       if (!res || !res.success) {
         throw new Error('Failed to update order on server');
-      }
-      if (res.record) {
-        setOrders(prev => prev.map(o => o.orderId === res.record.orderId ? res.record : o));
       }
     } catch (err) {
       console.error('Error updating order:', err);
