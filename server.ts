@@ -771,6 +771,8 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
   // Fallback to memory
   if (!existing) existing = ordersStore[orderId];
   
+  console.log(`POST /api/orders/${orderId} - Incoming body:`, JSON.stringify(req.body));
+  
   if (req.body.fulfillmentStatus === undefined) {
       console.warn('POST /orders/:orderId received update WITHOUT fulfillmentStatus. Body:', JSON.stringify(req.body));
   }
