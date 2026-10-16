@@ -6,13 +6,13 @@ import {
   Activity, 
   Settings, 
   X,
-  UserCheck
+  Calculator
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
 interface SidebarProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin';
-  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin') => void;
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator';
+  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator') => void;
   currentStaff: StaffMember;
   setCurrentStaff: (staff: StaffMember) => void;
   settings: AppSettings;
@@ -46,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { id: 'search', label: 'Orders', icon: Search },
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
+    { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
     { id: 'history', label: 'Recording History', icon: History },
     { id: 'admin', label: 'Admin Dashboard', icon: Activity },
   ];

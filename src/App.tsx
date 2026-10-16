@@ -7,6 +7,7 @@ import { SearchRetrieval } from './components/SearchRetrieval';
 import { RecordingHistory } from './components/RecordingHistory';
 import { AdminDashboard } from './components/AdminDashboard';
 import { OrderDetailsPage } from './components/OrderDetailsPage';
+import { ShippingRateCalculator } from './components/ShippingRateCalculator';
 import { SettingsModal } from './components/SettingsModal';
 import { AddOrderModal } from './components/AddOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
@@ -66,9 +67,10 @@ function AppContent() {
   const location = useLocation();
   
   // Map path to active tab
-  const getActiveTab = (path: string) => {
+  const getActiveTab = (path: string): 'station' | 'search' | 'history' | 'admin' | 'calculator' => {
     if (path === '/station') return 'station';
     if (path === '/orders' || path === '/search' || path === '/') return 'search';
+    if (path === '/calculator' || path === '/rate-calculator') return 'calculator';
     if (path === '/history') return 'history';
     if (path === '/admin') return 'admin';
     if (path.startsWith('/order/')) return 'search'; // Order detail counts as search context
@@ -345,6 +347,14 @@ function AppContent() {
                 currentStaffName={currentStaff?.name}
               />
             } />
+            <Route path="/calculator" element={
+              <ShippingRateCalculator
+                orders={orders}
+                onUpdateOrder={handleUpdateOrder}
+                currentStaffName={currentStaff?.name}
+              />
+            } />
+            <Route path="/rate-calculator" element={<Navigate to="/calculator" replace />} />
             {/* Fallback to orders */}
             <Route path="*" element={<Navigate to="/orders" replace />} />
           </Routes>
