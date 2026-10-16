@@ -318,6 +318,59 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     if (!ctx) return null;
 
     ctx.drawImage(video, 0, 0, width, height);
+
+    // Render Order ID Watermark Badge in bottom corner
+    const targetId = activeOrderId || orderIdInput.trim() || 'ORDER';
+    const watermarkText = `ORDER ID: ${targetId}`;
+    const timestampText = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
+
+    const fontSize = Math.max(18, Math.floor(height * 0.03));
+    ctx.save();
+    ctx.font = `bold ${fontSize}px sans-serif`;
+
+    const textMetrics1 = ctx.measureText(watermarkText);
+    const textMetrics2 = ctx.measureText(timestampText);
+    const textWidth = Math.max(textMetrics1.width, textMetrics2.width);
+    const paddingX = fontSize * 0.7;
+    const paddingY = fontSize * 0.5;
+    const boxWidth = textWidth + (paddingX * 2);
+    const boxHeight = (fontSize * 2.2) + (paddingY * 2);
+
+    const margin = Math.max(16, Math.floor(width * 0.02));
+    const x = width - boxWidth - margin;
+    const y = height - boxHeight - margin;
+
+    // Draw dark rounded badge
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; // Slate-900 translucent
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = Math.max(2, Math.floor(fontSize * 0.08));
+
+    const radius = Math.max(8, fontSize * 0.3);
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + boxWidth - radius, y);
+    ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + radius);
+    ctx.lineTo(x + boxWidth, y + boxHeight - radius);
+    ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - radius, y + boxHeight);
+    ctx.lineTo(x + radius, y + boxHeight);
+    ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw Order ID text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'top';
+    ctx.fillText(watermarkText, x + paddingX, y + paddingY);
+
+    // Draw Timestamp text
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = `${Math.floor(fontSize * 0.75)}px monospace`;
+    ctx.fillText(timestampText, x + paddingX, y + paddingY + fontSize + 4);
+    ctx.restore();
+
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
 
     // Convert dataURL to Blob
@@ -336,7 +389,7 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     playFeedbackTone('snap');
 
     return { blob, dataUrl };
-  }, []);
+  }, [activeOrderId, orderIdInput]);
 
   // Handler: Take photo directly
   const handleTakeSnapshot = useCallback(() => {

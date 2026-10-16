@@ -24,9 +24,26 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
     fs.writeFileSync(inputPath, inputBuffer);
 
     const bin = ffmpegPath || 'ffmpeg';
-    // Optimized for 10+ minute packing videos: H.264 compression to fit under Telegram 50MB bot limit, with 300s timeout
-    const ffmpegCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -maxrate 800k -bufsize 1600k -pix_fmt yuv420p -vf "scale='min(1280,iw)':-2:flags=lanczos" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
-    await execPromise(ffmpegCmd, { timeout: 300000 });
+    const cleanOrderId = orderId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const istTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
+    const fontPath = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf';
+    
+    // Watermark lines: Order ID and Timestamp
+    const line1 = `ORDER ID\\: ${cleanOrderId}`;
+    const line2 = istTime.replace(/:/g, '\\:'); // Escape colons for FFmpeg
+    
+    const drawtextFilter = `drawtext=fontfile='${fontPath}':text='${line1}':x=w-tw-20:y=h-th-45:fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.65:boxborderw=8,` +
+                           `drawtext=fontfile='${fontPath}':text='${line2}':x=w-tw-20:y=h-th-15:fontcolor=lightskyblue:fontsize=h/38:box=1:boxcolor=black@0.65:boxborderw=8`;
+
+    // Optimized for packing videos: H.264 compression with Order ID and Time watermark burned in bottom-right corner
+    const ffmpegCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -maxrate 800k -bufsize 1600k -pix_fmt yuv420p -vf "scale='min(1280,iw)':-2:flags=lanczos,${drawtextFilter}" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+    try {
+      await execPromise(ffmpegCmd, { timeout: 300000 });
+    } catch (e) {
+      console.warn('Watermarked transcoding fallback triggered:', e);
+      const fallbackCmd = `"${bin}" -fflags +genpts -i "${inputPath}" -c:v libx264 -preset veryfast -crf 30 -maxrate 800k -bufsize 1600k -pix_fmt yuv420p -vf "scale='min(1280,iw)':-2:flags=lanczos" -c:a aac -b:a 64k -movflags +faststart "${outputPath}" -y`;
+      await execPromise(fallbackCmd, { timeout: 300000 });
+    }
 
     if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
       const mp4Buffer = fs.readFileSync(outputPath);
