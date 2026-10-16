@@ -73,6 +73,60 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
   return { mp4Buffer: inputBuffer };
 }
 
+async function sendTelegramUpdate(record: OrderRecord) {
+  const rawBotToken = settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '';
+  const rawChatId = settings.telegramChatId || process.env.TELEGRAM_CHAT_ID || '';
+  const botToken = cleanTelegramCredential(rawBotToken);
+  const chatId = cleanTelegramCredential(rawChatId);
+  if (botToken && chatId && record.telegramMessageId) {
+    const durMin = Math.floor((record.durationSeconds || 0) / 60);
+    const durSec = (record.durationSeconds || 0) % 60;
+    const durationStr = `${durMin}m ${durSec}s`;
+    const formattedDate = record.createdAt ? new Date(record.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('en-IN');
+    const safeOrderId = escapeHtml(record.orderId);
+    const captionLines = [
+      `<b>📦 Order ID: ${safeOrderId} (Updated)</b>`,
+      record.awbNumber ? `<b>🚚 AWB / Tracking:</b> ${escapeHtml(record.awbNumber)}` : '',
+      record.courier ? `<b>🏢 Courier:</b> ${escapeHtml(record.courier)}` : '',
+      record.weight ? `<b>⚖️ Weight:</b> ${escapeHtml(record.weight)}` : '',
+      record.productSku ? `<b>🏷️ SKU / Item:</b> ${escapeHtml(record.productSku)}` : '',
+      record.itemCount ? `<b>🔢 Qty:</b> ${escapeHtml(String(record.itemCount))}` : '',
+      record.customerName ? `<b>👤 Customer / City:</b> ${escapeHtml(record.customerName)}` : '',
+      record.contactPerson ? `<b>📞 Contact Person:</b> ${escapeHtml(record.contactPerson)}` : '',
+      record.contactPhone ? `<b>📱 Contact Phone:</b> ${escapeHtml(record.contactPhone)}` : '',
+      record.orderReceivedDate ? `<b>📥 Received Date:</b> ${escapeHtml(record.orderReceivedDate)}` : '',
+      record.dispatchDate ? `<b>📤 Despatch Date:</b> ${escapeHtml(record.dispatchDate)}` : '',
+      record.orderAmount ? `<b>💰 Order Amount:</b> ₹${escapeHtml(record.orderAmount)}` : '',
+      record.shippingAmount ? `<b>📦 Shipping Amount:</b> ₹${escapeHtml(record.shippingAmount)}` : '',
+      record.orderTotal ? `<b>💵 Total Amount:</b> ₹${escapeHtml(record.orderTotal)}` : '',
+      record.deliveredDate ? `<b>✅ Delivered Date:</b> ${escapeHtml(record.deliveredDate)}` : '',
+      `<b>👷 Staff:</b> ${escapeHtml(record.staffId)}`,
+      `<b>📍 Station:</b> ${escapeHtml(record.stationId)}`,
+      `<b>📅 Recorded:</b> ${escapeHtml(formattedDate)} (IST)`,
+      `<b>⏱️ Duration:</b> ${escapeHtml(durationStr)}`,
+      `<b>🚛 Fulfillment:</b> <b>${escapeHtml(record.fulfillmentStatus || 'Pending')}</b>`,
+      record.notes ? `<b>📝 Notes:</b> ${escapeHtml(record.notes)}` : '',
+      record.remarks ? `<b>✅ QC Remarks:</b> ${escapeHtml(record.remarks)}` : '',
+      '<b>✏️ Status:</b> Order details edited & synced by Management'
+    ].filter(Boolean);
+    const newCaption = captionLines.join('\n');
+    try {
+      await fetch(`https://api.telegram.org/bot${botToken}/editMessageCaption`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: record.telegramChatId || chatId,
+          message_id: Number(record.telegramMessageId),
+          caption: newCaption,
+          parse_mode: 'HTML'
+        })
+      });
+    } catch (e) {
+      console.error('Telegram editMessageCaption error:', e);
+    }
+  }
+}
+
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -700,8 +754,14 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
     createdAt: existing?.createdAt || req.body.createdAt || now
   };
 
+  const fulfillmentChanged = existing && existing.fulfillmentStatus !== record.fulfillmentStatus;
+
   ordersStore[orderId] = record;
   saveLocalBackup();
+
+  if (fulfillmentChanged) {
+      await sendTelegramUpdate(record);
+  }
 
   if (firestoreDb) {
     try {

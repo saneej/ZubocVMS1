@@ -66,11 +66,6 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     };
 
     onUpdateOrder(updated);
-    fetch("/api/telegram/update-caption", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated)
-    }).catch(() => {});
   };
 
   const handleMarkAsPacked = async (mediaFile: File) => {
