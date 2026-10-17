@@ -173,7 +173,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       fulfillmentFilter === 'ALL' || 
       (order.fulfillmentStatus || 'Pending') === fulfillmentFilter;
 
-    return matchesSearch && matchesUploadStatus && matchesFulfillment;
+    return matchesSearch && matchesUploadStatus && matchesFulfillment && !order.isProductionDeckOrder;
   });
 
   const handleDelete = async (orderId: string) => {

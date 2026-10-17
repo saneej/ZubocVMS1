@@ -14,7 +14,7 @@ import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { ProductionDeck } from './components/ProductionDeck';
 import { OrderRecord, StaffMember, AppSettings } from './types';
-import { collection, query, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
 import { cleanForFirestore } from './utils/firestoreHelper';
@@ -55,13 +55,37 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
+    // 1. Always try loading from cache first
+    const cached = localStorage.getItem('zuboc_orders_cache');
+    if (cached) {
+      try {
+        setOrders(JSON.parse(cached));
+      } catch {}
+    }
+
+    // 2. Try server API
     try {
       const response = await safeFetchJson('/api/orders');
-      if (response && Array.isArray(response)) {
+      if (response && Array.isArray(response) && response.length > 0) {
         setOrders(response);
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(response));
+        return;
       }
     } catch {}
+
+    // 3. Fallback to direct Firestore, but handle quota exhaustion explicitly
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      const fsOrders = snap.docs.map((d: any) => d.data() as OrderRecord);
+      setOrders(fsOrders);
+      localStorage.setItem('zuboc_orders_cache', JSON.stringify(fsOrders));
+      setIsFirestoreQuotaExceeded(false);
+    } catch (e: any) {
+      if (e?.code === 'resource-exhausted') {
+        setIsFirestoreQuotaExceeded(true);
+        console.warn('Firestore quota exceeded. Using cached data.');
+      }
+    }
   };
 
   const fetchStaffsAPI = async () => {
@@ -276,6 +300,13 @@ const AppContent: React.FC = () => {
                 onSaveCapacityLimit={(limit) => {
                   setSettings(prev => ({ ...prev, maxDailyDispatches: limit }));
                 }}
+              />
+            } />
+            <Route path="/calculator" element={
+              <ShippingRateCalculator
+                orders={orders}
+                onUpdateOrder={handleUpdateOrder}
+                currentStaffName={currentStaff?.name}
               />
             } />
             <Route path="*" element={<Navigate to="/orders" replace />} />
