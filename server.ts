@@ -416,7 +416,7 @@ let lastOrdersSyncTime = 0;
 async function syncOrdersWithFirestore(force = false) {
   if (!firestoreDb || firestoreQuotaExceeded) return;
   const now = Date.now();
-  if (!force && now - lastOrdersSyncTime < 120000) {
+  if (!force && now - lastOrdersSyncTime < 3600000) {
     return; // Throttle to prevent exhausting Firestore daily read units
   }
   lastOrdersSyncTime = now;

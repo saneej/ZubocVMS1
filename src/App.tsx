@@ -14,7 +14,7 @@ import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { ProductionDeck } from './components/ProductionDeck';
 import { OrderRecord, StaffMember, AppSettings } from './types';
-import { collection, query, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
 import { cleanForFirestore } from './utils/firestoreHelper';
@@ -75,7 +75,8 @@ const AppContent: React.FC = () => {
 
     // 3. Fallback to direct Firestore, but handle quota exhaustion explicitly
     try {
-      const snap = await getDocs(collection(db, 'orders'));
+      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
+      const snap = await getDocs(q);
       const fsOrders = snap.docs.map((d: any) => d.data() as OrderRecord);
       setOrders(fsOrders);
       localStorage.setItem('zuboc_orders_cache', JSON.stringify(fsOrders));
