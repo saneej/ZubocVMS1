@@ -499,191 +499,202 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   };
 
   return (
-    <div className={`flex flex-col bg-[#F9F8F6] text-slate-800 min-h-screen font-sans antialiased selection:bg-[#832f5e] selection:text-white ${
-      isTvWallMode ? 'fixed inset-0 z-50 overflow-hidden bg-slate-950 text-slate-100' : ''
-    }`}>
+    <div className="flex flex-col bg-[#F4F6F9] text-slate-900 min-h-screen font-sans antialiased selection:bg-[#832f5e] selection:text-white">
       
       {/* =========================================================================
-          TOP HEADER & CAPACITY BAR (CLEAN MINIMAL LIGHT/DARK MATCHING UI)
+          TOP HEADER & CAPACITY BAR (BRIGHT MINIMAL PROFESSIONAL UI)
           ========================================================================= */}
-      <header className={`sticky top-0 z-40 px-4 sm:px-6 py-3.5 backdrop-blur-md border-b transition-colors ${
-        isTvWallMode 
-          ? 'bg-slate-900/95 border-slate-800 text-white' 
-          : 'bg-white/90 border-stone-200/80 text-slate-800 shadow-2xs'
-      }`}>
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          
-          {/* Left Title */}
+      {/* =========================================================================
+          TOP HEADER & CAPACITY BAR (BRIGHT MINIMAL PROFESSIONAL UI / TV MODE)
+          ========================================================================= */}
+      {isTvWallMode ? (
+        <header className="sticky top-0 z-40 px-6 py-3 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#832f5e] text-white flex items-center justify-center shadow-sm">
-              <Tv className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-[#832f5e] text-white flex items-center justify-center font-bold">
+              <Tv className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight font-sans">
-                  Production TV Deck
-                </h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#832f5e]/10 text-[#832f5e] font-mono border border-[#832f5e]/20">
-                  55&quot; TV MONITOR
+              <h1 className="text-sm font-black tracking-wide uppercase font-sans flex items-center gap-2">
+                <span>Zuboc Live Production Deck</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  LIVE TV MODE
                 </span>
-              </div>
-              <p className="text-[11px] text-stone-500 font-medium">
-                Live workshop sub-assembly &amp; dispatch schedule
+              </h1>
+              <p className="text-[10px] text-slate-400 font-mono">
+                Active Orders: <strong className="text-white">{activeOrdersCount}</strong> | Due Today: <strong className="text-rose-400">{urgentDueTodayCount}</strong>
               </p>
             </div>
           </div>
-
-          {/* Center Metrics & Capacity Bar */}
-          <div className="flex flex-wrap items-center gap-3">
-            
-            {/* Active Jobs */}
-            <div className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border ${
-              isTvWallMode ? 'bg-slate-900 border-slate-800' : 'bg-stone-50 border-stone-200'
-            }`}>
-              <span className="text-[10px] font-bold uppercase text-stone-500">Active</span>
-              <span className="text-base font-black font-mono leading-none">{activeOrdersCount}</span>
-            </div>
-
-            {/* Urgent / Due Today */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${
-              urgentDueTodayCount > 0 
-                ? 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse'
-                : isTvWallMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-stone-50 border-stone-200 text-stone-700'
-            }`}>
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="font-bold uppercase text-[10px]">Due Today:</span>
-                <span className="font-black font-mono">{urgentDueTodayCount}</span>
-              </div>
-            </div>
-
-            {/* Daily Capacity Tracker */}
-            <div 
-              onClick={() => setIsCapacityModalOpen(true)}
-              className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border cursor-pointer hover:border-[#832f5e] transition-colors ${
-                isTvWallMode ? 'bg-slate-900 border-slate-800' : 'bg-stone-50 border-stone-200'
-              }`}
-              title="Click to adjust daily capacity limit"
-            >
-              <div className="flex flex-col min-w-[130px]">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-1">
-                  <span className="text-stone-500">Dispatches Today:</span>
-                  <span className={`font-mono font-bold ${isCapacityFull ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {dispatchesScheduledToday}/{maxDailyDispatches}
-                  </span>
-                </div>
-                <div className={`w-full rounded-full h-1.5 overflow-hidden ${isTvWallMode ? 'bg-slate-800' : 'bg-stone-200'}`}>
-                  <div 
-                    className={`h-full rounded-full ${isCapacityFull ? 'bg-rose-600' : 'bg-emerald-500'}`}
-                    style={{ width: `${Math.min(100, (dispatchesScheduledToday / maxDailyDispatches) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Right Action Tools */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsNewOrderModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              onClick={() => setIsTvWallMode(false)}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold font-mono border border-slate-700 cursor-pointer flex items-center gap-1.5 shadow-sm"
             >
-              <PackagePlus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Job</span>
-            </button>
-
-            <button
-              onClick={() => setIsAutoScrollActive(!isAutoScrollActive)}
-              className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-1 transition-all cursor-pointer ${
-                isAutoScrollActive 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                  : isTvWallMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-stone-200 text-stone-600'
-              }`}
-              title="Toggle Auto-Scroll"
-            >
-              {isAutoScrollActive ? <Play className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" /> : <Pause className="w-3.5 h-3.5" />}
-            </button>
-
-            <button
-              onClick={() => {
-                if (onRefreshOrders) onRefreshOrders();
-                setAutoRefreshCountdown(30);
-              }}
-              className={`p-2 rounded-xl border text-xs flex items-center gap-1 transition-all cursor-pointer ${
-                isTvWallMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-stone-200 text-stone-600'
-              }`}
-              title="Refresh Orders"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span className="font-mono text-[11px]">{autoRefreshCountdown}s</span>
-            </button>
-
-            <button
-              onClick={() => setIsTvWallMode(!isTvWallMode)}
-              className={`p-2 rounded-xl border text-xs transition-all cursor-pointer ${
-                isTvWallMode 
-                  ? 'bg-amber-500 text-slate-950 font-bold border-amber-400' 
-                  : 'bg-white border-stone-200 text-stone-600 hover:text-stone-900'
-              }`}
-              title="Toggle Wall TV Dark Mode"
-            >
-              <Tv className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={toggleFullscreen}
-              className={`p-2 rounded-xl border text-xs transition-all cursor-pointer ${
-                isTvWallMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-stone-200 text-stone-600'
-              }`}
-              title="Fullscreen"
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              <Minimize2 className="w-4 h-4 text-amber-400" />
+              <span>Exit TV Mode</span>
             </button>
           </div>
+        </header>
+      ) : (
+        <header className="sticky top-0 z-40 px-6 py-4 bg-white/95 backdrop-blur-md border-b border-slate-200 text-slate-900 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            
+            {/* Left Title */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#832f5e] text-white flex items-center justify-center shadow-sm">
+                <Tv className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base sm:text-lg font-black tracking-tight font-sans">
+                    Production TV Deck
+                  </h1>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#832f5e]/10 text-[#832f5e] font-mono border border-[#832f5e]/20">
+                    55&quot; TV MONITOR
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500 font-medium">
+                  Live workshop sub-assembly &amp; dispatch schedule
+                </p>
+              </div>
+            </div>
 
-        </div>
+            {/* Center Metrics & Capacity Bar */}
+            <div className="flex flex-wrap items-center gap-3">
+              
+              {/* Active Jobs */}
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border bg-stone-50 border-stone-200">
+                <span className="text-[10px] font-bold uppercase text-stone-500">Active</span>
+                <span className="text-base font-black font-mono leading-none">{activeOrdersCount}</span>
+              </div>
 
-        {/* Sub-bar: Search & Urgency Filters */}
-        <div className={`mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${
-          isTvWallMode ? 'border-slate-800' : 'border-stone-200/80'
-        }`}>
-          <div className="flex items-center gap-2 flex-1 max-w-sm">
-            <div className="relative w-full">
-              <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search orders, client name, product..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-8 pr-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:border-[#832f5e] ${
-                  isTvWallMode ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-stone-200 text-slate-800 placeholder-stone-400'
+              {/* Urgent / Due Today */}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${
+                urgentDueTodayCount > 0 
+                  ? 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse'
+                  : 'bg-stone-50 border-stone-200 text-stone-700'
+              }`}>
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="font-bold uppercase text-[10px]">Due Today:</span>
+                  <span className="font-black font-mono">{urgentDueTodayCount}</span>
+                </div>
+              </div>
+
+              {/* Daily Capacity Tracker */}
+              <div 
+                onClick={() => setIsCapacityModalOpen(true)}
+                className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border cursor-pointer hover:border-[#832f5e] transition-colors bg-stone-50 border-stone-200"
+                title="Click to adjust daily capacity limit"
+              >
+                <div className="flex flex-col min-w-[130px]">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-1">
+                    <span className="text-stone-500">Dispatches Today:</span>
+                    <span className={`font-mono font-bold ${isCapacityFull ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {dispatchesScheduledToday}/{maxDailyDispatches}
+                    </span>
+                  </div>
+                  <div className="w-full rounded-full h-1.5 overflow-hidden bg-stone-200">
+                    <div 
+                      className={`h-full rounded-full ${isCapacityFull ? 'bg-rose-600' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(100, (dispatchesScheduledToday / maxDailyDispatches) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Action Tools */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsNewOrderModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <PackagePlus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Job</span>
+              </button>
+
+              <button
+                onClick={() => setIsAutoScrollActive(!isAutoScrollActive)}
+                className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-1 transition-all cursor-pointer ${
+                  isAutoScrollActive 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-white border-stone-200 text-stone-600'
                 }`}
-              />
+                title="Toggle Auto-Scroll"
+              >
+                {isAutoScrollActive ? <Play className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" /> : <Pause className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (onRefreshOrders) onRefreshOrders();
+                  setAutoRefreshCountdown(30);
+                }}
+                className="p-2 rounded-xl border text-xs flex items-center gap-1 transition-all cursor-pointer bg-white border-stone-200 text-stone-600"
+                title="Refresh Orders"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span className="font-mono text-[11px]">{autoRefreshCountdown}s</span>
+              </button>
+
+              <button
+                onClick={() => setIsTvWallMode(!isTvWallMode)}
+                className="p-2 rounded-xl border text-xs transition-all cursor-pointer bg-white border-stone-200 text-stone-600 hover:text-stone-900"
+                title="Toggle Wall TV Dark Mode"
+              >
+                <Tv className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 rounded-xl border text-xs transition-all cursor-pointer bg-white border-stone-200 text-stone-600"
+                title="Fullscreen"
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+            </div>
+
+          </div>
+
+          {/* Sub-bar: Search & Urgency Filters */}
+          <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs border-stone-200/80">
+            <div className="flex items-center gap-2 flex-1 max-w-sm">
+              <div className="relative w-full">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search orders, client name, product..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:border-[#832f5e] bg-white border-stone-200 text-slate-800 placeholder-stone-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {[
+                { id: 'all', label: `All (${filteredList.length})` },
+                { id: 'dueToday', label: `Due Today (${urgentDueTodayCount})` },
+                { id: 'balancePending', label: 'Balance Pending' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedUrgencyFilter(tab.id as any)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedUrgencyFilter === tab.id
+                      ? 'bg-[#832f5e] text-white shadow-xs'
+                      : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
-
-          <div className="flex items-center gap-1.5">
-            {[
-              { id: 'all', label: `All (${filteredList.length})` },
-              { id: 'dueToday', label: `Due Today (${urgentDueTodayCount})` },
-              { id: 'balancePending', label: 'Balance Pending' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setSelectedUrgencyFilter(tab.id as any)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  selectedUrgencyFilter === tab.id
-                    ? 'bg-[#832f5e] text-white shadow-xs'
-                    : isTvWallMode ? 'bg-slate-900 text-slate-400 border border-slate-800' : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Floating Exit TV Wall mode button */}
       {isTvWallMode && (
@@ -713,14 +724,10 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
             return (
               <div 
                 key={stage.id} 
-                className={`flex flex-col rounded-2xl border overflow-hidden shadow-sm transition-colors ${
-                  isTvWallMode 
-                    ? 'bg-slate-900/80 border-slate-800' 
-                    : 'bg-white border-stone-200'
-                }`}
+                className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all hover:shadow-md"
               >
                 {/* Stage Header */}
-                <div className={`p-4 border-b ${stage.headerBorder} ${isTvWallMode ? 'bg-slate-900' : 'bg-[#FDFCFB]'}`}>
+                <div className="p-4 border-b border-slate-100 bg-slate-50/80">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <div className={`p-1.5 rounded-lg ${stage.badgeBg}`}>
