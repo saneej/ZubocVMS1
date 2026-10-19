@@ -14,6 +14,7 @@ import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { ProductionDeck } from './components/ProductionDeck';
 import { PublicProductionDeck } from './components/PublicProductionDeck';
+import { DiagnosePage } from './components/DiagnosePage';
 import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -347,6 +348,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/public-deck" element={<PublicProductionDeck />} />
+        <Route path="/diagnose" element={<DiagnosePage />} />
         <Route path="*" element={<AppContent />} />
       </Routes>
     </BrowserRouter>
