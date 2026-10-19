@@ -106305,6 +106305,7 @@ apiRouter.post("/telegram/detect-chat-id", async (req, res) => {
   }
 });
 app.use("/api", apiRouter);
+app.use("/", apiRouter);
 app.use((err, req, res, next) => {
   console.error("Unhandled Server Error:", err);
   res.status(500).json({ error: err.message || "Internal Server Error" });
