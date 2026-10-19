@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && cp firebase-applet-config.json vms_data.json ./ 2>/dev/null || true && esbuild server.ts --bundle --platform=node --target=node20 --outfile=server.js --format=esm --external:@vitejs/devtools/config --external:vite",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --target=node20 --outfile=server.js --format=esm --packages=external",
     "start": "node server.js",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
@@ -28,7 +28,6 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.4.0",
-    "node-fetch": "3.3.2",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.4",

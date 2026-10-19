@@ -153,7 +153,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // Versioning for tracking deployment updates
-const APP_VERSION = '1.2.5-FORCE-SYNC';
+const APP_VERSION = '1.2.6-PROD-FIX';
 
 // Extreme priority heartbeat for diagnostics
 app.get('/ping', (req, res) => res.send(`OK-${APP_VERSION}`));
