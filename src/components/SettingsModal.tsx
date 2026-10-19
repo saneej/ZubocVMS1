@@ -15,13 +15,11 @@ import {
   Shield,
   Eye,
   EyeOff,
-  User
+  User,
+  Activity
 } from 'lucide-react';
 import { AppSettings, StaffMember } from '../types';
 import { safeFetchJson } from '../utils/api';
-import { db } from '../firebase';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { cleanForFirestore } from '../utils/firestoreHelper';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -830,6 +828,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
+        </div>
+
+        {/* Modal Footer with Diagnose Portal link */}
+        <div className="p-4 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
+          <a
+            href="/diagnose"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-stone-500 hover:text-[#832f5e] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Activity className="w-3.5 h-3.5 text-[#832f5e]" />
+            <span>System &amp; Quota Diagnostics (/diagnose)</span>
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-xl font-bold text-xs cursor-pointer transition-colors"
+          >
+            Close
+          </button>
         </div>
 
       </div>

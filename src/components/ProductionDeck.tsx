@@ -35,7 +35,8 @@ import {
   Truck,
   Camera,
   PackageCheck,
-  PackagePlus
+  PackagePlus,
+  ExternalLink
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -58,8 +59,6 @@ interface ProductionDeckProps {
   settings: AppSettings;
   onOpenSettings?: () => void;
   onSaveCapacityLimit?: (limit: number) => void;
-  isTvWallMode?: boolean;
-  setIsTvWallMode?: (active: boolean) => void;
 }
 
 // Stage configuration definition
@@ -262,14 +261,10 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   onRefreshOrders,
   currentStaff,
   settings,
-  onSaveCapacityLimit,
-  isTvWallMode: externalIsTvWallMode,
-  setIsTvWallMode: externalSetIsTvWallMode
+  onSaveCapacityLimit
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [internalTvMode, setInternalTvMode] = useState<boolean>(false);
-  const isTvWallMode = externalIsTvWallMode !== undefined ? externalIsTvWallMode : internalTvMode;
-  const setIsTvWallMode = externalSetIsTvWallMode || setInternalTvMode;
+  const [isTvWallMode, setIsTvWallMode] = useState<boolean>(false);
   const [isAutoScrollActive, setIsAutoScrollActive] = useState<boolean>(true);
   const [scrollSpeed, setScrollSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
   const [isUserHovering, setIsUserHovering] = useState<boolean>(false);
@@ -967,9 +962,15 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
       onClick={onCardClick}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-xs font-bold text-[#832f5e]">
-          #{order.orderId}
-        </span>
+        <a
+          href={`/order/${order.orderId}`}
+          onClick={(e) => e.stopPropagation()}
+          className="font-mono text-xs font-bold text-[#832f5e] hover:underline flex items-center gap-1 group/link cursor-pointer"
+          title="Open Full Individual Order Details"
+        >
+          <span>#{order.orderId}</span>
+          <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/link:opacity-100 transition-opacity" />
+        </a>
         {renderDuePill()}
       </div>
 
@@ -1165,9 +1166,19 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
               <span className="text-xs font-mono text-stone-500">#{order.orderId}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg bg-stone-200 text-stone-700 hover:bg-stone-300">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/order/${order.orderId}`}
+              className="px-2.5 py-1.5 rounded-lg bg-[#832f5e]/10 text-[#832f5e] hover:bg-[#832f5e]/20 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer"
+              title="Open Full Individual Order Details & Audit Logs"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Full Details</span>
+            </a>
+            <button type="button" onClick={onClose} className="p-2 rounded-lg bg-stone-200 text-stone-700 hover:bg-stone-300 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-5 flex-1 text-xs">

@@ -404,7 +404,8 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       try { staffs = JSON.parse(localStaffs); } catch {}
     }
 
-    if (db) {
+    // Only query Firestore if local cache is empty
+    if (!localStaffs && db) {
       try {
         const snap = await getDocs(collection(db, 'staffs'));
         if (!snap.empty) {
@@ -412,10 +413,6 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
             staffs[d.id] = d.data();
           });
           localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
-        } else {
-          for (const k of Object.keys(staffs)) {
-            await setDoc(doc(db, 'staffs', k), cleanForFirestore(staffs[k]), { merge: true });
-          }
         }
       } catch {}
     }

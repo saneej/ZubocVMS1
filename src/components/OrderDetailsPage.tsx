@@ -29,6 +29,7 @@ import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
 import { watermarkPhoto } from '../utils/watermark';
 import { exportSingleOrderPDF } from '../utils/pdfExport';
+import { safeFetchJson } from '../utils/api';
 
 interface OrderDetailsPageProps {
   orders?: OrderRecord[];
@@ -45,8 +46,68 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 }) => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
+  const [fetchedOrder, setFetchedOrder] = useState<OrderRecord | null>(null);
+  const [isApiLoading, setIsApiLoading] = useState<boolean>(false);
   
-  const order = orders.find(o => o.orderId === orderId);
+  // Robust order lookup: 1) props, 2) localStorage cache, 3) fetched order
+  const order = React.useMemo(() => {
+    if (!orderId) return null;
+    let decodedId = orderId;
+    try {
+      decodedId = decodeURIComponent(orderId);
+    } catch {}
+    const rawClean = decodedId.trim().toLowerCase();
+    const noHash = rawClean.replace(/^#/, '');
+
+    const matchesId = (candidate?: string) => {
+      if (!candidate) return false;
+      const c = candidate.trim().toLowerCase();
+      const cNoHash = c.replace(/^#/, '');
+      return c === rawClean || cNoHash === noHash || c === noHash || cNoHash === rawClean;
+    };
+    
+    // 1. Search in orders prop
+    const foundInProps = orders.find(o => matchesId(o.orderId));
+    if (foundInProps) return foundInProps;
+    
+    // 2. Search in fetchedOrder state
+    if (fetchedOrder && matchesId(fetchedOrder.orderId)) {
+      return fetchedOrder;
+    }
+    
+    // 3. Search in localStorage cache
+    try {
+      const cached = localStorage.getItem('zuboc_orders_cache') || localStorage.getItem('zuboc_orders_store');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          const cachedFound = parsed.find((o: OrderRecord) => matchesId(o.orderId));
+          if (cachedFound) return cachedFound;
+        }
+      }
+    } catch {}
+    
+    return null;
+  }, [orders, orderId, fetchedOrder]);
+
+  // If not found in memory/cache, fetch from server API
+  useEffect(() => {
+    if (!order && orderId) {
+      setIsApiLoading(true);
+      const safeParam = encodeURIComponent(orderId.trim());
+      safeFetchJson(`/api/orders/${safeParam}`)
+        .then(res => {
+          if (res && res.orderId) {
+            setFetchedOrder(res);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsApiLoading(false);
+        });
+    }
+  }, [order, orderId]);
+
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
 
   // Page-level Edit State
@@ -155,8 +216,8 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     handleSaveFields({ remarks: cleanRemarks }, `Updated QC remarks to "${cleanRemarks.substring(0, 30)}${cleanRemarks.length > 30 ? '...' : ''}"`);
   };
 
-  const isLoading = !order && orders.length === 0;
-  const error = !order && orders.length > 0 ? 'Order not found' : null;
+  const isLoading = !order && (isApiLoading || orders.length === 0);
+  const error = !order && !isLoading ? 'Order not found' : null;
 
   const handleMarkAsPacked = async (mediaFile: File) => {
     if (!order || !onUpdateOrder) return;
@@ -383,7 +444,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
             <div className="flex items-center gap-2">
               {((order.telegramMessageLink && order.telegramMessageLink.trim() !== '') || 
                 (order.videoUrl && order.videoUrl.trim() !== '') || 
-                (order.photoUrls && order.photoUrls.some(url => url.trim() !== '')) || 
+                (order.photoUrls && order.photoUrls.some((url: string) => url.trim() !== '')) || 
                 (order.photoDataUrl && order.photoDataUrl.trim() !== '')) ? (
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold text-xs border border-emerald-200">
                   <CheckCircle2 className="w-4 h-4" />
@@ -919,7 +980,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         <p className="text-xs">No chat notes posted yet.</p>
                       </div>
                     ) : (
-                      order.chatNotes?.map((note) => (
+                      order.chatNotes?.map((note: any) => (
                         <div 
                           key={note.id} 
                           className={`flex flex-col max-w-[90%] ${note.staffId === currentStaffId ? 'ml-auto items-end' : 'items-start'}`}
@@ -1079,15 +1140,15 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 font-mono text-[11px] custom-scrollbar">
-              {(!order.auditLogs || order.auditLogs.filter(l => l.type === activeLogTab).length === 0) ? (
+              {(!order.auditLogs || order.auditLogs.filter((l: any) => l.type === activeLogTab).length === 0) ? (
                 <div className="text-slate-400 text-center py-12 px-4 italic border-2 border-dashed border-slate-50 rounded-2xl">
                   No {activeLogTab.toLowerCase().replace('_', ' ')}s recorded for this order.
                 </div>
               ) : (
                 order.auditLogs
-                  .filter(l => l.type === activeLogTab)
-                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                  .map((log, idx) => (
+                  .filter((l: any) => l.type === activeLogTab)
+                  .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((log: any, idx: number) => (
                     <div key={idx} className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-1.5 transition-all hover:border-blue-200">
                       <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
                         <span className="text-blue-600">{log.staffId}</span>

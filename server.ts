@@ -360,7 +360,9 @@ let lastStaffsSyncTime = 0;
 async function syncStaffsFromFirestore(force = false) {
   if (!firestoreDb || firestoreQuotaExceeded) return;
   const now = Date.now();
-  if (!force && now - lastStaffsSyncTime < 120000) return;
+  const hasStaffs = Object.keys(staffsStore).length > 0;
+  // If we already have staffs in memory, only refresh every 6 hours or when explicitly forced
+  if (!force && hasStaffs && now - lastStaffsSyncTime < 21600000) return;
   lastStaffsSyncTime = now;
 
   try {
@@ -374,11 +376,6 @@ async function syncStaffsFromFirestore(force = false) {
         };
       });
       saveLocalBackup();
-    } else {
-      // Seed default staffs into Firestore
-      for (const s of DEFAULT_STAFFS) {
-        await setDoc(doc(firestoreDb, 'staffs', s.id), cleanForFirestore(s), { merge: true });
-      }
     }
   } catch (e: any) {
     if (e?.message?.includes('Quota') || e?.message?.includes('quota') || e?.code === 'resource-exhausted') {
@@ -432,25 +429,11 @@ async function syncOrdersWithFirestore(force = false) {
       }
     });
 
-    for (const [orderId, localOrd] of Object.entries(ordersStore)) {
-      if (!fsOrdersMap[orderId]) {
-        try {
-          await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(localOrd), { merge: true });
-        } catch (e) {
-          console.error('Error seeding order to Firestore:', orderId, e);
-        }
-      } else {
-        ordersStore[orderId] = {
-          ...fsOrdersMap[orderId],
-          ...localOrd
-        };
-      }
-    }
-
     for (const [orderId, fsOrd] of Object.entries(fsOrdersMap)) {
-      if (!ordersStore[orderId]) {
-        ordersStore[orderId] = fsOrd;
-      }
+      ordersStore[orderId] = {
+        ...(ordersStore[orderId] || {}),
+        ...fsOrd
+      };
     }
     saveLocalBackup();
   } catch (e: any) {
@@ -731,26 +714,58 @@ apiRouter.get('/orders', async (req, res) => {
   res.json(orders);
 });
 
-// Orders GET by ID
+// Orders GET by ID - Checks in-memory cache first (Zero Firestore read units)
 apiRouter.get('/orders/:orderId', async (req, res) => {
-  const orderId = sanitizeString(req.params.orderId);
-  if (firestoreDb) {
+  const rawId = req.params.orderId || '';
+  let decodedId = rawId;
+  try {
+    decodedId = decodeURIComponent(rawId);
+  } catch {}
+  const orderId = sanitizeString(decodedId);
+  const cleanId = orderId.replace(/^#/, '').trim().toLowerCase();
+
+  // 1. Direct memory lookup
+  let matchedOrder: OrderRecord | undefined = ordersStore[orderId] || ordersStore[cleanId] || ordersStore[`#${cleanId}`];
+
+  // 2. Scan in-memory store case-insensitively and hash-stripped
+  if (!matchedOrder) {
+    matchedOrder = Object.values(ordersStore).find(o => {
+      if (!o.orderId) return false;
+      const oId = o.orderId.trim().toLowerCase();
+      const oIdNoHash = oId.replace(/^#/, '');
+      return oId === cleanId || oIdNoHash === cleanId || oId === orderId.toLowerCase() || oIdNoHash === orderId.toLowerCase();
+    });
+  }
+
+  if (matchedOrder) {
+    return res.json(matchedOrder);
+  }
+
+  // 3. Fallback to Firestore only if not found in memory and quota ok
+  if (firestoreDb && !firestoreQuotaExceeded) {
     try {
-      const docRef = doc(firestoreDb, 'orders', orderId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        return res.json(snap.data());
+      let docRef = doc(firestoreDb, 'orders', orderId);
+      let snap = await getDoc(docRef);
+      if (!snap.exists() && orderId.startsWith('#')) {
+        docRef = doc(firestoreDb, 'orders', orderId.replace(/^#/, ''));
+        snap = await getDoc(docRef);
       }
-    } catch (e) {
-      console.error('Error fetching order from Firestore:', e);
+      if (snap.exists()) {
+        const fsData = snap.data() as OrderRecord;
+        ordersStore[fsData.orderId || orderId] = fsData;
+        return res.json(fsData);
+      }
+    } catch (e: any) {
+      if (e?.message?.includes('Quota') || e?.message?.includes('quota') || e?.code === 'resource-exhausted') {
+        firestoreQuotaExceeded = true;
+        console.warn('Firestore read quota exceeded during order lookup. Using memory fallback.');
+      } else {
+        console.error('Error fetching order from Firestore:', e);
+      }
     }
   }
 
-  const order = ordersStore[orderId];
-  if (!order) {
-    return res.status(404).json({ error: 'Order recording not found' });
-  }
-  res.json(order);
+  return res.status(404).json({ error: 'Order recording not found' });
 });
 
 // Create or update order record metadata
@@ -854,11 +869,16 @@ apiRouter.post('/orders/bulk', async (req, res) => {
     ordersStore[cleanId] = recordToSave;
     processedRecords.push(recordToSave);
 
-    if (firestoreDb) {
+    if (firestoreDb && !firestoreQuotaExceeded) {
       try {
         await setDoc(doc(firestoreDb, 'orders', cleanId), cleanForFirestore(recordToSave), { merge: true });
-      } catch (e) {
-        console.error('Error writing bulk order to Firestore:', cleanId, e);
+      } catch (e: any) {
+        if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+          firestoreQuotaExceeded = true;
+          console.warn('Bulk import: Firestore write quota limit reached. Saving remainder in memory & local storage.');
+        } else {
+          console.error('Error writing bulk order to Firestore:', cleanId, e);
+        }
       }
     }
   }

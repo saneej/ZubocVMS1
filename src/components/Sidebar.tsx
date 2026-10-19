@@ -7,7 +7,9 @@ import {
   Settings, 
   X,
   Calculator,
-  Tv
+  Tv,
+  Activity,
+  ExternalLink
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
@@ -147,6 +149,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {settings.hasToken ? 'TELEGRAM READY' : 'SETUP'}
             </span>
           </button>
+
+          {/* Diagnostics Portal Link (Opens separate from dashboard) */}
+          <a
+            href="/diagnose"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors text-xs font-bold border border-transparent hover:border-stone-200 group/diag cursor-pointer"
+            title="Open Zero-Waste Quota Diagnostics Portal"
+          >
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-600 group-hover/diag:animate-pulse" />
+              <span>Quota Diagnostics</span>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-stone-400 group-hover/diag:text-stone-600" />
+          </a>
 
           {/* Operator Switcher & Account */}
           <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2 shadow-2xs">
