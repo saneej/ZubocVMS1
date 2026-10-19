@@ -105492,6 +105492,17 @@ apiRouter.get("/orders/:orderId", async (req, res) => {
   if (matchedOrder) {
     return res.json(matchedOrder);
   }
+  if (supabaseServer) {
+    try {
+      const { data: supaOrder } = await supabaseServer.from("orders").select("*").or(`orderId.eq.${orderId},orderId.eq.${cleanId}`).maybeSingle();
+      if (supaOrder && supaOrder.orderId) {
+        ordersStore[supaOrder.orderId] = supaOrder;
+        return res.json(supaOrder);
+      }
+    } catch (supaErr) {
+      console.warn("Supabase order lookup notice:", supaErr);
+    }
+  }
   if (firestoreDb && !firestoreQuotaExceeded) {
     try {
       let docRef = doc(firestoreDb, "orders", orderId);
@@ -106291,8 +106302,15 @@ async function startServer() {
       console.warn("Vite dev server middleware omitted:", e);
     }
   } else if (!process.env.VERCEL) {
-    app.use(import_express.default.static(path.join(__dirname2, "dist")));
+    app.use(import_express.default.static(path.join(__dirname2, "dist"), {
+      setHeaders: (res, filepath) => {
+        if (filepath.endsWith("index.html") || filepath.endsWith("sw.js") || filepath.endsWith("manifest.webmanifest")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
       res.sendFile(path.join(__dirname2, "dist", "index.html"));
     });
   }

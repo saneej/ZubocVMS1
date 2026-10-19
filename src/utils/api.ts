@@ -161,6 +161,20 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       if (localOrders) {
         try { orders = JSON.parse(localOrders); } catch {}
       }
+
+      // Check if path requested a specific single order (e.g. /api/orders/ZUB-123)
+      const pathParts = cleanPath.split('/orders/');
+      if (pathParts[1] && pathParts[1].trim()) {
+        const rawTargetId = decodeURIComponent(pathParts[1].trim());
+        const cleanTargetId = rawTargetId.toLowerCase().replace(/^#/, '');
+        const singleOrder = orders.find(o => {
+          if (!o || !o.orderId) return false;
+          const oId = String(o.orderId).toLowerCase().replace(/^#/, '');
+          return oId === cleanTargetId || String(o.orderId).toLowerCase() === rawTargetId.toLowerCase();
+        });
+        if (singleOrder) return singleOrder;
+      }
+
       return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (method === 'POST') {
       const orderId = body.orderId || `ORD-${Date.now()}`;

@@ -47,7 +47,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const [fetchedOrder, setFetchedOrder] = useState<OrderRecord | null>(null);
-  const [isApiLoading, setIsApiLoading] = useState<boolean>(false);
+  const [isApiLoading, setIsApiLoading] = useState<boolean>(true);
   
   // Robust order lookup: 1) props, 2) localStorage cache, 3) fetched order
   const order = React.useMemo(() => {
@@ -92,21 +92,37 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 
   // If not found in memory/cache, fetch from server API
   useEffect(() => {
-    if (!order && orderId) {
+    let isMounted = true;
+    if (orderId) {
       setIsApiLoading(true);
       const safeParam = encodeURIComponent(orderId.trim());
-      safeFetchJson(`/api/orders/${safeParam}`)
+      
+      // Try direct API fetch first
+      fetch(`/api/orders/${safeParam}`)
+        .then(async r => {
+          if (r.ok) return r.json();
+          return safeFetchJson(`/api/orders/${safeParam}`);
+        })
         .then(res => {
+          if (!isMounted) return;
           if (res && res.orderId) {
             setFetchedOrder(res);
+          } else if (Array.isArray(res)) {
+            const found = res.find((o: any) => o.orderId === orderId || o.orderId?.toLowerCase() === orderId.toLowerCase());
+            if (found) setFetchedOrder(found);
           }
         })
-        .catch(() => {})
+        .catch(err => {
+          console.warn('Failed to load order details:', err);
+        })
         .finally(() => {
-          setIsApiLoading(false);
+          if (isMounted) setIsApiLoading(false);
         });
+    } else {
+      setIsApiLoading(false);
     }
-  }, [order, orderId]);
+    return () => { isMounted = false; };
+  }, [orderId]);
 
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
 
@@ -216,7 +232,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     handleSaveFields({ remarks: cleanRemarks }, `Updated QC remarks to "${cleanRemarks.substring(0, 30)}${cleanRemarks.length > 30 ? '...' : ''}"`);
   };
 
-  const isLoading = !order && (isApiLoading || orders.length === 0);
+  const isLoading = !order && isApiLoading;
   const error = !order && !isLoading ? 'Order not found' : null;
 
   const handleMarkAsPacked = async (mediaFile: File) => {
