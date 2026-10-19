@@ -153,7 +153,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // Versioning for tracking deployment updates
-const APP_VERSION = '1.2.2-diag';
+const APP_VERSION = '1.2.5-FORCE-SYNC';
 
 // Extreme priority heartbeat for diagnostics
 app.get('/ping', (req, res) => res.send(`OK-${APP_VERSION}`));
@@ -244,26 +244,27 @@ try {
 }
 
 // Lazy Initialize Supabase Client to prevent startup crashes
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.NAQ_B4oLhyLPLlnUeJGc9lJ1NPcO7oH0_e3ZxeAlrF4';
+// Primary Supabase configuration (Hardcoded for stability, can be overridden)
+// Primary Supabase configuration (Hardcoded for stability)
+// We use these as absolute defaults to ensure the deployed app works even if env vars are missing
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.NAQ_B4oLhyLPLlnUeJGc9lJ1NPcO7oH0_e3ZxeAlrF4';
 
 let _supabaseServer: any = null;
 function getSupabaseClient() {
   if (_supabaseServer) return _supabaseServer;
   try {
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-      console.log(`Initializing Supabase client with URL: ${SUPABASE_URL.slice(0, 15)}...`);
       _supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
         auth: { persistSession: false },
         global: {
-          headers: { 'x-application-name': 'zuboc-vms' }
+          headers: { 'x-application-name': 'zuboc-vms-server' }
         }
       });
-      console.log('Lazy: Supabase client initialized.');
       return _supabaseServer;
     }
   } catch (e: any) {
-    console.error('Lazy: Supabase initialization error:', e?.message);
+    console.error('Supabase init error:', e?.message);
   }
   return null;
 }
@@ -286,20 +287,27 @@ let isSupabaseReady = false;
 let hasPerformedInitialSync = false;
 let syncPromise: Promise<void> | null = null;
 
-// Ensure initial sync happens exactly once, even in serverless environments
+// Ensure initial sync happens exactly once
 async function ensureInitialSync() {
   if (hasPerformedInitialSync) return;
   if (syncPromise) return syncPromise;
   
-  syncPromise = syncFromSupabase().then(() => {
-    hasPerformedInitialSync = true;
-    syncPromise = null;
-  }).catch(err => {
-    console.error('Background sync failed:', err);
-    syncPromise = null;
-  });
+  syncPromise = (async () => {
+    try {
+      await syncFromSupabase();
+      hasPerformedInitialSync = true;
+    } catch (err) {
+      console.warn('Warmup sync failed:', err);
+    } finally {
+      syncPromise = null;
+    }
+  })();
   
-  return syncPromise;
+  // In serverless, we wait a bit but not forever to avoid Vercel timeouts
+  return Promise.race([
+    syncPromise,
+    new Promise(resolve => setTimeout(resolve, 3000))
+  ]);
 }
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
@@ -517,47 +525,42 @@ async function syncFromSupabase() {
     return;
   }
   try {
-    console.log('Starting initial sync from Supabase...');
-    const { data: ords, error: ordErr } = (await withTimeout(
-      client.from('orders').select('*').order('createdAt', { ascending: false }),
-      10000
-    )) as { data: any[]; error: any };
+    console.log('Starting parallel initial sync from Supabase...');
     
-    if (ordErr) {
-      console.error('Initial sync error (orders):', ordErr.message, ordErr.code);
-    } else if (Array.isArray(ords)) {
-      isSupabaseReady = true;
-      for (const o of ords) {
-        if (o.orderId) ordersStore[o.orderId] = o;
+    const [ordersRes, staffsRes, settingsRes] = await Promise.allSettled([
+      withTimeout(client.from('orders').select('*').order('createdAt', { ascending: false }), 10000),
+      withTimeout(client.from('staffs').select('*'), 8000),
+      withTimeout(client.from('settings').select('*').eq('id', 'config').maybeSingle(), 5000)
+    ]);
+
+    if (ordersRes.status === 'fulfilled') {
+      const { data: ords, error: ordErr } = ordersRes.value as any;
+      if (ordErr) console.error('Sync error (orders):', ordErr.message);
+      else if (Array.isArray(ords)) {
+        isSupabaseReady = true;
+        for (const o of ords) if (o.orderId) ordersStore[o.orderId] = o;
+        console.log(`Synced ${ords.length} orders.`);
       }
-      console.log(`Synced ${ords.length} orders from Supabase successfully.`);
     }
 
-    const { data: stfs, error: stfErr } = (await withTimeout(
-      client.from('staffs').select('*'),
-      8000
-    )) as { data: any[]; error: any };
-    
-    if (stfErr) {
-      console.error('Initial sync error (staffs):', stfErr.message);
-    } else if (Array.isArray(stfs)) {
-      for (const s of stfs) {
-        if (s.id) staffsStore[s.id] = s;
+    if (staffsRes.status === 'fulfilled') {
+      const { data: stfs, error: stfErr } = staffsRes.value as any;
+      if (stfErr) console.error('Sync error (staffs):', stfErr.message);
+      else if (Array.isArray(stfs)) {
+        for (const s of stfs) if (s.id) staffsStore[s.id] = s;
+        console.log(`Synced ${stfs.length} staff members.`);
       }
-      console.log(`Synced ${stfs.length} staff members from Supabase.`);
     }
 
-    const { data: sett, error: settErr } = (await withTimeout(
-      client.from('settings').select('*').eq('id', 'config').maybeSingle(),
-      5000
-    )) as { data: any; error: any };
-    
-    if (settErr) {
-      console.error('Initial sync error (settings):', settErr.message);
-    } else if (sett) {
-      settings = { ...settings, ...sett };
-      console.log('Synced system settings from Supabase.');
+    if (settingsRes.status === 'fulfilled') {
+      const { data: sett, error: settErr } = settingsRes.value as any;
+      if (settErr) console.error('Sync error (settings):', settErr.message);
+      else if (sett) {
+        settings = { ...settings, ...sett };
+        console.log('Synced system settings.');
+      }
     }
+
     hasPerformedInitialSync = true;
   } catch (err: any) {
     console.warn('Supabase initial sync failure:', err?.message);
@@ -927,14 +930,15 @@ apiRouter.get('/diag/system-report', async (req, res) => {
   const report: any = {
     timestamp: new Date().toISOString(),
     v: APP_VERSION,
-    nodeVersion: process.version,
-    platform: process.platform,
     env: {
       NODE_ENV: process.env.NODE_ENV,
       VERCEL: process.env.VERCEL,
-      SUPABASE_URL_SET: Boolean(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL),
-      SUPABASE_KEY_SET: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY),
-      FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID
+      SUPABASE_URL_SET: Boolean(process.env.SUPABASE_URL),
+      SUPABASE_KEY_SET: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    },
+    effectiveConfig: {
+      supabaseUrl: SUPABASE_URL.slice(0, 15) + '...',
+      supabaseKeySet: Boolean(SUPABASE_SERVICE_ROLE_KEY)
     },
     stores: {
       ordersCount: Object.keys(ordersStore).length,
@@ -943,33 +947,25 @@ apiRouter.get('/diag/system-report', async (req, res) => {
     connectivity: {
       googleReachable: false,
       supabaseReachable: false,
-      hasFetch: typeof fetch !== 'undefined'
+      hasGlobalFetch: typeof globalThis.fetch !== 'undefined'
     }
   };
 
-  // 1. Check Internet Connectivity
-  try {
-    if (typeof fetch !== 'undefined') {
-      const googlePing = await withTimeout(fetch('https://www.google.com', { method: 'HEAD' }), 3000);
-      report.connectivity.googleReachable = googlePing.ok;
-    }
-  } catch (e: any) {
-    report.connectivity.googleError = e.message;
-  }
-    
-  // 2. Check Supabase Connectivity (Raw Ping)
-  try {
-    if (typeof fetch !== 'undefined') {
-      const supaUrl = (SUPABASE_URL || '').split('.co')[0] + '.co';
-      const supaPing = await withTimeout(fetch(supaUrl, { method: 'HEAD' }), 3000);
-      report.connectivity.supabaseReachable = supaPing.ok;
-    }
-  } catch (e: any) {
-    report.connectivity.supabasePingError = e.message;
-  }
+  const ping = async (url: string) => {
+    try {
+      if (typeof globalThis.fetch !== 'undefined') {
+        const resp = await withTimeout(globalThis.fetch(url, { method: 'HEAD' }), 3000);
+        return resp.ok;
+      }
+      return false;
+    } catch (e) { return false; }
+  };
+
+  report.connectivity.googleReachable = await ping('https://www.google.com');
+  const supaUrl = (SUPABASE_URL || '').split('.co')[0] + '.co';
+  report.connectivity.supabaseReachable = await ping(supaUrl);
 
   try {
-    // 3. Check Supabase DB Status
     const client = getSupabaseClient();
     if (client) {
       const { error } = (await withTimeout(client.from('orders').select('orderId').limit(1), 4000)) as { error: any };
@@ -989,6 +985,21 @@ apiRouter.get('/diag/system-report', async (req, res) => {
 });
 
 // Sync orders between memory and Supabase (bi-directional)
+
+// Force a fresh sync from Supabase to Server Memory
+apiRouter.post('/supabase/force-sync', async (req, res) => {
+  try {
+    hasPerformedInitialSync = false;
+    await syncFromSupabase();
+    res.json({ 
+      success: true, 
+      message: 'Server memory successfully refreshed from Supabase.',
+      ordersCount: Object.keys(ordersStore).length 
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Push/Migrate all current in-memory orders, staffs, and settings to Supabase
 apiRouter.post('/supabase/migrate', async (req, res) => {
@@ -1461,8 +1472,10 @@ apiRouter.post('/orders', async (req, res) => {
     }
   }
 
-  const supaSynced = await saveOrderToSupabase(record);
-  res.json({ success: true, record, supaSynced });
+  // Async background save to Supabase to avoid blocking response
+  saveOrderToSupabase(record).catch(err => console.error('Supabase Background Sync Error:', err));
+  
+  res.json({ success: true, record, supaSynced: 'PENDING' });
 });
 
 // Bulk import orders (e.g. from Shopify CSV)

@@ -179,6 +179,7 @@ export const DiagnosePage: React.FC = () => {
   const [showSql, setShowSql] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
   const [serverTestState, setServerTestState] = useState<{ loading: boolean; result?: any }>({ loading: false });
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [systemReport, setSystemReport] = useState<{ loading: boolean; data?: any }>({ loading: false });
 
@@ -256,6 +257,24 @@ export const DiagnosePage: React.FC = () => {
       addLog(`Migration error: ${err.message}`, 'error');
     } finally {
       setIsMigrating(false);
+    }
+  };
+
+  const handleForceServerSync = async () => {
+    setIsSyncing(true);
+    addLog('Requesting manual server-side memory refresh from Supabase...', 'info');
+    try {
+      const res = await safeFetchJson('/api/supabase/force-sync', { method: 'POST' });
+      if (res?.success) {
+        addLog(`Server Sync Success: ${res.message} (Orders: ${res.ordersCount})`, 'success');
+        checkSupabaseStatus();
+      } else {
+        addLog(`Sync failed: ${res?.error || 'Unknown server error'}`, 'error');
+      }
+    } catch (err: any) {
+      addLog(`Communication crash during sync: ${err.message}`, 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -518,10 +537,13 @@ export const DiagnosePage: React.FC = () => {
                 {/* Env Section */}
                 <div className="space-y-1">
                   <div className="text-amber-400 font-bold border-b border-slate-800 mb-1">ENV & PLATFORM</div>
-                  <div className="flex justify-between"><span className="text-slate-500">Platform:</span> <span className="text-slate-300">{systemReport.data.report?.platform || 'N/A'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">App Version:</span> <span className="text-emerald-400 font-bold">{systemReport.data.report?.v || '1.2.5'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Vercel:</span> <span className="text-slate-300">{String(systemReport.data.report?.env?.VERCEL)}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Supabase URL:</span> <span className={systemReport.data.report?.env?.SUPABASE_URL_SET ? 'text-emerald-400' : 'text-rose-400'}>{systemReport.data.report?.env?.SUPABASE_URL_SET ? 'SET ✅' : 'MISSING ❌'}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Supabase Key:</span> <span className={systemReport.data.report?.env?.SUPABASE_KEY_SET ? 'text-emerald-400' : 'text-rose-400'}>{systemReport.data.report?.env?.SUPABASE_KEY_SET ? 'SET ✅' : 'MISSING ❌'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Env URL:</span> <span className={systemReport.data.report?.env?.SUPABASE_URL_SET ? 'text-emerald-400' : 'text-amber-400'}>{systemReport.data.report?.env?.SUPABASE_URL_SET ? 'SET ✅' : 'MISSING ⚠️'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Env Key:</span> <span className={systemReport.data.report?.env?.SUPABASE_KEY_SET ? 'text-emerald-400' : 'text-amber-400'}>{systemReport.data.report?.env?.SUPABASE_KEY_SET ? 'SET ✅' : 'MISSING ⚠️'}</span></div>
+                  <div className="mt-2 pt-1 border-t border-slate-800 text-[9px] text-slate-500">
+                    {systemReport.data.report?.env?.SUPABASE_URL_SET ? 'Using Environment Variables' : 'Using Hardcoded Fallback Credentials'}
+                  </div>
                 </div>
 
                 {/* Connectivity Section */}
@@ -597,18 +619,31 @@ export const DiagnosePage: React.FC = () => {
               </p>
             </div>
 
-            {supabaseState.tableExists && (
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={handleMigrateToSupabase}
-                disabled={isMigrating}
+                onClick={handleForceServerSync}
+                disabled={isSyncing}
                 className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
-                  isMigrating ? 'bg-stone-200 text-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  isSyncing ? 'bg-stone-200 text-stone-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
                 }`}
               >
-                <UploadCloud className={`w-4 h-4 ${isMigrating ? 'animate-bounce' : ''}`} />
-                <span>{isMigrating ? 'Migrating...' : 'Sync Local Data to Supabase'}</span>
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Syncing...' : 'Force Server Sync'}</span>
               </button>
-            )}
+
+              {supabaseState.tableExists && (
+                <button
+                  onClick={handleMigrateToSupabase}
+                  disabled={isMigrating}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                    isMigrating ? 'bg-stone-200 text-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  }`}
+                >
+                  <UploadCloud className={`w-4 h-4 ${isMigrating ? 'animate-bounce' : ''}`} />
+                  <span>{isMigrating ? 'Migrating...' : 'Sync Local Data to Supabase'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {showSql && (
