@@ -116,6 +116,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [editNotes, setEditNotes] = useState('');
   const [editRemarks, setEditRemarks] = useState('');
   const [editFulfillmentStatus, setEditFulfillmentStatus] = useState('Pending');
+  const [editIsProductionDeckOrder, setEditIsProductionDeckOrder] = useState(false);
   
   const [activeLogTab, setActiveLogTab] = useState<'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG'>('EDIT_LOG');
 
@@ -195,6 +196,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     setEditNotes(order.notes || '');
     setEditRemarks(order.remarks || '');
     setEditFulfillmentStatus(order.fulfillmentStatus || 'Pending');
+    setEditIsProductionDeckOrder(Boolean(order.isProductionDeckOrder));
   };
 
   const handleSaveOrderEdit = (e: React.FormEvent) => {
@@ -270,6 +272,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       notes: editNotes.trim() || undefined,
       remarks: editRemarks.trim() || undefined,
       fulfillmentStatus: editFulfillmentStatus,
+      isProductionDeckOrder: editIsProductionDeckOrder,
       auditLogs: newLogs,
       updatedAt: nowIso
     };
@@ -1004,6 +1007,22 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       placeholder="QC Remarks..."
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
+                  </div>
+
+                  {/* Production TV Deck Toggle */}
+                  <div className="col-span-full pt-1">
+                    <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#832f5e]/5 border border-[#832f5e]/20 cursor-pointer font-bold text-slate-900 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={editIsProductionDeckOrder}
+                        onChange={(e) => setEditIsProductionDeckOrder(e.target.checked)}
+                        className="w-4 h-4 rounded text-[#832f5e] focus:ring-[#832f5e] cursor-pointer"
+                      />
+                      <div className="flex flex-col">
+                        <span className="font-bold text-[#832f5e]">Display on Production TV Deck Schedule</span>
+                        <span className="text-[10px] font-normal text-stone-500">Enable if this order requires workshop sub-assembly and 55&quot; TV monitoring</span>
+                      </div>
+                    </label>
                   </div>
 
                 </div>

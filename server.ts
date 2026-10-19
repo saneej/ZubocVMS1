@@ -698,15 +698,31 @@ apiRouter.post('/supabase/migrate', async (req, res) => {
   }
 });
 
-// Staffs GET
+// Staffs GET - Syncs live from Supabase
 apiRouter.get('/staffs', async (req, res) => {
-  await syncStaffsFromFirestore();
+  if (supabaseServer) {
+    try {
+      const { data: supaStaffs, error } = await supabaseServer.from('staffs').select('*');
+      if (!error && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
+        const freshMap: Record<string, StaffMember> = {};
+        for (const s of supaStaffs) {
+          if (s.id) freshMap[s.id] = s;
+        }
+        staffsStore = freshMap;
+        saveLocalBackup();
+      }
+    } catch (e: any) {
+      console.warn('Supabase staffs fetch warning:', e?.message);
+    }
+  }
+
   const staffList = Object.values(staffsStore).map(s => ({
     id: s.id,
     name: s.name,
     role: s.role,
     stationId: s.stationId,
     email: s.email,
+    password: s.password || s.id,
     createdAt: s.createdAt,
     hasPassword: Boolean(s.password)
   }));
@@ -867,7 +883,39 @@ apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
 
   let authenticatedStaff: StaffMember | null = null;
 
-  if (cleanCode === envMasterCode || cleanCode === masterWord || cleanCode === '889900' || cleanCode === 'zuboc2026') {
+  // 1. Fetch fresh staffs from Supabase
+  if (supabaseServer) {
+    try {
+      const { data: supaStaffs } = await supabaseServer.from('staffs').select('*');
+      if (supaStaffs && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
+        const freshMap: Record<string, StaffMember> = {};
+        for (const s of supaStaffs) {
+          if (s.id) freshMap[s.id] = s;
+        }
+        staffsStore = freshMap;
+      }
+    } catch {}
+  } else {
+    await syncStaffsFromFirestore();
+  }
+
+  // 2. Check matched staff by passphrase, ID, or name
+  const matchedStaff = Object.values(staffsStore).find(s => {
+    const p = String(s.password || '').trim().toLowerCase();
+    const id = String(s.id || '').trim().toLowerCase();
+    const name = String(s.name || '').trim().toLowerCase();
+    return p === cleanCode || id === cleanCode || name === cleanCode;
+  });
+
+  if (matchedStaff) {
+    authenticatedStaff = {
+      id: matchedStaff.id,
+      name: matchedStaff.name,
+      role: matchedStaff.role || 'PACKER',
+      stationId: matchedStaff.stationId || 'Packing-01',
+      email: matchedStaff.email
+    };
+  } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || 'zuboc2026').trim().toLowerCase()) {
     authenticatedStaff = {
       id: 'Zuboc',
       name: 'Zuboc (ADMIN)',
@@ -875,31 +923,6 @@ apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
       stationId: 'Packing-01',
       email: 'admin@zuboc.com'
     };
-  } else if (cleanCode === envPackingCode || cleanCode === '123456' || cleanCode === 'packing01' || cleanCode === 'floor') {
-    authenticatedStaff = {
-      id: 'Operator-01',
-      name: 'Packing Operator',
-      role: 'PACKER',
-      stationId: 'Packing-01'
-    };
-  } else {
-    // Check matched staff in memory / Supabase
-    await syncStaffsFromFirestore();
-    const matchedStaff = Object.values(staffsStore).find(s => {
-      const p = String(s.password || '').trim().toLowerCase();
-      const id = String(s.id || '').trim().toLowerCase();
-      return p === cleanCode || id === cleanCode;
-    });
-
-    if (matchedStaff) {
-      authenticatedStaff = {
-        id: matchedStaff.id,
-        name: matchedStaff.name,
-        role: matchedStaff.role || 'PACKER',
-        stationId: matchedStaff.stationId || 'Packing-01',
-        email: matchedStaff.email
-      };
-    }
   }
 
   if (authenticatedStaff) {
@@ -971,8 +994,13 @@ apiRouter.get('/orders', async (req, res) => {
         .select('*')
         .order('createdAt', { ascending: false });
       if (!error && Array.isArray(supaOrders)) {
-        for (const o of supaOrders) {
-          if (o.orderId) ordersStore[o.orderId] = o;
+        if (supaOrders.length > 0) {
+          const freshOrdersMap: Record<string, OrderRecord> = {};
+          for (const o of supaOrders) {
+            if (o.orderId) freshOrdersMap[o.orderId] = o;
+          }
+          ordersStore = freshOrdersMap;
+          saveLocalBackup();
         }
       }
     } catch (e: any) {

@@ -58,56 +58,55 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
-    // 1. Instant local render from browser cache (0ms delay)
-    const cached = localStorage.getItem('zuboc_orders_cache');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setOrders(parsed);
-        }
-      } catch {}
-    }
-
-    // 2. Fast parallel fetch: Server memory API + Direct Supabase DB
-    const serverPromise = safeFetchJson('/api/orders').catch(() => null);
-    const supabasePromise = (async () => {
-      try {
-        const { data } = await supabase
-          .from('orders')
-          .select('*')
-          .order('createdAt', { ascending: false });
-        return data;
-      } catch {
-        return null;
+    try {
+      const serverResponse = await safeFetchJson('/api/orders');
+      if (Array.isArray(serverResponse) && serverResponse.length > 0) {
+        setOrders(serverResponse);
+        try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(serverResponse)); } catch {}
+        return;
       }
-    })();
+    } catch {}
 
-    const [serverResponse, supabaseResponse] = await Promise.all([serverPromise, supabasePromise]);
-    const freshestData = (Array.isArray(serverResponse) && serverResponse.length > 0)
-      ? serverResponse
-      : (Array.isArray(supabaseResponse) && supabaseResponse.length > 0)
-        ? supabaseResponse
-        : null;
-
-    if (freshestData) {
-      setOrders(freshestData);
-      try {
-        localStorage.setItem('zuboc_orders_cache', JSON.stringify(freshestData));
-      } catch {}
-    }
+    try {
+      const { data: supaOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      if (Array.isArray(supaOrders) && supaOrders.length > 0) {
+        setOrders(supaOrders);
+        try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(supaOrders)); } catch {}
+      }
+    } catch {}
   };
 
   const fetchStaffsAPI = async () => {
     try {
       const response = await safeFetchJson('/api/staffs');
-      if (response && Array.isArray(response)) {
+      if (Array.isArray(response) && response.length > 0) {
         setStaffList(response);
+        try { localStorage.setItem('zuboc_staffs_cache', JSON.stringify(response)); } catch {}
+        return;
+      }
+    } catch {}
+
+    try {
+      const { data: supaStaffs } = await supabase.from('staffs').select('*');
+      if (Array.isArray(supaStaffs) && supaStaffs.length > 0) {
+        setStaffList(supaStaffs);
+        try { localStorage.setItem('zuboc_staffs_cache', JSON.stringify(supaStaffs)); } catch {}
       }
     } catch {}
   };
 
-  // Realtime Supabase WebSockets listener for sub-second updates
+  const broadcastSync = () => {
+    try {
+      const bc = new BroadcastChannel('zuboc_vms_sync');
+      bc.postMessage({ type: 'SYNC_REFRESH' });
+      bc.close();
+    } catch {}
+  };
+
+  // Realtime Supabase WebSockets listener + Polling + Focus + BroadcastChannel
   useEffect(() => {
     const channel = supabase
       .channel('vms-orders-realtime')
@@ -127,9 +126,7 @@ const AppContent: React.FC = () => {
                 } else {
                   next = [record, ...prev];
                 }
-                try {
-                  localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
-                } catch {}
+                try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(next)); } catch {}
                 return next;
               });
             }
@@ -138,9 +135,7 @@ const AppContent: React.FC = () => {
             if (deletedId) {
               setOrders(prev => {
                 const next = prev.filter(o => o.orderId !== deletedId);
-                try {
-                  localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
-                } catch {}
+                try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(next)); } catch {}
                 return next;
               });
             }
@@ -149,8 +144,80 @@ const AppContent: React.FC = () => {
       )
       .subscribe();
 
+    const staffChannel = supabase
+      .channel('vms-staffs-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staffs' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const stf = payload.new as StaffMember;
+            if (stf && stf.id) {
+              setStaffList(prev => {
+                const idx = prev.findIndex(s => s.id === stf.id);
+                let next: StaffMember[];
+                if (idx >= 0) {
+                  next = [...prev];
+                  next[idx] = { ...next[idx], ...stf };
+                } else {
+                  next = [...prev, stf];
+                }
+                try { localStorage.setItem('zuboc_staffs_cache', JSON.stringify(next)); } catch {}
+                return next;
+              });
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setStaffList(prev => {
+                const next = prev.filter(s => s.id !== deletedId);
+                try { localStorage.setItem('zuboc_staffs_cache', JSON.stringify(next)); } catch {}
+                return next;
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // Polling every 4 seconds guarantees cross-browser sync even if WebSocket drops
+    const syncInterval = setInterval(() => {
+      fetchOrdersAPI();
+      fetchStaffsAPI();
+    }, 4000);
+
+    const handleFocus = () => {
+      fetchOrdersAPI();
+      fetchStaffsAPI();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchOrdersAPI();
+        fetchStaffsAPI();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('zuboc_vms_sync');
+      bc.onmessage = (msg) => {
+        if (msg.data?.type === 'SYNC_REFRESH') {
+          fetchOrdersAPI();
+          fetchStaffsAPI();
+        }
+      };
+    } catch {}
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(staffChannel);
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (bc) bc.close();
     };
   }, []);
 
@@ -192,13 +259,14 @@ const AppContent: React.FC = () => {
       return next;
     });
 
-    // 2. Single-source persistence via server (eliminates duplicate Firestore writes)
+    // 2. Single-source persistence via server
     try {
       await safeFetchJson('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRecord)
       });
+      broadcastSync();
     } catch {}
   };
 
@@ -219,6 +287,7 @@ const AppContent: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
+      broadcastSync();
     } catch (apiErr) {}
   };
 
@@ -232,6 +301,7 @@ const AppContent: React.FC = () => {
     });
     try {
       await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
+      broadcastSync();
     } catch (apiErr) {}
   };
 

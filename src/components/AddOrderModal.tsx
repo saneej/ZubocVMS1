@@ -39,6 +39,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const [deliveredDate, setDeliveredDate] = useState('');
   const [notes, setNotes] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [sendToProductionDeck, setSendToProductionDeck] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,15 +48,6 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
   if (!isOpen) return null;
 
   const quickCouriers = ['Delhivery', 'Blue Dart', 'DTDC', 'Shiprocket', 'Ekart', 'Xpressbees', 'India Post'];
-
-  const saveOrderToLocalStore = (record: OrderRecord) => {
-    try {
-      const raw = localStorage.getItem('zuboc_orders_cache');
-      const orders: OrderRecord[] = raw ? JSON.parse(raw) : [];
-      const next = [record, ...orders.filter(o => o.orderId !== record.orderId)];
-      localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
-    } catch {}
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +94,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       stationId: 'Packing-01',
       recordingStatus: 'PENDING',
       uploadStatus: 'PENDING',
+      isProductionDeckOrder: sendToProductionDeck,
       createdAt: now,
       updatedAt: now
     };
@@ -116,23 +109,16 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setSuccessMsg(`Order ${cleanId} added successfully!`);
       if (onSuccess) onSuccess((res && res.record) ? res.record : newRecord as OrderRecord);
     } catch (err) {
-      if (db) {
-        try {
-          const docRef = doc(db, 'orders', cleanId);
-          await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
-          setSuccessMsg(`Order ${cleanId} added successfully!`);
-          if (onSuccess) onSuccess(newRecord as OrderRecord);
-        } catch (fsErr) {
-          console.warn('Direct Firestore save failed, fallback to local storage:', fsErr);
-          saveOrderToLocalStore(newRecord as OrderRecord);
-          setSuccessMsg(`Order ${cleanId} saved locally!`);
-          if (onSuccess) onSuccess(newRecord as OrderRecord);
-        }
-      } else {
-        // Pure Localhost Mode
-        saveOrderToLocalStore(newRecord as OrderRecord);
-        setSuccessMsg(`Order ${cleanId} saved locally!`);
+      try {
+        const docRef = doc(db, 'orders', cleanId);
+        await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
+        setSuccessMsg(`Order ${cleanId} added successfully!`);
         if (onSuccess) onSuccess(newRecord as OrderRecord);
+      } catch (fsErr) {
+        console.error('Error adding order record:', err);
+        setError('Failed to save order record. Please check your network connection.');
+        setIsSubmitting(false);
+        return;
       }
     }
 
@@ -511,6 +497,21 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
               </div>
             </div>
 
+            {/* Production TV Deck Toggle */}
+            <div className="pt-1">
+              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#832f5e]/5 border border-[#832f5e]/20 cursor-pointer font-bold text-slate-900 text-xs">
+                <input
+                  type="checkbox"
+                  checked={sendToProductionDeck}
+                  onChange={(e) => setSendToProductionDeck(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#832f5e] focus:ring-[#832f5e] cursor-pointer"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-[#832f5e]">Display on Production TV Deck Schedule</span>
+                  <span className="text-[10px] font-normal text-stone-500">Enable if this order requires workshop sub-assembly and 55&quot; TV monitoring</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Footer Actions */}

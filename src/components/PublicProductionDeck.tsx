@@ -228,11 +228,15 @@ export const PublicProductionDeck: React.FC = () => {
 
     const refreshTimer = setInterval(() => {
       fetchPublicOrders();
-    }, 30000);
+    }, 5000);
+
+    const handleFocus = () => fetchPublicOrders();
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       clearInterval(timer);
       clearInterval(refreshTimer);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

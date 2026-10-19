@@ -120,42 +120,56 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     }
 
     let staff: any = null;
-    if (cleanCode === 'admin' || cleanCode === 'zuboc' || cleanCode === 'zuboc2026' || cleanCode === '889900') {
-      staff = { id: 'Zuboc', name: 'Zuboc (ADMIN)', role: 'ADMIN', stationId: 'Packing-01', email: 'admin@zuboc.com' };
-    } else if (cleanCode === 'packing01' || cleanCode === 'floor' || cleanCode === 'operator' || cleanCode === '123456') {
-      staff = { id: 'Operator-01', name: 'Packing Operator', role: 'PACKER', stationId: 'Packing-01' };
-    } else {
+
+    // Direct Supabase Verification
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+      const { data: supaStaffs } = await client.from('staffs').select('*');
+      if (Array.isArray(supaStaffs) && supaStaffs.length > 0) {
+        const found = supaStaffs.find((s: any) => 
+          String(s.password || '').trim().toLowerCase() === cleanCode || 
+          String(s.id || '').trim().toLowerCase() === cleanCode ||
+          String(s.name || '').trim().toLowerCase() === cleanCode
+        );
+        if (found) staff = found;
+      }
+    } catch {}
+
+    // Local Cache Backup Check
+    if (!staff) {
       try {
         const cachedStaffs = localStorage.getItem('zuboc_staffs_cache');
         if (cachedStaffs) {
           const list = JSON.parse(cachedStaffs);
           if (Array.isArray(list)) {
             const found = list.find((s: any) => 
-              s.id?.toLowerCase() === cleanCode || 
-              s.name?.toLowerCase() === cleanCode ||
-              (s.password && s.password.toLowerCase() === cleanCode)
+              String(s.password || '').trim().toLowerCase() === cleanCode || 
+              String(s.id || '').trim().toLowerCase() === cleanCode ||
+              String(s.name || '').trim().toLowerCase() === cleanCode
             );
             if (found) staff = found;
           }
         }
       } catch {}
-
-      if (!staff) {
-        staff = {
-          id: 'op-' + Math.floor(Math.random() * 1000),
-          name: cleanCode.toUpperCase() + ' (Operator)',
-          role: 'SUPERVISOR',
-          stationId: 'Packing-01'
-        };
-      }
     }
 
-    return {
-      success: true,
-      token: `zuboc_token_${Date.now()}`,
-      staff,
-      message: `Access granted as ${staff.name}`
-    };
+    if (staff) {
+      return {
+        success: true,
+        token: `zuboc_token_${Date.now()}`,
+        staff: {
+          id: staff.id,
+          name: staff.name,
+          role: staff.role || 'PACKER',
+          stationId: staff.stationId || 'Packing-01',
+          email: staff.email
+        },
+        message: `Access granted as ${staff.name}`
+      };
+    }
+
+    return { success: false, error: 'Invalid Access Code or Passphrase. Access Denied.' };
   }
 
   // 2. Settings GET / POST

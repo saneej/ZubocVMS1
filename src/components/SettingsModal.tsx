@@ -278,6 +278,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setShowAddForm(false);
         await fetchStaffs();
         onStaffUpdated?.();
+        try {
+          const bc = new BroadcastChannel('zuboc_vms_sync');
+          bc.postMessage({ type: 'SYNC_REFRESH' });
+          bc.close();
+        } catch {}
       } else {
         throw new Error(res?.error || 'Failed to add staff member');
       }
@@ -307,6 +312,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setStaffActionSuccess(`Staff member ${staffName} removed.`);
         await fetchStaffs();
         onStaffUpdated?.();
+        try {
+          const bc = new BroadcastChannel('zuboc_vms_sync');
+          bc.postMessage({ type: 'SYNC_REFRESH' });
+          bc.close();
+        } catch {}
       } else {
         throw new Error(res?.error || 'Failed to remove staff');
       }
@@ -339,6 +349,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setResettingStaffId(null);
         setResetNewPassword('');
         await fetchStaffs();
+        try {
+          const bc = new BroadcastChannel('zuboc_vms_sync');
+          bc.postMessage({ type: 'SYNC_REFRESH' });
+          bc.close();
+        } catch {}
       } else {
         throw new Error(res?.error || 'Failed to reset password');
       }
