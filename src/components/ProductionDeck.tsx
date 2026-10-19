@@ -1407,7 +1407,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
 
 // New Job Modal & Capacity Modal
 interface NewFloorJobModalProps {
-  currentStaff: StaffMember;
+  currentStaff?: StaffMember | null;
   onClose: () => void;
   onCreated: (order: OrderRecord) => Promise<void>;
 }
@@ -1420,68 +1420,80 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
   const [totalBillingAmount, setTotalBillingAmount] = useState(24500);
   const [advanceReceived, setAdvanceReceived] = useState(12000);
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [customisations, setCustomisations] = useState<ZubocCustomisations>({
     goldFoil: true, digitalPrinting: true, screenPrinting: true, dieCutting: true, waxStamp: true, rubberStamp: false, embosserStamp: false, seals: true
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderId || !clientName) return;
+    if (!orderId || !clientName) {
+      alert('Please enter Job ID and Client Name');
+      return;
+    }
 
-    const now = new Date().toISOString();
-    const balance = Math.max(0, totalBillingAmount - advanceReceived);
+    setIsSubmitting(true);
+    try {
+      const now = new Date().toISOString();
+      const balance = Math.max(0, totalBillingAmount - advanceReceived);
 
-    const newRecord: OrderRecord = {
-      orderId,
-      staffId: currentStaff.id,
-      stationId: 'Floor-Deck',
-      recordingStartedAt: now,
-      durationSeconds: 0,
-      recordingStatus: 'PENDING',
-      uploadStatus: 'PENDING',
-      isProductionDeckOrder: true,
-      clientName,
-      product,
-      customerName: clientName,
-      productSku: product,
-      formFillingDate: now.slice(0, 10),
-      preparedBy: currentStaff.name,
-      checkedBy: 'Supervisor',
-      customisations,
-      subAssemblyProgress: {
-        envelopeDieCutting: false,
-        screenPrinting: false,
-        goldFoiling: false,
-        waxSealApplied: false,
-        curationCompleted: false,
-        photoshootCompleted: false,
-        qcPackedCompleted: false
-      },
-      productionStage: 'PRE_PRODUCTION',
-      promisedDeliveryDate,
-      dispatchDate: promisedDeliveryDate,
-      stageDueDates: {
-        PRE_PRODUCTION: promisedDeliveryDate,
-        CURATION_ASSEMBLY: promisedDeliveryDate,
-        PHOTOSHOOT: promisedDeliveryDate,
-        QC_PACKED: promisedDeliveryDate,
-        DISPATCHED: promisedDeliveryDate
-      },
-      paymentGate: { 
-        totalBillingAmount, 
-        advanceReceived, 
-        balanceAmount: balance, 
-        balanceStatus: balance <= 0 ? 'COMPLETED' : 'PENDING' 
-      },
-      fulfillmentStatus: 'Pending',
-      productionNotes: notes,
-      remarks: notes,
-      notes,
-      createdAt: now,
-      updatedAt: now
-    };
+      const newRecord: OrderRecord = {
+        orderId: orderId.trim(),
+        staffId: currentStaff?.id || 'Zuboc',
+        stationId: 'Floor-Deck',
+        recordingStartedAt: now,
+        durationSeconds: 0,
+        recordingStatus: 'PENDING',
+        uploadStatus: 'PENDING',
+        isProductionDeckOrder: true,
+        clientName: clientName.trim(),
+        product: product.trim() || 'Bespoke Wedding Suite',
+        customerName: clientName.trim(),
+        productSku: product.trim() || 'Bespoke Wedding Suite',
+        formFillingDate: now.slice(0, 10),
+        preparedBy: currentStaff?.name || 'Zuboc',
+        checkedBy: 'Supervisor',
+        customisations,
+        subAssemblyProgress: {
+          envelopeDieCutting: false,
+          screenPrinting: false,
+          goldFoiling: false,
+          waxSealApplied: false,
+          curationCompleted: false,
+          photoshootCompleted: false,
+          qcPackedCompleted: false
+        },
+        productionStage: 'PRE_PRODUCTION',
+        promisedDeliveryDate,
+        dispatchDate: promisedDeliveryDate,
+        stageDueDates: {
+          PRE_PRODUCTION: promisedDeliveryDate,
+          CURATION_ASSEMBLY: promisedDeliveryDate,
+          PHOTOSHOOT: promisedDeliveryDate,
+          QC_PACKED: promisedDeliveryDate,
+          DISPATCHED: promisedDeliveryDate
+        },
+        paymentGate: { 
+          totalBillingAmount, 
+          advanceReceived, 
+          balanceAmount: balance, 
+          balanceStatus: balance <= 0 ? 'COMPLETED' : 'PENDING' 
+        },
+        fulfillmentStatus: 'Pending',
+        productionNotes: notes,
+        remarks: notes,
+        notes,
+        createdAt: now,
+        updatedAt: now
+      };
 
-    await onCreated(newRecord);
+      await onCreated(newRecord);
+    } catch (err: any) {
+      console.error('Error creating production job:', err);
+      alert('Failed to save job: ' + (err?.message || 'Database write error'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1553,7 +1565,9 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
 
           <div className="flex items-center justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl bg-stone-100 font-bold">Cancel</button>
-            <button type="submit" className="px-5 py-2 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white font-bold uppercase tracking-wide cursor-pointer">Create Job</button>
+            <button type="submit" disabled={isSubmitting} className="px-5 py-2 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white font-bold uppercase tracking-wide cursor-pointer disabled:opacity-50">
+              {isSubmitting ? 'Creating Job...' : 'Create Job'}
+            </button>
           </div>
         </form>
       </div>
