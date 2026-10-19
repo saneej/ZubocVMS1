@@ -455,24 +455,7 @@ export const DiagnosePage: React.FC = () => {
                 className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${supabaseState.loading ? 'animate-spin' : ''}`} />
-                <span>Check Status</span>
-              </button>
-
-              <button
-                onClick={handleTestServerSupabase}
-                disabled={serverTestState.loading}
-                className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-indigo-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border border-indigo-100 shadow-xs"
-              >
-                <Database className={`w-3.5 h-3.5 ${serverTestState.loading ? 'animate-bounce' : ''}`} />
-                <span>Test Backend (Write/Read)</span>
-              </button>
-
-              <button
-                onClick={() => setShowSql(!showSql)}
-                className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Code className="w-3.5 h-3.5 text-stone-500" />
-                <span>{showSql ? 'Hide SQL Script' : 'View / Copy SQL Script'}</span>
+                <span>Refresh Status</span>
               </button>
             </div>
           </div>
@@ -482,35 +465,34 @@ export const DiagnosePage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-stone-600">Table Schema Status:</span>
                 {supabaseState.tableExists ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Database Tables Ready &amp; Connected
+                   <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Ready &amp; Connected
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Tables Not Detected Yet (Run SQL in Supabase)
+                    <AlertTriangle className="w-3.5 h-3.5" /> Setup Required
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-stone-500">
                 {supabaseState.tableExists 
-                  ? 'All 53 columns verified. Live read/write operations automatically sync with Supabase with zero quota limits.'
-                  : 'Please paste and run the SQL script in your Supabase SQL Editor once. Once tables are created, click Check Status.'}
+                  ? 'All 53 columns verified. Use the Control Center below for deep connectivity tests.'
+                  : 'Tables not detected. Ensure you have run the SQL script in your Supabase project.'}
               </p>
             </div>
 
-            <button
-              onClick={handleMigrateToSupabase}
-              disabled={isMigrating || !supabaseState.tableExists}
-              className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
-                supabaseState.tableExists
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
-                  : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-              }`}
-              title={supabaseState.tableExists ? 'Push all orders, staff and settings to Supabase' : 'Run SQL script first to enable data push'}
-            >
-              <UploadCloud className={`w-4 h-4 ${isMigrating ? 'animate-bounce' : ''}`} />
-              <span>{isMigrating ? 'Migrating Data...' : 'Push All Local Orders to Supabase'}</span>
-            </button>
+            {supabaseState.tableExists && (
+              <button
+                onClick={handleMigrateToSupabase}
+                disabled={isMigrating}
+                className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                  isMigrating ? 'bg-stone-200 text-stone-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                }`}
+              >
+                <UploadCloud className={`w-4 h-4 ${isMigrating ? 'animate-bounce' : ''}`} />
+                <span>{isMigrating ? 'Migrating...' : 'Sync Local Data to Supabase'}</span>
+              </button>
+            )}
           </div>
 
           {showSql && (
@@ -607,26 +589,76 @@ export const DiagnosePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Controls & Diagnostic Actions */}
-        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-          <h2 className="text-sm font-extrabold uppercase text-stone-800">Diagnostic Actions</h2>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={handleTestFirestoreRead}
-              disabled={dbStatus === 'TESTING'}
-              className="px-4 py-2.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${dbStatus === 'TESTING' ? 'animate-spin' : ''}`} />
-              <span>Test Firestore Connection &amp; Quota Reset</span>
-            </button>
+        {/* Consolidated Action Controls & Diagnostic Actions */}
+        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-5">
+          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+            <h2 className="text-sm font-extrabold uppercase text-stone-800 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#832f5e]" />
+              Diagnostic Control Center
+            </h2>
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase">Full Access Mode</span>
+          </div>
 
-            <button
-              onClick={handleClearCache}
-              className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
-            >
-              <Trash2 className="w-4 h-4 text-rose-600" />
-              <span>Clear Browser Cache</span>
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Database Tests Section */}
+            <div className="space-y-3">
+              <h3 className="text-[11px] font-black text-stone-500 uppercase tracking-wider">Database &amp; Connectivity Tests</h3>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleTestServerSupabase}
+                  disabled={serverTestState.loading}
+                  className="w-full px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Database className={`w-4 h-4 ${serverTestState.loading ? 'animate-bounce' : ''}`} />
+                  <span>{serverTestState.loading ? 'Testing Backend...' : 'Run Deep Backend Test (Write/Read)'}</span>
+                </button>
+
+                <button
+                  onClick={handleTestFirestoreRead}
+                  disabled={dbStatus === 'TESTING'}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${dbStatus === 'TESTING' ? 'animate-spin' : ''}`} />
+                  <span>Test Firestore Connection &amp; Quota</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Maintenance & Reports Section */}
+            <div className="space-y-3">
+              <h3 className="text-[11px] font-black text-stone-500 uppercase tracking-wider">Maintenance &amp; Support</h3>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={async () => {
+                    addLog('Fetching full system diagnostic report...', 'info');
+                    try {
+                      const data = await safeFetchJson('/api/diag/system-report');
+                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `zuboc-diag-report-${Date.now()}.json`;
+                      a.click();
+                      addLog('System report generated and downloaded successfully.', 'success');
+                    } catch (e: any) {
+                      addLog(`Failed to generate report: ${e.message}`, 'error');
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Code className="w-4 h-4 text-emerald-400" />
+                  <span>Download Detailed System Report</span>
+                </button>
+
+                <button
+                  onClick={handleClearCache}
+                  className="w-full px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold border border-stone-200 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Hard Purge Cache &amp; Unregister SW</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

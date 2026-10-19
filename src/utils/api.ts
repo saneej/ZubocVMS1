@@ -63,9 +63,9 @@ export async function safeFetchJson(path: string, options: RequestInit = {}): Pr
         throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
       }
       if (rawText.includes('A server error') || rawText.startsWith('<!DOCTYPE') || rawText.startsWith('<html')) {
-        throw new Error(`Server endpoint temporarily unavailable (HTTP ${response.status}). Direct protocol active.`);
+        throw new Error(`Server endpoint temporarily unavailable (HTTP ${response.status}). Details: ${rawText.slice(0, 500)}`);
       }
-      throw new Error(rawText ? rawText.slice(0, 150) : `HTTP ${response.status} ${response.statusText}`);
+      throw new Error(rawText ? rawText.slice(0, 500) : `HTTP ${response.status} ${response.statusText}`);
     }
     throw new Error(`API request failed for ${path}`);
   }

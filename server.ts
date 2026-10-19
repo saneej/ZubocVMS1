@@ -642,6 +642,51 @@ apiRouter.post('/settings', async (req, res) => {
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
 });
 
+// Detailed System Diagnostic Report
+apiRouter.get('/diag/system-report', async (req, res) => {
+  const report: any = {
+    timestamp: new Date().toISOString(),
+    environment: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      env: process.env.NODE_ENV,
+      port: PORT,
+      hasSupabaseUrl: Boolean(SUPABASE_URL),
+      hasSupabaseKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      hasFirebaseConfig: Boolean(firebaseApp),
+      hasTelegramToken: Boolean(settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN),
+    },
+    database: {
+      supabaseInitialized: Boolean(supabaseServer),
+      firebaseInitialized: Boolean(firestoreDb),
+      isSupabaseReady,
+      firestoreQuotaExceeded,
+    },
+    storage: {
+      dataFileExists: fs.existsSync(DATA_FILE),
+      tmpDataFileExists: fs.existsSync(TMP_DATA_FILE),
+      cwd: process.cwd(),
+      dirname: __dirname,
+    },
+    connectivity: {}
+  };
+
+  // Test Network
+  try {
+    const start = Date.now();
+    const netRes = await fetch('https://api.supabase.com/health', { method: 'GET' });
+    report.connectivity.supabaseApi = {
+      ok: netRes.ok,
+      status: netRes.status,
+      latencyMs: Date.now() - start
+    };
+  } catch (e: any) {
+    report.connectivity.supabaseApi = { ok: false, error: e.message };
+  }
+
+  res.json({ success: true, report });
+});
+
 // Server-side Supabase Test (Detailed Diagnostic)
 apiRouter.post('/supabase/test-server', async (req, res) => {
   try {
