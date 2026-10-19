@@ -377,7 +377,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
         tableExists: Boolean(res?.tableExists), 
         checking: false,
         error: res?.error || (res?.connected ? undefined : 'Disconnected'),
-        v: res?.v || 'v1.1'
+        v: res?.v || 'v1.2.1'
       });
       if (onRefreshOrders) onRefreshOrders();
     } catch (err: any) {

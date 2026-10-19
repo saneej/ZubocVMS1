@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import ffmpegPath from 'ffmpeg-static';
+// ffmpeg-static will be dynamically imported when needed to avoid startup crashes
 import { createClient } from '@supabase/supabase-js';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
@@ -26,7 +26,15 @@ async function transcodeToTelegramMp4(inputBuffer: Buffer, orderId: string): Pro
   try {
     fs.writeFileSync(inputPath, inputBuffer);
 
-    const bin = ffmpegPath || 'ffmpeg';
+    // Dynamic import to avoid startup issues in restricted environments
+    let bin = 'ffmpeg';
+    try {
+      const ffmpegStatic: any = await import('ffmpeg-static');
+      bin = ffmpegStatic.default || ffmpegStatic || 'ffmpeg';
+    } catch (e) {
+      console.warn('ffmpeg-static dynamic import failed, using system path:', e);
+    }
+    
     const cleanOrderId = orderId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const istTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' IST';
     const escapedTime = istTime.replace(/:/g, '\\:');
@@ -144,7 +152,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-// Utility to sanitize iOS smart punctuation dashes and extra whitespace
+// Extreme priority heartbeat for diagnostics
+app.get('/ping', (req, res) => res.send('OK-V1.2.1'));
+app.get('/api/ping-basic', (req, res) => res.json({ status: 'ok', v: '1.2.1-diag' }));
 function sanitizeString(str: any): string {
   if (typeof str !== 'string') return '';
   return str
@@ -230,31 +240,28 @@ try {
   console.error('Error initializing Firebase in server.ts:', e);
 }
 
-// Initialize Supabase Client
+// Lazy Initialize Supabase Client to prevent startup crashes
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.NAQ_B4oLhyLPLlnUeJGc9lJ1NPcO7oH0_e3ZxeAlrF4';
 
-let supabaseServer: any = null;
-let isSupabaseReady = false;
-
-try {
-  console.log('Supabase Init Check:', {
-    hasUrl: Boolean(process.env.SUPABASE_URL),
-    hasKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    url: SUPABASE_URL.substring(0, 20) + '...'
-  });
-  
-  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-    supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false }
-    });
-    console.log('Server initialized Supabase connection successfully.');
-  } else {
-    console.error('Supabase initialization failed: URL or Key missing.');
+let _supabaseServer: any = null;
+function getSupabaseClient() {
+  if (_supabaseServer) return _supabaseServer;
+  try {
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      _supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false }
+      });
+      console.log('Lazy: Supabase client initialized.');
+      return _supabaseServer;
+    }
+  } catch (e: any) {
+    console.error('Lazy: Supabase initialization error:', e?.message);
   }
-} catch (e: any) {
-  console.error('Error initializing Supabase in server.ts:', e?.message);
+  return null;
 }
+
+let isSupabaseReady = false;
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
 const TMP_DATA_FILE = '/tmp/vms_data.json';
@@ -405,13 +412,13 @@ function cleanForSupabase(obj: any): any {
 }
 
 async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
-  if (!supabaseServer) {
+  if (!getSupabaseClient()) {
     console.warn('Supabase save skipped: Client not initialized.');
     return false;
   }
   try {
     const payload = cleanForSupabase(record);
-    const { error } = await supabaseServer.from('orders').upsert(payload, { onConflict: 'orderId' });
+    const { error } = await getSupabaseClient().from('orders').upsert(payload, { onConflict: 'orderId' });
     if (error) {
       console.error(`Supabase save error for Order #${record.orderId}:`, error.message, error.code, error.details);
       if (error.code === '42P01') {
@@ -431,41 +438,41 @@ async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
 }
 
 async function deleteOrderFromSupabase(orderId: string) {
-  if (!supabaseServer) return;
+  if (!getSupabaseClient()) return;
   try {
-    await supabaseServer.from('orders').delete().eq('orderId', orderId);
+    await getSupabaseClient().from('orders').delete().eq('orderId', orderId);
   } catch {}
 }
 
 async function saveStaffToSupabase(staff: StaffMember) {
-  if (!supabaseServer) return;
+  if (!getSupabaseClient()) return;
   try {
-    await supabaseServer.from('staffs').upsert(cleanForSupabase(staff), { onConflict: 'id' });
+    await getSupabaseClient().from('staffs').upsert(cleanForSupabase(staff), { onConflict: 'id' });
   } catch {}
 }
 
 async function deleteStaffFromSupabase(staffId: string) {
-  if (!supabaseServer) return;
+  if (!getSupabaseClient()) return;
   try {
-    await supabaseServer.from('staffs').delete().eq('id', staffId);
+    await getSupabaseClient().from('staffs').delete().eq('id', staffId);
   } catch {}
 }
 
 async function saveSettingsToSupabase(sett: AppSettings) {
-  if (!supabaseServer) return;
+  if (!getSupabaseClient()) return;
   try {
-    await supabaseServer.from('settings').upsert({ id: 'config', ...cleanForSupabase(sett) }, { onConflict: 'id' });
+    await getSupabaseClient().from('settings').upsert({ id: 'config', ...cleanForSupabase(sett) }, { onConflict: 'id' });
   } catch {}
 }
 
 async function syncFromSupabase() {
-  if (!supabaseServer) {
+  if (!getSupabaseClient()) {
     console.warn('Initial sync skipped: Supabase client not initialized.');
     return;
   }
   try {
     console.log('Starting initial sync from Supabase...');
-    const { data: ords, error: ordErr } = await supabaseServer.from('orders').select('*').order('createdAt', { ascending: false });
+    const { data: ords, error: ordErr } = await getSupabaseClient().from('orders').select('*').order('createdAt', { ascending: false });
     if (ordErr) {
       console.error('Initial sync error (orders):', ordErr.message, ordErr.code);
     } else if (Array.isArray(ords)) {
@@ -476,7 +483,7 @@ async function syncFromSupabase() {
       console.log(`Synced ${ords.length} orders from Supabase successfully.`);
     }
 
-    const { data: stfs, error: stfErr } = await supabaseServer.from('staffs').select('*');
+    const { data: stfs, error: stfErr } = await getSupabaseClient().from('staffs').select('*');
     if (stfErr) {
       console.error('Initial sync error (staffs):', stfErr.message);
     } else if (Array.isArray(stfs)) {
@@ -486,7 +493,7 @@ async function syncFromSupabase() {
       console.log(`Synced ${stfs.length} staff members from Supabase.`);
     }
 
-    const { data: sett, error: settErr } = await supabaseServer.from('settings').select('*').eq('id', 'config').maybeSingle();
+    const { data: sett, error: settErr } = await getSupabaseClient().from('settings').select('*').eq('id', 'config').maybeSingle();
     if (settErr) {
       console.error('Initial sync error (settings):', settErr.message);
     } else if (sett) {
@@ -498,8 +505,8 @@ async function syncFromSupabase() {
   }
 }
 
-// Initial sync check with Supabase
-syncFromSupabase();
+// Initial sync check with Supabase - moved inside startServer to prevent startup hangs
+// syncFromSupabase();
 
 let lastStaffsSyncTime = 0;
 
@@ -703,7 +710,7 @@ apiRouter.get('/diag/system-report', async (req, res) => {
         hasFirebaseConfig: Boolean(firebaseApp),
       },
       database: {
-        supabaseInitialized: Boolean(supabaseServer),
+        supabaseInitialized: Boolean(getSupabaseClient()),
         firebaseInitialized: Boolean(firestoreDb),
         isSupabaseReady,
         firestoreQuotaExceeded,
@@ -743,10 +750,11 @@ apiRouter.get('/diag/system-report', async (req, res) => {
 // Server-side Supabase Test (Detailed Diagnostic)
 apiRouter.post('/supabase/test-server', async (req, res) => {
   try {
-    if (!supabaseServer) {
+    const client = getSupabaseClient();
+    if (!client) {
       return res.json({ 
         success: false, 
-        error: 'Supabase server client not initialized. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set correctly.' 
+        error: 'Supabase server client not initialized. Check server logs for initialization errors.' 
       });
     }
 
@@ -762,7 +770,7 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
     };
 
     // 1. Attempt Write (Upsert)
-    const { error: insertErr } = await supabaseServer
+    const { error: insertErr } = await client
       .from('orders')
       .upsert(testRecord, { onConflict: 'orderId' });
 
@@ -777,7 +785,7 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
     }
 
     // 2. Attempt Read
-    const { data: readData, error: readErr } = await supabaseServer
+    const { data: readData, error: readErr } = await client
       .from('orders')
       .select('*')
       .eq('orderId', testId)
@@ -792,7 +800,7 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
     }
 
     // 3. Attempt Delete (Cleanup)
-    const { error: deleteErr } = await supabaseServer
+    const { error: deleteErr } = await client
       .from('orders')
       .delete()
       .eq('orderId', testId);
@@ -806,7 +814,7 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
       message: 'Server-side Supabase connection is fully healthy (Read/Write/Delete verified).',
       project: SUPABASE_URL.split('://')[1]?.split('.')[0] || 'hidden',
       usingServiceRole: true,
-      v: '1.2.0-diag'
+      v: '1.2.1-diag'
     });
 
   } catch (err: any) {
@@ -822,30 +830,32 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
 
 // Supabase Status check endpoint
 apiRouter.get('/supabase/status', async (req, res) => {
-  if (!supabaseServer) {
-    return res.json({ connected: false, error: 'No client initialized' });
+  const client = getSupabaseClient();
+  if (!client) {
+    return res.json({ connected: false, error: 'No client initialized', v: '1.2.1-diag' });
   }
   try {
-    const { data, error } = await supabaseServer.from('orders').select('orderId').limit(1);
+    const { data, error } = await client.from('orders').select('orderId').limit(1);
     if (error) {
       return res.json({
         connected: false,
         tableExists: false,
         code: error.code,
-        message: error.message
+        message: error.message,
+        v: '1.2.1-diag'
       });
     }
     return res.json({
       connected: true,
       tableExists: true,
-      v: '1.2.0-diag',
+      v: '1.2.1-diag',
       sampleCount: data ? data.length : 0
     });
   } catch (err: any) {
     return res.json({
       connected: false,
       error: err.message,
-      v: '1.2.0-diag'
+      v: '1.2.1-diag'
     });
   }
 });
@@ -854,23 +864,23 @@ apiRouter.get('/supabase/status', async (req, res) => {
 
 // Push/Migrate all current in-memory orders, staffs, and settings to Supabase
 apiRouter.post('/supabase/migrate', async (req, res) => {
-  if (!supabaseServer) {
+  if (!getSupabaseClient()) {
     return res.status(500).json({ error: 'Supabase client not initialized' });
   }
   try {
     const ordersList = Object.values(ordersStore);
     let ordersUploaded = 0;
     for (const ord of ordersList) {
-      const { error } = await supabaseServer.from('orders').upsert(cleanForSupabase(ord), { onConflict: 'orderId' });
+      const { error } = await getSupabaseClient().from('orders').upsert(cleanForSupabase(ord), { onConflict: 'orderId' });
       if (!error) ordersUploaded++;
     }
 
     const staffsList = Object.values(staffsStore);
     for (const st of staffsList) {
-      await supabaseServer.from('staffs').upsert(cleanForSupabase(st), { onConflict: 'id' });
+      await getSupabaseClient().from('staffs').upsert(cleanForSupabase(st), { onConflict: 'id' });
     }
 
-    await supabaseServer.from('settings').upsert({ id: 'config', ...cleanForSupabase(settings) }, { onConflict: 'id' });
+    await getSupabaseClient().from('settings').upsert({ id: 'config', ...cleanForSupabase(settings) }, { onConflict: 'id' });
 
     res.json({
       success: true,
@@ -884,9 +894,9 @@ apiRouter.post('/supabase/migrate', async (req, res) => {
 
 // Staffs GET - Syncs live from Supabase
 apiRouter.get('/staffs', async (req, res) => {
-  if (supabaseServer) {
+  if (getSupabaseClient()) {
     try {
-      const { data: supaStaffs, error } = await supabaseServer.from('staffs').select('*');
+      const { data: supaStaffs, error } = await getSupabaseClient().from('staffs').select('*');
       if (!error && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
         const freshMap: Record<string, StaffMember> = {};
         for (const s of supaStaffs) {
@@ -1068,9 +1078,9 @@ apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
   let authenticatedStaff: StaffMember | null = null;
 
   // 1. Fetch fresh staffs from Supabase
-  if (supabaseServer) {
+  if (getSupabaseClient()) {
     try {
-      const { data: supaStaffs } = await supabaseServer.from('staffs').select('*');
+      const { data: supaStaffs } = await getSupabaseClient().from('staffs').select('*');
       if (supaStaffs && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
         const freshMap: Record<string, StaffMember> = {};
         for (const s of supaStaffs) {
@@ -1171,9 +1181,9 @@ apiRouter.post('/auth/login', async (req, res) => {
 
 // Orders GET - Syncs latest orders from Supabase and serves them
 apiRouter.get('/orders', async (req, res) => {
-  if (supabaseServer) {
+  if (getSupabaseClient()) {
     try {
-      const { data: supaOrders, error } = await supabaseServer
+      const { data: supaOrders, error } = await getSupabaseClient()
         .from('orders')
         .select('*')
         .order('createdAt', { ascending: false });
@@ -1226,9 +1236,9 @@ apiRouter.get('/orders/:orderId', async (req, res) => {
   }
 
   // 3. Fallback to Supabase
-  if (supabaseServer) {
+  if (getSupabaseClient()) {
     try {
-      const { data: supaOrder } = await supabaseServer
+      const { data: supaOrder } = await getSupabaseClient()
         .from('orders')
         .select('*')
         .or(`orderId.eq.${orderId},orderId.eq.${cleanId}`)
@@ -2197,7 +2207,9 @@ async function startServer() {
 
   if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Zuboc VMS Server running on http://localhost:${PORT}`);
+      console.log(`Zuboc VMS Server (v1.2.1-diag) running on http://localhost:${PORT}`);
+      // Initial sync in background to avoid blocking startup
+      syncFromSupabase().catch(e => console.error('Background sync error:', e));
     });
   }
 }

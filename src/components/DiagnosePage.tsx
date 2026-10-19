@@ -179,6 +179,25 @@ export const DiagnosePage: React.FC = () => {
   const [sqlCopied, setSqlCopied] = useState(false);
   const [serverTestState, setServerTestState] = useState<{ loading: boolean; result?: any }>({ loading: false });
 
+  const [systemReport, setSystemReport] = useState<{ loading: boolean; data?: any }>({ loading: false });
+
+  const handleRunSystemReport = async () => {
+    setSystemReport({ loading: true });
+    addLog('Requesting complete system health audit...', 'info');
+    try {
+      const res = await safeFetchJson('/api/diag/system-report');
+      setSystemReport({ loading: false, data: res });
+      if (res.success) {
+        addLog('System report generated successfully.', 'success');
+      } else {
+        addLog(`System report failed: ${res.error}`, 'error');
+      }
+    } catch (err: any) {
+      setSystemReport({ loading: false, data: { success: false, error: err.message } });
+      addLog(`Communication crash: ${err.message}`, 'error');
+    }
+  };
+
   const handleTestServerSupabase = async () => {
     setServerTestState({ loading: true });
     addLog('Running deep server-side Supabase Read/Write test...', 'info');
@@ -455,7 +474,7 @@ export const DiagnosePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={checkSupabaseStatus}
                 disabled={supabaseState.loading}
@@ -464,8 +483,48 @@ export const DiagnosePage: React.FC = () => {
                 <RefreshCw className={`w-3.5 h-3.5 ${supabaseState.loading ? 'animate-spin' : ''}`} />
                 <span>Refresh Status</span>
               </button>
+
+              <button
+                onClick={handleTestServerSupabase}
+                disabled={serverTestState.loading}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                {serverTestState.loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                <span>Test Write/Read</span>
+              </button>
+
+              <button
+                onClick={handleRunSystemReport}
+                disabled={systemReport.loading}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                {systemReport.loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                <span>System Audit Report</span>
+              </button>
             </div>
           </div>
+
+          {systemReport.data && (
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Full System Diagnostic Output:</span>
+                <span className={`text-[10px] font-bold ${systemReport.data.success ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {systemReport.data.success ? '✓ REPORT GENERATED' : '✗ AUDIT FAILED'}
+                </span>
+              </div>
+              <pre className="text-[10px] font-mono bg-white p-3 rounded-lg border border-slate-200 max-h-60 overflow-y-auto whitespace-pre-wrap">
+                {JSON.stringify(systemReport.data, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {serverTestState.result && (
+            <div className="p-4 rounded-xl border border-stone-200 bg-stone-50 space-y-2">
+               <pre className="text-[10px] font-mono bg-white p-3 rounded-lg border border-stone-200 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                {JSON.stringify(serverTestState.result, null, 2)}
+              </pre>
+            </div>
+          )}
 
           <div className="p-4 rounded-xl border border-stone-200 bg-stone-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="space-y-1">

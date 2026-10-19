@@ -36,7 +36,22 @@ export default defineConfig(() => {
           type: 'module'
         },
         workbox: {
-          maximumFileSizeToCacheInBytes: 5000000
+          maximumFileSizeToCacheInBytes: 5000000,
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith('/api/') || url.pathname.includes('/supabase/') || url.pathname === '/ping',
+              handler: 'NetworkOnly',
+              options: {
+                cacheName: 'api-cache',
+                backgroundSync: {
+                  name: 'api-sync',
+                  options: {
+                    maxRetentionTime: 24 * 60
+                  }
+                }
+              }
+            }
+          ]
         }
       })
     ],
