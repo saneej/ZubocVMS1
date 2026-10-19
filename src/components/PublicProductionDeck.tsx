@@ -132,9 +132,11 @@ export const PublicProductionDeck: React.FC = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(3600); // 1 hour
 
   const fetchPublicOrders = async () => {
+    setIsSyncing(true);
     try {
       const cached = localStorage.getItem('zuboc_orders_cache');
       if (cached) {
@@ -156,6 +158,7 @@ export const PublicProductionDeck: React.FC = () => {
       console.warn('Public fetch warning:', e);
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
   };
 
@@ -176,6 +179,11 @@ export const PublicProductionDeck: React.FC = () => {
       clearInterval(countTimer);
     };
   }, []);
+
+  const handleManualSync = () => {
+    fetchPublicOrders();
+    setCountdown(3600);
+  };
 
   const normalizedList = useMemo(() => {
     return orders.map(ord => ({
@@ -215,8 +223,8 @@ export const PublicProductionDeck: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-slate-900 flex flex-col font-sans antialiased selection:bg-[#832f5e] selection:text-white">
       
-      {/* Minimal Clean Header */}
-      <header className="px-6 py-5 bg-white border-b border-stone-200/60 flex items-center justify-between sticky top-0 z-40">
+      {/* Minimal Clean Header with Manual Sync Button */}
+      <header className="px-6 py-5 bg-white border-b border-stone-200/60 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
         <div className="flex items-center gap-5">
           <img 
             src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=500" 
@@ -224,19 +232,30 @@ export const PublicProductionDeck: React.FC = () => {
             className="h-7 w-auto object-contain"
           />
           <div className="h-4 w-px bg-stone-200"></div>
-          <span className="text-xs font-bold uppercase tracking-widest text-stone-500 font-mono">
+          <span className="text-xs font-bold uppercase tracking-widest text-stone-500 font-mono hidden sm:inline">
             Live Production Schedule
           </span>
         </div>
 
         <div className="flex items-center gap-3 text-xs font-mono">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-stone-100 text-stone-700">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-stone-100 text-stone-700">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Active: {activeOrdersCount}</span>
           </div>
-          <div className="text-stone-400">
-            Sync: {formatCountdown(countdown)}
-          </div>
+
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            title="Click to sync now"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+          </button>
+
+          <span className="text-stone-400 text-[11px] hidden lg:inline">
+            Next: {formatCountdown(countdown)}
+          </span>
         </div>
       </header>
 
