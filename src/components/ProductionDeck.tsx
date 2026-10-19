@@ -521,43 +521,9 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   };
 
   return (
-    <div className="flex flex-col bg-[#F4F6F9] text-slate-900 min-h-screen font-sans antialiased selection:bg-[#832f5e] selection:text-white">
+    <div className={`flex flex-col min-h-screen font-sans antialiased selection:bg-[#832f5e] selection:text-white ${isTvWallMode ? 'bg-slate-950 text-slate-100' : 'bg-[#F4F6F9] text-slate-900'}`}>
       
-      {/* =========================================================================
-          TOP HEADER & CAPACITY BAR (BRIGHT MINIMAL PROFESSIONAL UI)
-          ========================================================================= */}
-      {/* =========================================================================
-          TOP HEADER & CAPACITY BAR (BRIGHT MINIMAL PROFESSIONAL UI / TV MODE)
-          ========================================================================= */}
-      {isTvWallMode ? (
-        <header className="sticky top-0 z-40 px-6 py-3 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#832f5e] text-white flex items-center justify-center font-bold">
-              <Tv className="w-4 h-4" />
-            </div>
-            <div>
-              <h1 className="text-sm font-black tracking-wide uppercase font-sans flex items-center gap-2">
-                <span>Zuboc Live Production Deck</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  LIVE TV MODE
-                </span>
-              </h1>
-              <p className="text-[10px] text-slate-400 font-mono">
-                Active Orders: <strong className="text-white">{activeOrdersCount}</strong> | Due Today: <strong className="text-rose-400">{urgentDueTodayCount}</strong>
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsTvWallMode(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold font-mono border border-slate-700 cursor-pointer flex items-center gap-1.5 shadow-sm"
-            >
-              <Minimize2 className="w-4 h-4 text-amber-400" />
-              <span>Exit TV Mode</span>
-            </button>
-          </div>
-        </header>
-      ) : (
+      {!isTvWallMode && (
         <header className="sticky top-0 z-40 px-6 py-4 bg-white/95 backdrop-blur-md border-b border-slate-200 text-slate-900 shadow-xs">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
@@ -722,10 +688,10 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
       {isTvWallMode && (
         <button
           onClick={() => setIsTvWallMode(false)}
-          className="fixed bottom-4 right-4 z-50 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 shadow-2xl flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-slate-800"
+          className="fixed top-3 right-3 z-50 px-3.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800 shadow-xl flex items-center gap-1.5 text-xs font-bold cursor-pointer backdrop-blur-md"
         >
           <Minimize2 className="w-4 h-4 text-amber-400" />
-          <span>Exit TV Wall Mode</span>
+          <span>Exit TV Mode</span>
         </button>
       )}
 
