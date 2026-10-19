@@ -364,6 +364,23 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     };
   }, [isAutoScrollActive, isUserHovering, scrollSpeed]);
 
+  const [supabaseDiag, setSupabaseDiag] = useState<{ connected?: boolean; tableExists?: boolean; checking?: boolean }>({});
+
+  const checkSupabaseHealth = async () => {
+    setSupabaseDiag(p => ({ ...p, checking: true }));
+    try {
+      const res = await fetch('/api/supabase/status').then(r => r.json());
+      setSupabaseDiag({ connected: res.connected, tableExists: res.tableExists, checking: false });
+      if (onRefreshOrders) onRefreshOrders();
+    } catch {
+      setSupabaseDiag({ connected: false, checking: false });
+    }
+  };
+
+  useEffect(() => {
+    checkSupabaseHealth();
+  }, []);
+
   const normalizedList = useMemo(() => {
     return orders.filter(ord => ord.isProductionDeckOrder).map(ord => ({
       raw: ord,
@@ -596,6 +613,19 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
             {/* Right Action Tools */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={checkSupabaseHealth}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-stone-50 border-stone-200 text-xs font-bold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+                title="Live Supabase Connection & Diagnostics"
+              >
+                <span className={`w-2 h-2 rounded-full ${supabaseDiag.connected && supabaseDiag.tableExists ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <span className="font-mono text-[11px]">
+                  {supabaseDiag.checking ? 'Checking DB...' : supabaseDiag.connected && supabaseDiag.tableExists ? 'Supabase DB Live' : 'Checking DB'}
+                </span>
+                <RefreshCw className={`w-3.5 h-3.5 text-stone-500 ${supabaseDiag.checking ? 'animate-spin' : ''}`} />
+              </button>
+
               <button
                 onClick={() => setIsNewOrderModalOpen(true)}
                 className="px-3 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"

@@ -868,8 +868,24 @@ apiRouter.post('/auth/login', async (req, res) => {
   });
 });
 
-// Orders GET - Serves fast from server memory, consuming ZERO Firestore read units
+// Orders GET - Syncs latest orders from Supabase and serves them
 apiRouter.get('/orders', async (req, res) => {
+  if (supabaseServer) {
+    try {
+      const { data: supaOrders, error } = await supabaseServer
+        .from('orders')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      if (!error && Array.isArray(supaOrders)) {
+        for (const o of supaOrders) {
+          if (o.orderId) ordersStore[o.orderId] = o;
+        }
+      }
+    } catch (e: any) {
+      console.warn('Supabase sync warning on GET /orders:', e?.message);
+    }
+  }
+
   const orders = Object.values(ordersStore).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
