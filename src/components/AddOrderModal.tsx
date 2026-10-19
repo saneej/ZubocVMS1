@@ -48,6 +48,15 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const quickCouriers = ['Delhivery', 'Blue Dart', 'DTDC', 'Shiprocket', 'Ekart', 'Xpressbees', 'India Post'];
 
+  const saveOrderToLocalStore = (record: OrderRecord) => {
+    try {
+      const raw = localStorage.getItem('zuboc_orders_cache');
+      const orders: OrderRecord[] = raw ? JSON.parse(raw) : [];
+      const next = [record, ...orders.filter(o => o.orderId !== record.orderId)];
+      localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
+    } catch {}
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanId = orderId.trim();
@@ -107,16 +116,23 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setSuccessMsg(`Order ${cleanId} added successfully!`);
       if (onSuccess) onSuccess((res && res.record) ? res.record : newRecord as OrderRecord);
     } catch (err) {
-      try {
-        const docRef = doc(db, 'orders', cleanId);
-        await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
-        setSuccessMsg(`Order ${cleanId} added successfully!`);
+      if (db) {
+        try {
+          const docRef = doc(db, 'orders', cleanId);
+          await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
+          setSuccessMsg(`Order ${cleanId} added successfully!`);
+          if (onSuccess) onSuccess(newRecord as OrderRecord);
+        } catch (fsErr) {
+          console.warn('Direct Firestore save failed, fallback to local storage:', fsErr);
+          saveOrderToLocalStore(newRecord as OrderRecord);
+          setSuccessMsg(`Order ${cleanId} saved locally!`);
+          if (onSuccess) onSuccess(newRecord as OrderRecord);
+        }
+      } else {
+        // Pure Localhost Mode
+        saveOrderToLocalStore(newRecord as OrderRecord);
+        setSuccessMsg(`Order ${cleanId} saved locally!`);
         if (onSuccess) onSuccess(newRecord as OrderRecord);
-      } catch (fsErr) {
-        console.error('Error adding order record:', err);
-        setError('Failed to save order record. Please check your network connection.');
-        setIsSubmitting(false);
-        return;
       }
     }
 

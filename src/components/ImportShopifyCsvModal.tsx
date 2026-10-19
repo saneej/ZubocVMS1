@@ -22,9 +22,7 @@ import {
 } from '../utils/shopifyCsvParser';
 import { safeFetchJson } from '../utils/api';
 import { OrderRecord } from '../types';
-import { db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
-import { cleanForFirestore } from '../utils/firestoreHelper';
+
 
 interface ImportShopifyCsvModalProps {
   isOpen: boolean;

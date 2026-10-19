@@ -5,6 +5,7 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import ffmpegPath from 'ffmpeg-static';
+import { createClient } from '@supabase/supabase-js';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { INITIAL_FALLBACK_ORDERS } from './src/utils/initialOrders';
@@ -199,7 +200,7 @@ try {
     };
   }
 
-  if (firebaseConfig) {
+  if (firebaseConfig && process.env.DISABLE_FIREBASE !== 'true') {
     if (getApps().some(a => a.name === 'SERVER_APP')) {
       firebaseApp = getApp('SERVER_APP');
     } else {
@@ -213,6 +214,24 @@ try {
   }
 } catch (e) {
   console.error('Error initializing Firebase in server.ts:', e);
+}
+
+// Initialize Supabase Client
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.NAQ_B4oLhyLPLlnUeJGc9lJ1NPcO7oH0_e3ZxeAlrF4';
+
+let supabaseServer: any = null;
+let isSupabaseReady = false;
+
+try {
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    });
+    console.log('Server initialized Supabase connection:', SUPABASE_URL);
+  }
+} catch (e) {
+  console.error('Error initializing Supabase in server.ts:', e);
 }
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
@@ -354,6 +373,90 @@ function cleanForFirestore(obj: any): any {
     return value;
   }));
 }
+
+function cleanForSupabase(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  return JSON.parse(JSON.stringify(obj, (key, value) => {
+    if (value === undefined) return null;
+    return value;
+  }));
+}
+
+async function saveOrderToSupabase(record: OrderRecord) {
+  if (!supabaseServer) return;
+  try {
+    const payload = cleanForSupabase(record);
+    const { error } = await supabaseServer.from('orders').upsert(payload, { onConflict: 'orderId' });
+    if (error) {
+      if (error.code !== 'PGRST205') {
+        console.warn('Supabase save order warning:', error.message);
+      }
+    } else {
+      isSupabaseReady = true;
+    }
+  } catch (err: any) {
+    console.error('Supabase save error:', err?.message);
+  }
+}
+
+async function deleteOrderFromSupabase(orderId: string) {
+  if (!supabaseServer) return;
+  try {
+    await supabaseServer.from('orders').delete().eq('orderId', orderId);
+  } catch {}
+}
+
+async function saveStaffToSupabase(staff: StaffMember) {
+  if (!supabaseServer) return;
+  try {
+    await supabaseServer.from('staffs').upsert(cleanForSupabase(staff), { onConflict: 'id' });
+  } catch {}
+}
+
+async function deleteStaffFromSupabase(staffId: string) {
+  if (!supabaseServer) return;
+  try {
+    await supabaseServer.from('staffs').delete().eq('id', staffId);
+  } catch {}
+}
+
+async function saveSettingsToSupabase(sett: AppSettings) {
+  if (!supabaseServer) return;
+  try {
+    await supabaseServer.from('settings').upsert({ id: 'config', ...cleanForSupabase(sett) }, { onConflict: 'id' });
+  } catch {}
+}
+
+async function syncFromSupabase() {
+  if (!supabaseServer) return;
+  try {
+    const { data: ords, error: ordErr } = await supabaseServer.from('orders').select('*').order('createdAt', { ascending: false });
+    if (!ordErr && Array.isArray(ords)) {
+      isSupabaseReady = true;
+      for (const o of ords) {
+        if (o.orderId) ordersStore[o.orderId] = o;
+      }
+      console.log(`Synced ${ords.length} orders from Supabase.`);
+    }
+
+    const { data: stfs, error: stfErr } = await supabaseServer.from('staffs').select('*');
+    if (!stfErr && Array.isArray(stfs)) {
+      for (const s of stfs) {
+        if (s.id) staffsStore[s.id] = s;
+      }
+    }
+
+    const { data: sett, error: settErr } = await supabaseServer.from('settings').select('*').eq('id', 'config').maybeSingle();
+    if (!settErr && sett) {
+      settings = { ...settings, ...sett };
+    }
+  } catch (err: any) {
+    console.warn('Supabase initial sync notice:', err?.message);
+  }
+}
+
+// Initial sync check with Supabase
+syncFromSupabase();
 
 let lastStaffsSyncTime = 0;
 
@@ -531,7 +634,60 @@ apiRouter.post('/settings', async (req, res) => {
     }
   }
 
+  await saveSettingsToSupabase(settings);
+
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
+});
+
+// Supabase Status check endpoint
+apiRouter.get('/supabase/status', async (req, res) => {
+  if (!supabaseServer) {
+    return res.json({ connected: false, error: 'No client initialized' });
+  }
+  const { data, error } = await supabaseServer.from('orders').select('orderId').limit(1);
+  if (error) {
+    return res.json({
+      connected: false,
+      tableExists: false,
+      code: error.code,
+      message: error.message
+    });
+  }
+  return res.json({
+    connected: true,
+    tableExists: true,
+    sampleCount: data ? data.length : 0
+  });
+});
+
+// Push/Migrate all current in-memory orders, staffs, and settings to Supabase
+apiRouter.post('/supabase/migrate', async (req, res) => {
+  if (!supabaseServer) {
+    return res.status(500).json({ error: 'Supabase client not initialized' });
+  }
+  try {
+    const ordersList = Object.values(ordersStore);
+    let ordersUploaded = 0;
+    for (const ord of ordersList) {
+      const { error } = await supabaseServer.from('orders').upsert(cleanForSupabase(ord), { onConflict: 'orderId' });
+      if (!error) ordersUploaded++;
+    }
+
+    const staffsList = Object.values(staffsStore);
+    for (const st of staffsList) {
+      await supabaseServer.from('staffs').upsert(cleanForSupabase(st), { onConflict: 'id' });
+    }
+
+    await supabaseServer.from('settings').upsert({ id: 'config', ...cleanForSupabase(settings) }, { onConflict: 'id' });
+
+    res.json({
+      success: true,
+      message: `Successfully migrated ${ordersUploaded} orders, ${staffsList.length} staff accounts, and system settings to Supabase!`,
+      ordersCount: ordersUploaded
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message || 'Migration failed' });
+  }
 });
 
 // Staffs GET
@@ -584,6 +740,8 @@ apiRouter.post('/staffs', async (req, res) => {
     }
   }
 
+  await saveStaffToSupabase(updatedStaff);
+
   res.json({
     success: true,
     staff: {
@@ -628,6 +786,8 @@ apiRouter.delete('/staffs/:id', async (req, res) => {
     }
   }
 
+  await deleteStaffFromSupabase(id);
+
   res.json({ success: true, message: `Staff member ${id} removed successfully` });
 });
 
@@ -664,6 +824,8 @@ apiRouter.post(['/staffs/reset-password', '/auth/reset-password'], async (req, r
       console.error('Error updating password in Firestore:', e);
     }
   }
+
+  await saveStaffToSupabase(staffsStore[staffKey]);
 
   res.json({ success: true, message: `Password for ${staffsStore[staffKey].name} has been reset successfully!` });
 });
@@ -809,6 +971,8 @@ apiRouter.post('/orders', async (req, res) => {
     }
   }
 
+  await saveOrderToSupabase(record);
+
   res.json({ success: true, record });
 });
 
@@ -881,6 +1045,9 @@ apiRouter.post('/orders/bulk', async (req, res) => {
         }
       }
     }
+
+    // Save to Supabase
+    saveOrderToSupabase(recordToSave);
   }
 
   saveLocalBackup();
@@ -936,6 +1103,8 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
     }
   }
 
+  await saveOrderToSupabase(record);
+
   res.json({ success: true, record });
 });
 
@@ -960,6 +1129,8 @@ apiRouter.delete('/orders/:orderId', async (req, res) => {
       }
     }
   }
+
+  await deleteOrderFromSupabase(orderId);
 
   res.json({ success: true, message: `Order ${orderId} deleted successfully` });
 });

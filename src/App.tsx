@@ -80,8 +80,8 @@ const AppContent: React.FC = () => {
       }
     } catch {}
 
-    // 3. Only query direct Firestore if cache was completely empty and quota not exceeded
-    if (!hasCached && !isFirestoreQuotaExceeded) {
+    // 3. Only query direct Firestore if cache was completely empty, db is initialized, and quota not exceeded
+    if (!hasCached && !isFirestoreQuotaExceeded && db) {
       try {
         const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(25));
         const snap = await getDocs(q);

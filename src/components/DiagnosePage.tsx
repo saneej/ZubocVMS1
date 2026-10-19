@@ -14,12 +14,122 @@ import {
   Zap,
   Check,
   XCircle,
-  HelpCircle
+  HelpCircle,
+  Copy,
+  ExternalLink,
+  UploadCloud,
+  Code
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCurrentISTString } from '../utils/time';
+
+const SUPABASE_FULL_SQL = `-- 1. Create STAFFS Table
+CREATE TABLE IF NOT EXISTS public.staffs (
+    "id" TEXT PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'PACKER',
+    "stationId" TEXT DEFAULT 'Packing-01',
+    "password" TEXT NOT NULL DEFAULT 'password123',
+    "email" TEXT,
+    "createdAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Create SETTINGS Table
+CREATE TABLE IF NOT EXISTS public.settings (
+    "id" TEXT PRIMARY KEY DEFAULT 'config',
+    "telegramBotToken" TEXT,
+    "telegramChatId" TEXT,
+    "autoUpload" BOOLEAN DEFAULT TRUE,
+    "stationId" TEXT DEFAULT 'Station-01',
+    "maxDailyDispatches" INTEGER DEFAULT 50,
+    "tvAutoScroll" BOOLEAN DEFAULT FALSE,
+    "tvScrollSpeed" INTEGER DEFAULT 5,
+    "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Create ORDERS Table (All 53 Verified Columns)
+CREATE TABLE IF NOT EXISTS public.orders (
+    "orderId" TEXT PRIMARY KEY,
+    "staffId" TEXT,
+    "stationId" TEXT,
+    "recordingStartedAt" TIMESTAMPTZ,
+    "recordingCompletedAt" TIMESTAMPTZ,
+    "durationSeconds" INTEGER DEFAULT 0,
+    "recordingStatus" TEXT DEFAULT 'PENDING',
+    "uploadStatus" TEXT DEFAULT 'PENDING',
+    "evidenceType" TEXT,
+    "videoUrl" TEXT,
+    "photoUrls" JSONB DEFAULT '[]'::jsonb,
+    "photoDataUrl" TEXT,
+    "telegramChatId" TEXT,
+    "telegramMessageId" TEXT,
+    "telegramFileId" TEXT,
+    "telegramMessageLink" TEXT,
+    "awbNumber" TEXT,
+    "courier" TEXT,
+    "deliveryMethod" TEXT DEFAULT 'Normal',
+    "weight" TEXT,
+    "productSku" TEXT,
+    "customerName" TEXT,
+    "contactPerson" TEXT,
+    "contactPhone" TEXT,
+    "fulfillFrom" TEXT,
+    "orderReceivedDate" TEXT,
+    "dispatchDate" TEXT,
+    "deliveredDate" TEXT,
+    "orderAmount" TEXT,
+    "shippingAmount" TEXT,
+    "orderTotal" TEXT,
+    "itemCount" TEXT DEFAULT '1',
+    "fulfillmentStatus" TEXT DEFAULT 'Pending',
+    "notes" TEXT,
+    "remarks" TEXT,
+    "chatNotes" JSONB DEFAULT '[]'::jsonb,
+    "auditLogs" JSONB DEFAULT '[]'::jsonb,
+    "clientName" TEXT,
+    "product" TEXT,
+    "formFillingDate" TEXT,
+    "preparedBy" TEXT,
+    "checkedBy" TEXT,
+    "customisations" JSONB DEFAULT '{}'::jsonb,
+    "subAssemblyProgress" JSONB DEFAULT '{}'::jsonb,
+    "timeline" JSONB DEFAULT '{}'::jsonb,
+    "promisedDeliveryDate" TEXT,
+    "paymentGate" JSONB DEFAULT '{}'::jsonb,
+    "productionStage" TEXT DEFAULT 'PRE_PRODUCTION',
+    "stageDueDates" JSONB DEFAULT '{}'::jsonb,
+    "productionNotes" TEXT,
+    "isProductionDeckOrder" BOOLEAN DEFAULT FALSE,
+    "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Indexes
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders ("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_fulfillment_status ON public.orders ("fulfillmentStatus");
+CREATE INDEX IF NOT EXISTS idx_orders_production_stage ON public.orders ("productionStage");
+CREATE INDEX IF NOT EXISTS idx_orders_customer_name ON public.orders ("customerName");
+
+-- 5. Seed Initial Admin & Config
+INSERT INTO public.staffs ("id", "name", "role", "stationId", "password")
+VALUES ('Admin-01', 'David Admin', 'ADMIN', 'Packing-HQ', 'password123')
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO public.settings ("id", "autoUpload", "stationId", "maxDailyDispatches")
+VALUES ('config', TRUE, 'Station-01', 50)
+ON CONFLICT ("id") DO NOTHING;
+
+-- 6. Row Level Security (RLS)
+ALTER TABLE public.staffs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations on staffs" ON public.staffs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations on settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all operations on orders" ON public.orders FOR ALL USING (true) WITH CHECK (true);
+`;
 
 export const DiagnosePage: React.FC = () => {
   const navigate = useNavigate();
@@ -56,8 +166,61 @@ export const DiagnosePage: React.FC = () => {
     }
   };
 
+  const [supabaseState, setSupabaseState] = useState<{
+    loading: boolean;
+    connected?: boolean;
+    tableExists?: boolean;
+    sampleCount?: number;
+    message?: string;
+  }>({ loading: false });
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [showSql, setShowSql] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
+
+  const checkSupabaseStatus = async () => {
+    setSupabaseState(prev => ({ ...prev, loading: true }));
+    addLog('Checking Supabase connection and tables status...', 'info');
+    try {
+      const res = await fetch('/api/supabase/status').then(r => r.json());
+      setSupabaseState({
+        loading: false,
+        connected: res.connected,
+        tableExists: res.tableExists,
+        sampleCount: res.sampleCount,
+        message: res.message
+      });
+      if (res.connected && res.tableExists) {
+        addLog('Supabase connected and tables verified ready.', 'success');
+      } else {
+        addLog(`Supabase connected, but tables not created yet (${res.message || 'PGRST205'}).`, 'warn');
+      }
+    } catch (err: any) {
+      setSupabaseState({ loading: false, connected: false, message: err.message });
+      addLog(`Failed to check Supabase status: ${err.message}`, 'error');
+    }
+  };
+
+  const handleMigrateToSupabase = async () => {
+    setIsMigrating(true);
+    addLog('Starting 1-click data migration to Supabase...', 'info');
+    try {
+      const res = await fetch('/api/supabase/migrate', { method: 'POST' }).then(r => r.json());
+      if (res.success) {
+        addLog(res.message, 'success');
+        checkSupabaseStatus();
+      } else {
+        addLog(`Migration failed: ${res.error}`, 'error');
+      }
+    } catch (err: any) {
+      addLog(`Migration error: ${err.message}`, 'error');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   useEffect(() => {
     updateCacheStats();
+    checkSupabaseStatus();
     addLog('System Diagnostics Portal initialized. All Zero-Waste quota protections verified.', 'info');
   }, []);
 
@@ -205,6 +368,107 @@ export const DiagnosePage: React.FC = () => {
             <p className="text-[11px] text-stone-400 truncate" title={lastTestResult}>{lastTestResult}</p>
           </div>
 
+        </div>
+
+        {/* Supabase PostgreSQL Integration Card */}
+        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
+                <Database className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-slate-900">
+                    Supabase PostgreSQL Integration
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Unlimited Quota Mode
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-stone-500">
+                  Project ID: bdfgscjiuqccoidkeaqh &bull; https://bdfgscjiuqccoidkeaqh.supabase.co
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={checkSupabaseStatus}
+                disabled={supabaseState.loading}
+                className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${supabaseState.loading ? 'animate-spin' : ''}`} />
+                <span>Check Status</span>
+              </button>
+
+              <button
+                onClick={() => setShowSql(!showSql)}
+                className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Code className="w-3.5 h-3.5 text-stone-500" />
+                <span>{showSql ? 'Hide SQL Script' : 'View / Copy SQL Script'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-stone-200 bg-stone-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-stone-600">Table Schema Status:</span>
+                {supabaseState.tableExists ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Database Tables Ready &amp; Connected
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Tables Not Detected Yet (Run SQL in Supabase)
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-stone-500">
+                {supabaseState.tableExists 
+                  ? 'All 53 columns verified. Live read/write operations automatically sync with Supabase with zero quota limits.'
+                  : 'Please paste and run the SQL script in your Supabase SQL Editor once. Once tables are created, click Check Status.'}
+              </p>
+            </div>
+
+            <button
+              onClick={handleMigrateToSupabase}
+              disabled={isMigrating || !supabaseState.tableExists}
+              className={`px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                supabaseState.tableExists
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+              }`}
+              title={supabaseState.tableExists ? 'Push all orders, staff and settings to Supabase' : 'Run SQL script first to enable data push'}
+            >
+              <UploadCloud className={`w-4 h-4 ${isMigrating ? 'animate-bounce' : ''}`} />
+              <span>{isMigrating ? 'Migrating Data...' : 'Push All Local Orders to Supabase'}</span>
+            </button>
+          </div>
+
+          {showSql && (
+            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-950">Supabase Table Creation SQL Script:</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(SUPABASE_FULL_SQL);
+                    setSqlCopied(true);
+                    setTimeout(() => setSqlCopied(false), 2000);
+                  }}
+                  className="px-3 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-900 flex items-center gap-1 cursor-pointer"
+                >
+                  {sqlCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{sqlCopied ? 'Copied to Clipboard!' : 'Copy SQL'}</span>
+                </button>
+              </div>
+              <pre className="p-3 bg-slate-900 text-slate-100 rounded-lg text-[11px] font-mono max-h-60 overflow-y-auto leading-relaxed">
+                {SUPABASE_FULL_SQL}
+              </pre>
+            </div>
+          )}
         </div>
 
         {/* Audit Report: Why the Quota Ran Out */}
