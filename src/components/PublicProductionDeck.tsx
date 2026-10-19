@@ -11,9 +11,28 @@ import {
   CheckCircle2, 
   DollarSign, 
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  X,
+  User,
+  Calendar,
+  FileText,
+  Tag,
+  Check,
+  Printer,
+  Scissors,
+  Flame,
+  Award,
+  Zap,
+  Info
 } from 'lucide-react';
-import { OrderRecord, ProductionStage, ZubocCustomisations } from '../types';
+import { 
+  OrderRecord, 
+  ProductionStage, 
+  ZubocCustomisations, 
+  SubAssemblyProgress, 
+  ZubocTimeline, 
+  PaymentGateInfo 
+} from '../types';
 import { getCurrentISTString } from '../utils/time';
 import { safeFetchJson } from '../utils/api';
 
@@ -109,11 +128,40 @@ function normalizeOrder(order: OrderRecord) {
     }
   }
 
+  const customisations: ZubocCustomisations = order.customisations || {
+    goldFoil: Boolean(order.notes?.toLowerCase().includes('gold') || order.notes?.toLowerCase().includes('foil')),
+    digitalPrinting: true,
+    screenPrinting: Boolean(order.notes?.toLowerCase().includes('screen')),
+    dieCutting: Boolean(order.notes?.toLowerCase().includes('die') || order.notes?.toLowerCase().includes('cut')),
+    waxStamp: Boolean(order.notes?.toLowerCase().includes('wax')),
+    rubberStamp: false,
+    embosserStamp: Boolean(order.notes?.toLowerCase().includes('emboss')),
+    seals: Boolean(order.notes?.toLowerCase().includes('seal'))
+  };
+
+  const subAssembly: SubAssemblyProgress = order.subAssemblyProgress || {
+    envelopeDieCutting: stage !== 'PRE_PRODUCTION',
+    screenPrinting: stage !== 'PRE_PRODUCTION',
+    goldFoiling: stage !== 'PRE_PRODUCTION',
+    waxSealApplied: stage === 'PHOTOSHOOT' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    curationCompleted: stage === 'PHOTOSHOOT' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    photoshootCompleted: stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    qcPackedCompleted: stage === 'QC_PACKED' || stage === 'DISPATCHED'
+  };
+
+  const completedTasks = Object.values(subAssembly).filter(Boolean).length;
+  const totalTasks = Object.keys(subAssembly).length;
+  const progressPercent = Math.min(100, Math.round((completedTasks / Math.max(1, totalTasks)) * 100));
+
   const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '18500').replace(/[^0-9.]/g, '')) || 0;
   const advance = parseFloat(String(order.paymentGate?.advanceReceived || (totalAmount > 0 ? totalAmount * 0.5 : '10000')).replace(/[^0-9.]/g, '')) || 0;
   const balance = Math.max(0, totalAmount - advance);
   const balanceStatus = order.paymentGate?.balanceStatus || (balance <= 0 ? 'COMPLETED' : 'PENDING');
   const isBalancePaid = balanceStatus === 'COMPLETED' || balance <= 0;
+
+  const notes = order.productionNotes || order.remarks || order.notes || '';
+  const courier = order.courier || '';
+  const awbNumber = order.awbNumber || '';
 
   return {
     clientName,
@@ -122,8 +170,19 @@ function normalizeOrder(order: OrderRecord) {
     dueDate,
     dueStatus,
     dueDays,
+    customisations,
+    subAssembly,
+    completedTasks,
+    totalTasks,
+    progressPercent,
+    totalAmount,
+    advance,
     balance,
-    isBalancePaid
+    isBalancePaid,
+    balanceStatus,
+    notes,
+    courier,
+    awbNumber
   };
 }
 
@@ -132,12 +191,11 @@ export const PublicProductionDeck: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [countdown, setCountdown] = useState<number>(3600); // 1 hour
+  const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
 
   const fetchPublicOrders = async () => {
     setIsSyncing(true);
     try {
-      // 1. Try local cache first for instant display
       const cached = localStorage.getItem('zuboc_orders_cache');
       if (cached) {
         try {
@@ -148,7 +206,6 @@ export const PublicProductionDeck: React.FC = () => {
         } catch {}
       }
 
-      // 2. Fetch from server API (reads from server memory, 0 Firestore quota used)
       const res = await safeFetchJson('/api/orders');
       if (res && Array.isArray(res) && res.length > 0) {
         setOrders(res.filter((o: OrderRecord) => o.isProductionDeckOrder));
@@ -164,40 +221,23 @@ export const PublicProductionDeck: React.FC = () => {
 
   useEffect(() => {
     fetchPublicOrders();
-    const timeTimer = setInterval(() => setCurrentTime(getCurrentISTString()), 1000);
+    const timer = setInterval(() => {
+      setCurrentTime(getCurrentISTString());
+    }, 1000);
+    setCurrentTime(getCurrentISTString());
+
     const refreshTimer = setInterval(() => {
       fetchPublicOrders();
-      setCountdown(3600);
-    }, 3600000); // 1 hour
-    const countTimer = setInterval(() => {
-      setCountdown(c => (c > 1 ? c - 1 : 3600));
-    }, 1000);
+    }, 30000);
 
     return () => {
-      clearInterval(timeTimer);
+      clearInterval(timer);
       clearInterval(refreshTimer);
-      clearInterval(countTimer);
     };
   }, []);
 
-  const handleManualSync = () => {
-    fetchPublicOrders();
-    setCountdown(3600);
-  };
-
-  const normalizedList = useMemo(() => {
-    return orders.map(ord => ({
-      raw: ord,
-      norm: normalizeOrder(ord)
-    }));
-  }, [orders]);
-
-  const activeOrdersCount = useMemo(() => {
-    return normalizedList.filter(item => item.norm.stage !== 'DISPATCHED').length;
-  }, [normalizedList]);
-
   const stageColumns = useMemo(() => {
-    const map: Record<ProductionStage, typeof normalizedList> = {
+    const map: Record<ProductionStage, { raw: OrderRecord; norm: ReturnType<typeof normalizeOrder> }[]> = {
       PRE_PRODUCTION: [],
       CURATION_ASSEMBLY: [],
       PHOTOSHOOT: [],
@@ -205,69 +245,71 @@ export const PublicProductionDeck: React.FC = () => {
       DISPATCHED: []
     };
 
-    normalizedList.forEach(item => {
-      if (map[item.norm.stage]) {
-        map[item.norm.stage].push(item);
+    orders.forEach(ord => {
+      const norm = normalizeOrder(ord);
+      if (map[norm.stage]) {
+        map[norm.stage].push({ raw: ord, norm });
       }
     });
 
     return map;
-  }, [normalizedList]);
-
-  const formatCountdown = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
-  };
+  }, [orders]);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-slate-900 flex flex-col font-sans antialiased selection:bg-[#832f5e] selection:text-white">
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased">
       
-      {/* Minimal Clean Header with Manual Sync Button */}
-      <header className="px-6 py-5 bg-white border-b border-stone-200/60 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
-        <div className="flex items-center gap-5">
-          <img 
-            src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=500" 
-            alt="Zuboc Logo" 
-            className="h-7 w-auto object-contain"
-          />
-          <div className="h-4 w-px bg-stone-200"></div>
-          <span className="text-xs font-bold uppercase tracking-widest text-stone-500 font-mono hidden sm:inline">
-            Live Production Schedule
-          </span>
+      {/* Header Bar */}
+      <header className="px-6 py-4 bg-white border-b border-stone-200 flex items-center justify-between shadow-xs sticky top-0 z-30">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-[#832f5e] text-white flex items-center justify-center font-bold shadow-xs">
+            <Tv className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm tracking-tight font-serif text-[#832f5e]">zuboc</span>
+              <span className="text-stone-300">|</span>
+              <h1 className="text-xs sm:text-sm font-black uppercase tracking-wider text-stone-700">
+                Live Production Schedule
+              </h1>
+            </div>
+            <p className="text-[10px] text-stone-400 font-medium">
+              Real-time workshop sub-assembly, proofing &amp; dispatch tracking
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-stone-100 text-stone-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Active: {activeOrdersCount}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-50 border border-stone-200 text-xs font-mono">
+            <Clock className="w-3.5 h-3.5 text-stone-500" />
+            <span className="font-bold text-stone-800">{currentTime || 'IST'}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Active Jobs: {orders.length}</span>
           </div>
 
           <button
-            onClick={handleManualSync}
+            onClick={fetchPublicOrders}
             disabled={isSyncing}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
-            title="Click to sync now"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            title="Click to sync latest updates"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+            <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
           </button>
-
-          <span className="text-stone-400 text-[11px] hidden lg:inline">
-            Next: {formatCountdown(countdown)}
-          </span>
         </div>
       </header>
 
-      {/* Main Minimal Kanban Grid */}
+      {/* Main Kanban Grid */}
       <main className="flex-1 p-6 overflow-x-auto">
         {isLoading ? (
           <div className="h-96 flex flex-col items-center justify-center text-stone-400">
-            <div className="w-6 h-6 border-2 border-[#832f5e] border-t-transparent rounded-full animate-spin mb-2"></div>
-            <p className="text-xs font-mono uppercase tracking-widest text-stone-400">Loading...</p>
+            <div className="w-8 h-8 border-3 border-[#832f5e] border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p className="text-xs font-mono font-bold uppercase tracking-widest text-stone-500">Loading Live Schedule...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 min-w-[1250px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 min-w-[1300px]">
             {STAGES.map((stage) => {
               const columnItems = stageColumns[stage.id] || [];
               const Icon = stage.icon;
@@ -275,13 +317,13 @@ export const PublicProductionDeck: React.FC = () => {
               return (
                 <div 
                   key={stage.id}
-                  className="flex flex-col rounded-2xl bg-white border border-stone-200/80 shadow-2xs overflow-hidden"
+                  className="flex flex-col rounded-2xl bg-white border border-stone-200/90 shadow-sm overflow-hidden"
                 >
-                  {/* Clean Stage Header */}
-                  <div className="p-4 border-b border-stone-100 bg-stone-50/50 flex items-center justify-between">
+                  {/* Stage Header */}
+                  <div className="p-4 border-b border-stone-100 bg-stone-50/60 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg border ${stage.badgeBg}`}>
-                        <Icon className="w-3.5 h-3.5" />
+                      <div className={`p-1.5 rounded-xl border ${stage.badgeBg}`}>
+                        <Icon className="w-4 h-4" />
                       </div>
                       <div>
                         <h2 className="font-bold text-xs uppercase tracking-wider text-stone-800">
@@ -292,59 +334,146 @@ export const PublicProductionDeck: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-stone-100 text-stone-700">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-stone-100 text-stone-700">
                       {columnItems.length}
                     </span>
                   </div>
 
                   {/* Cards List */}
-                  <div className="flex-1 p-3 space-y-2.5 min-h-[480px]">
+                  <div className="flex-1 p-3 space-y-3 min-h-[500px]">
                     {columnItems.length === 0 ? (
-                      <div className="h-32 flex items-center justify-center text-stone-300 text-xs font-mono">
-                        No orders
+                      <div className="h-32 flex items-center justify-center text-stone-300 text-xs font-mono italic">
+                        No orders in stage
                       </div>
                     ) : (
                       columnItems.map(({ raw, norm }) => (
                         <div 
                           key={raw.orderId}
-                          className="rounded-xl border border-stone-200/80 bg-white p-3.5 space-y-2 shadow-2xs hover:border-stone-300 transition-all"
+                          onClick={() => setSelectedOrder(raw)}
+                          className="rounded-2xl border border-stone-200 bg-white p-4 space-y-3 shadow-xs hover:shadow-md hover:border-[#832f5e]/40 transition-all cursor-pointer group relative overflow-hidden"
                         >
+                          <div className="absolute top-0 left-0 w-1 h-full bg-[#832f5e] opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                          {/* Top Row: Order ID & Urgency Pill */}
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[11px] font-bold text-[#832f5e]">
+                            <span className="font-mono text-xs font-black text-[#832f5e] group-hover:underline">
                               #{raw.orderId}
                             </span>
+                            
                             {norm.dueStatus === 'OVERDUE' && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                              <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">
                                 {Math.abs(norm.dueDays)}D OVERDUE
                               </span>
                             )}
                             {norm.dueStatus === 'DUE_TODAY' && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-600 text-white animate-pulse">
-                                TODAY
+                              <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-rose-600 text-white animate-pulse">
+                                DUE TODAY
                               </span>
                             )}
                             {norm.dueStatus === 'DAYS_LEFT' && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-100 text-stone-600">
+                              <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-stone-100 text-stone-600 border border-stone-200">
                                 {norm.dueDays}D LEFT
                               </span>
                             )}
                           </div>
 
-                          {raw.stageDueDates?.[norm.stage] && (
-                            <div className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 flex items-center gap-1 w-fit font-bold">
-                              <Clock className="w-3 h-3 text-amber-600" />
-                              <span>{raw.stageDueDates[norm.stage]}</span>
+                          {/* Stage Promised Date */}
+                          {norm.dueDate && (
+                            <div className="text-[10px] font-mono text-amber-900 bg-amber-50/80 px-2.5 py-1 rounded-lg border border-amber-200/80 flex items-center gap-1.5 w-fit font-extrabold">
+                              <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>Promised: {norm.dueDate}</span>
                             </div>
                           )}
 
+                          {/* Client Name & Product */}
                           <div>
-                            <h3 className="font-bold text-xs tracking-tight text-slate-900 truncate">
+                            <h3 className="font-extrabold text-sm tracking-tight text-slate-900 line-clamp-1 group-hover:text-[#832f5e] transition-colors">
                               {norm.clientName}
                             </h3>
-                            <p className="text-[11px] text-stone-400 font-medium truncate">
+                            <p className="text-xs text-stone-500 font-medium line-clamp-1">
                               {norm.product}
                             </p>
                           </div>
+
+                          {/* Craft / Customisation Badges */}
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {norm.customisations.goldFoil && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200/80 flex items-center gap-0.5">
+                                ✨ Gold Foil
+                              </span>
+                            )}
+                            {norm.customisations.screenPrinting && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5">
+                                🖨️ Screen Print
+                              </span>
+                            )}
+                            {norm.customisations.dieCutting && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5">
+                                ✂️ Die Cut
+                              </span>
+                            )}
+                            {norm.customisations.waxStamp && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 flex items-center gap-0.5">
+                                🕯️ Wax Seal
+                              </span>
+                            )}
+                            {norm.customisations.digitalPrinting && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
+                                📄 Digital
+                              </span>
+                            )}
+                            {norm.customisations.seals && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-700 border border-teal-200/60">
+                                🏷️ Seals
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Sub-Assembly Progress Bar */}
+                          <div className="space-y-1 pt-1 border-t border-stone-100">
+                            <div className="flex items-center justify-between text-[10px] font-bold text-stone-500 font-mono">
+                              <span>Assembly Progress:</span>
+                              <span className="text-stone-700">{norm.completedTasks}/{norm.totalTasks} Done</span>
+                            </div>
+                            <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-[#832f5e] h-full rounded-full transition-all duration-300"
+                                style={{ width: `${norm.progressPercent}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Financial / Payment Gate Status */}
+                          <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-[11px] font-mono">
+                            <span className="text-stone-500 font-semibold">
+                              Billing: <strong className="text-slate-900">₹{norm.totalAmount.toLocaleString('en-IN')}</strong>
+                            </span>
+                            {norm.isBalancePaid ? (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-0.5">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                PAID
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                                Bal: ₹{norm.balance.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Courier & Logistics if present */}
+                          {(norm.courier || norm.awbNumber) && (
+                            <div className="text-[10px] font-mono text-stone-600 bg-stone-50 px-2 py-1 rounded-lg border border-stone-200 flex items-center justify-between">
+                              <span className="font-bold">{norm.courier || 'Courier'}</span>
+                              <span className="text-slate-900 font-mono">{norm.awbNumber ? `#${norm.awbNumber}` : 'Assigned'}</span>
+                            </div>
+                          )}
+
+                          {/* Notes Excerpt */}
+                          {norm.notes && (
+                            <p className="text-[10px] text-stone-500 italic bg-amber-50/40 p-1.5 rounded border border-amber-100 line-clamp-1">
+                              &ldquo;{norm.notes}&rdquo;
+                            </p>
+                          )}
                         </div>
                       ))
                     )}
@@ -356,13 +485,132 @@ export const PublicProductionDeck: React.FC = () => {
         )}
       </main>
 
-      {/* Minimal Footer */}
-      <footer className="py-4 px-6 bg-white border-t border-stone-200/60 text-center text-xs text-stone-400 flex items-center justify-between">
-        <span className="font-mono text-[11px]">Zuboc Luxury Stationery • Public Live Schedule</span>
-        <span className="font-mono text-[11px]">{currentTime || 'Synced'}</span>
+      {/* Detail Modal */}
+      {selectedOrder && (
+        <PublicOrderDetailsModal 
+          order={selectedOrder} 
+          onClose={() => setSelectedOrder(null)} 
+        />
+      )}
+
+      {/* Footer */}
+      <footer className="py-4 px-6 bg-white border-t border-stone-200 text-center text-xs text-stone-400 flex items-center justify-between">
+        <span className="font-mono text-[11px] font-semibold text-stone-500">Zuboc Luxury Stationery • Public Live Schedule</span>
+        <span className="font-mono text-[11px] font-bold text-slate-700">{currentTime || 'Synced'}</span>
       </footer>
 
     </div>
   );
 };
+
+// Modal Component for Full Public Order Details
+interface PublicOrderDetailsModalProps {
+  order: OrderRecord;
+  onClose: () => void;
+}
+
+const PublicOrderDetailsModal: React.FC<PublicOrderDetailsModalProps> = ({ order, onClose }) => {
+  const norm = normalizeOrder(order);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white border border-stone-200 rounded-3xl max-w-lg w-full p-6 text-slate-900 shadow-2xl font-sans text-xs space-y-5 max-h-[90vh] overflow-y-auto">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-black font-mono text-[#832f5e]">#{order.orderId}</h2>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-stone-100 text-stone-700 border border-stone-200">
+                {norm.stage.replace('_', ' ')}
+              </span>
+            </div>
+            <p className="text-xs font-bold text-slate-900">{norm.clientName}</p>
+          </div>
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="p-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Product & Specifications */}
+        <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-stone-500 font-bold uppercase text-[10px]">Product / Suite</span>
+            <span className="font-extrabold text-slate-900 text-xs">{norm.product}</span>
+          </div>
+          {norm.dueDate && (
+            <div className="flex items-center justify-between text-amber-900 font-mono font-bold">
+              <span>Promised Dispatch:</span>
+              <span>{norm.dueDate}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Customisations Breakdown */}
+        <div className="space-y-2">
+          <h4 className="text-[11px] font-black uppercase text-stone-500 tracking-wider">Craft &amp; Customisations</h4>
+          <div className="grid grid-cols-2 gap-2 font-medium">
+            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.goldFoil ? 'bg-amber-50 border-amber-200 text-amber-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <span>✨ Gold Foil</span>
+            </div>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.screenPrinting ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <span>🖨️ Screen Print</span>
+            </div>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.dieCutting ? 'bg-purple-50 border-purple-200 text-purple-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <span>✂️ Die Cutting</span>
+            </div>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.waxStamp ? 'bg-rose-50 border-rose-200 text-rose-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <span>🕯️ Wax Seal</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Gate Summary */}
+        <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 space-y-1.5 font-mono">
+          <div className="flex justify-between text-stone-600">
+            <span>Total Billing:</span>
+            <span className="font-bold text-slate-900">₹{norm.totalAmount.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex justify-between text-stone-600">
+            <span>Advance Received:</span>
+            <span className="font-bold text-emerald-700">₹{norm.advance.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex justify-between border-t border-stone-200 pt-1.5 font-extrabold text-xs">
+            <span>Balance Due:</span>
+            <span className={norm.isBalancePaid ? 'text-emerald-600' : 'text-rose-600'}>
+              ₹{norm.balance.toLocaleString('en-IN')} ({norm.isBalancePaid ? 'PAID' : 'PENDING'})
+            </span>
+          </div>
+        </div>
+
+        {/* Production Notes */}
+        {norm.notes && (
+          <div className="space-y-1">
+            <h4 className="text-[11px] font-black uppercase text-stone-500 tracking-wider">Workshop Notes</h4>
+            <p className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/80 text-stone-700 font-medium text-xs leading-relaxed">
+              {norm.notes}
+            </p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="pt-2 flex justify-end">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 export default PublicProductionDeck;

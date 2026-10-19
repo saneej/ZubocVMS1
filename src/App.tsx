@@ -58,7 +58,7 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
-    // 1. Try loading from cache first
+    // 1. Instant local render from browser cache (0ms delay)
     const cached = localStorage.getItem('zuboc_orders_cache');
     if (cached) {
       try {
@@ -69,29 +69,32 @@ const AppContent: React.FC = () => {
       } catch {}
     }
 
-    // 2. Try server API
-    try {
-      const response = await safeFetchJson('/api/orders');
-      if (response && Array.isArray(response) && response.length > 0) {
-        setOrders(response);
-        localStorage.setItem('zuboc_orders_cache', JSON.stringify(response));
-        return;
+    // 2. Fast parallel fetch: Server memory API + Direct Supabase DB
+    const serverPromise = safeFetchJson('/api/orders').catch(() => null);
+    const supabasePromise = (async () => {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('*')
+          .order('createdAt', { ascending: false });
+        return data;
+      } catch {
+        return null;
       }
-    } catch {}
+    })();
 
-    // 3. Direct Supabase client query (guarantees fetching orders directly from Supabase DB)
-    try {
-      const { data: supaOrders, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('createdAt', { ascending: false });
-      if (!error && Array.isArray(supaOrders) && supaOrders.length > 0) {
-        setOrders(supaOrders);
-        localStorage.setItem('zuboc_orders_cache', JSON.stringify(supaOrders));
-        return;
-      }
-    } catch (supaErr) {
-      console.warn('Direct Supabase fetch notice:', supaErr);
+    const [serverResponse, supabaseResponse] = await Promise.all([serverPromise, supabasePromise]);
+    const freshestData = (Array.isArray(serverResponse) && serverResponse.length > 0)
+      ? serverResponse
+      : (Array.isArray(supabaseResponse) && supabaseResponse.length > 0)
+        ? supabaseResponse
+        : null;
+
+    if (freshestData) {
+      setOrders(freshestData);
+      try {
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(freshestData));
+      } catch {}
     }
   };
 
@@ -103,6 +106,53 @@ const AppContent: React.FC = () => {
       }
     } catch {}
   };
+
+  // Realtime Supabase WebSockets listener for sub-second updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('vms-orders-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const record = payload.new as OrderRecord;
+            if (record && record.orderId) {
+              setOrders(prev => {
+                const idx = prev.findIndex(o => o.orderId === record.orderId);
+                let next: OrderRecord[];
+                if (idx >= 0) {
+                  next = [...prev];
+                  next[idx] = { ...next[idx], ...record };
+                } else {
+                  next = [record, ...prev];
+                }
+                try {
+                  localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
+                } catch {}
+                return next;
+              });
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.orderId;
+            if (deletedId) {
+              setOrders(prev => {
+                const next = prev.filter(o => o.orderId !== deletedId);
+                try {
+                  localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
+                } catch {}
+                return next;
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     const init = async () => {
