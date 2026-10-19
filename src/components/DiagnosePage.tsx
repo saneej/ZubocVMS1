@@ -18,7 +18,8 @@ import {
   Copy,
   ExternalLink,
   UploadCloud,
-  Code
+  Code,
+  FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
@@ -505,16 +506,61 @@ export const DiagnosePage: React.FC = () => {
           </div>
 
           {systemReport.data && (
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Full System Diagnostic Output:</span>
-                <span className={`text-[10px] font-bold ${systemReport.data.success ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {systemReport.data.success ? '✓ REPORT GENERATED' : '✗ AUDIT FAILED'}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-900 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">System Health Audit Report</span>
+                <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-400">
+                  {systemReport.data.report?.v || '1.2.2'}
                 </span>
               </div>
-              <pre className="text-[10px] font-mono bg-white p-3 rounded-lg border border-slate-200 max-h-60 overflow-y-auto whitespace-pre-wrap">
-                {JSON.stringify(systemReport.data, null, 2)}
-              </pre>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] font-mono">
+                {/* Env Section */}
+                <div className="space-y-1">
+                  <div className="text-amber-400 font-bold border-b border-slate-800 mb-1">ENV & PLATFORM</div>
+                  <div className="flex justify-between"><span className="text-slate-500">Platform:</span> <span className="text-slate-300">{systemReport.data.report?.platform || 'N/A'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Vercel:</span> <span className="text-slate-300">{String(systemReport.data.report?.env?.VERCEL)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Supabase URL:</span> <span className={systemReport.data.report?.env?.SUPABASE_URL_SET ? 'text-emerald-400' : 'text-rose-400'}>{systemReport.data.report?.env?.SUPABASE_URL_SET ? 'SET ✅' : 'MISSING ❌'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Supabase Key:</span> <span className={systemReport.data.report?.env?.SUPABASE_KEY_SET ? 'text-emerald-400' : 'text-rose-400'}>{systemReport.data.report?.env?.SUPABASE_KEY_SET ? 'SET ✅' : 'MISSING ❌'}</span></div>
+                </div>
+
+                {/* Connectivity Section */}
+                <div className="space-y-1">
+                  <div className="text-amber-400 font-bold border-b border-slate-800 mb-1">CONNECTIVITY</div>
+                  <div className="flex justify-between"><span className="text-slate-500">Internet (Google):</span> <span className={systemReport.data.report?.connectivity?.googleReachable ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{systemReport.data.report?.connectivity?.googleReachable ? 'ONLINE ✅' : 'OFFLINE ❌'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Supabase API:</span> <span className={systemReport.data.report?.connectivity?.supabaseReachable ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{systemReport.data.report?.connectivity?.supabaseReachable ? 'ONLINE ✅' : 'OFFLINE ❌'}</span></div>
+                  {systemReport.data.report?.connectivity?.error && (
+                    <div className="text-rose-400 text-[10px] mt-1 break-words">Error: {systemReport.data.report?.connectivity?.error}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Database Section */}
+              <div className="pt-2 border-t border-slate-800">
+                <div className="text-amber-400 font-bold text-[11px] font-mono mb-1">DATABASE (SUPABASE POSTGRES)</div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className={`w-2 h-2 rounded-full ${systemReport.data.report?.database?.supabase === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                  <span className={`text-[11px] font-mono font-bold ${systemReport.data.report?.database?.supabase === 'CONNECTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {systemReport.data.report?.database?.supabase === 'CONNECTED' ? 'DATABASE LIVE & SYNCED' : 'DATABASE CONNECTION FAILED'}
+                  </span>
+                </div>
+                {systemReport.data.report?.database?.error && (
+                  <div className="text-rose-400 text-[10px] font-mono bg-rose-950/30 p-2 rounded border border-rose-900/50">
+                    {systemReport.data.report?.database?.error}
+                    {systemReport.data.report?.database?.code && <span className="block mt-1 opacity-60">Code: {systemReport.data.report?.database?.code}</span>}
+                  </div>
+                )}
+              </div>
+
+              <details className="mt-2 group">
+                <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 font-mono list-none flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 border-t border-r border-slate-500 group-open:rotate-135 rotate-45 transition-transform" />
+                  View Raw JSON Data
+                </summary>
+                <pre className="text-[9px] font-mono text-slate-500 bg-black/30 p-3 rounded-lg border border-slate-800 mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap">
+                  {JSON.stringify(systemReport.data, null, 2)}
+                </pre>
+              </details>
             </div>
           )}
 

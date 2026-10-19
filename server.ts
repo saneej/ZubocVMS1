@@ -152,9 +152,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Versioning for tracking deployment updates
+const APP_VERSION = '1.2.2-diag';
+
 // Extreme priority heartbeat for diagnostics
-app.get('/ping', (req, res) => res.send('OK-V1.2.1'));
-app.get('/api/ping-basic', (req, res) => res.json({ status: 'ok', v: '1.2.1-diag' }));
+app.get('/ping', (req, res) => res.send(`OK-${APP_VERSION}`));
+app.get('/api/ping-basic', (req, res) => res.json({ status: 'ok', v: APP_VERSION }));
 function sanitizeString(str: any): string {
   if (typeof str !== 'string') return '';
   return str
@@ -241,16 +244,20 @@ try {
 }
 
 // Lazy Initialize Supabase Client to prevent startup crashes
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.NAQ_B4oLhyLPLlnUeJGc9lJ1NPcO7oH0_e3ZxeAlrF4';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.NAQ_B4oLhyLPLlnUeJGc9lJ1NPcO7oH0_e3ZxeAlrF4';
 
 let _supabaseServer: any = null;
 function getSupabaseClient() {
   if (_supabaseServer) return _supabaseServer;
   try {
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      console.log(`Initializing Supabase client with URL: ${SUPABASE_URL.slice(0, 15)}...`);
       _supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { persistSession: false }
+        auth: { persistSession: false },
+        global: {
+          headers: { 'x-application-name': 'zuboc-vms' }
+        }
       });
       console.log('Lazy: Supabase client initialized.');
       return _supabaseServer;
@@ -261,7 +268,22 @@ function getSupabaseClient() {
   return null;
 }
 
+// Helper for Supabase operations with internal timeout
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 8000): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    return result;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 let isSupabaseReady = false;
+let hasPerformedInitialSync = false;
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
 const TMP_DATA_FILE = '/tmp/vms_data.json';
@@ -412,13 +434,19 @@ function cleanForSupabase(obj: any): any {
 }
 
 async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
-  if (!getSupabaseClient()) {
+  const client = getSupabaseClient();
+  if (!client) {
     console.warn('Supabase save skipped: Client not initialized.');
     return false;
   }
   try {
     const payload = cleanForSupabase(record);
-    const { error } = await getSupabaseClient().from('orders').upsert(payload, { onConflict: 'orderId' });
+    // Add timeout to upsert to prevent hanging the request
+    const { error } = (await withTimeout(
+      client.from('orders').upsert(payload, { onConflict: 'orderId' }),
+      6000
+    )) as { error: any };
+    
     if (error) {
       console.error(`Supabase save error for Order #${record.orderId}:`, error.message, error.code, error.details);
       if (error.code === '42P01') {
@@ -432,7 +460,7 @@ async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
       return true;
     }
   } catch (err: any) {
-    console.error('Supabase save exception:', err?.message);
+    console.error(`Supabase save exception for Order #${record.orderId}:`, err?.message);
     return false;
   }
 }
@@ -466,13 +494,18 @@ async function saveSettingsToSupabase(sett: AppSettings) {
 }
 
 async function syncFromSupabase() {
-  if (!getSupabaseClient()) {
+  const client = getSupabaseClient();
+  if (!client) {
     console.warn('Initial sync skipped: Supabase client not initialized.');
     return;
   }
   try {
     console.log('Starting initial sync from Supabase...');
-    const { data: ords, error: ordErr } = await getSupabaseClient().from('orders').select('*').order('createdAt', { ascending: false });
+    const { data: ords, error: ordErr } = (await withTimeout(
+      client.from('orders').select('*').order('createdAt', { ascending: false }),
+      10000
+    )) as { data: any[]; error: any };
+    
     if (ordErr) {
       console.error('Initial sync error (orders):', ordErr.message, ordErr.code);
     } else if (Array.isArray(ords)) {
@@ -483,7 +516,11 @@ async function syncFromSupabase() {
       console.log(`Synced ${ords.length} orders from Supabase successfully.`);
     }
 
-    const { data: stfs, error: stfErr } = await getSupabaseClient().from('staffs').select('*');
+    const { data: stfs, error: stfErr } = (await withTimeout(
+      client.from('staffs').select('*'),
+      8000
+    )) as { data: any[]; error: any };
+    
     if (stfErr) {
       console.error('Initial sync error (staffs):', stfErr.message);
     } else if (Array.isArray(stfs)) {
@@ -493,15 +530,20 @@ async function syncFromSupabase() {
       console.log(`Synced ${stfs.length} staff members from Supabase.`);
     }
 
-    const { data: sett, error: settErr } = await getSupabaseClient().from('settings').select('*').eq('id', 'config').maybeSingle();
+    const { data: sett, error: settErr } = (await withTimeout(
+      client.from('settings').select('*').eq('id', 'config').maybeSingle(),
+      5000
+    )) as { data: any; error: any };
+    
     if (settErr) {
       console.error('Initial sync error (settings):', settErr.message);
     } else if (sett) {
       settings = { ...settings, ...sett };
       console.log('Synced system settings from Supabase.');
     }
+    hasPerformedInitialSync = true;
   } catch (err: any) {
-    console.warn('Supabase initial sync CRITICAL failure:', err?.message);
+    console.warn('Supabase initial sync failure:', err?.message);
   }
 }
 
@@ -832,32 +874,92 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
 apiRouter.get('/supabase/status', async (req, res) => {
   const client = getSupabaseClient();
   if (!client) {
-    return res.json({ connected: false, error: 'No client initialized', v: '1.2.1-diag' });
+    return res.json({ connected: false, error: 'No client initialized', v: APP_VERSION });
   }
   try {
-    const { data, error } = await client.from('orders').select('orderId').limit(1);
+    // Wrap Supabase call in timeout to prevent hanging on network issues
+    const { data, error } = (await withTimeout(client.from('orders').select('orderId').limit(1), 5000)) as { data: any; error: any };
+    
     if (error) {
       return res.json({
         connected: false,
         tableExists: false,
         code: error.code,
         message: error.message,
-        v: '1.2.1-diag'
+        v: APP_VERSION
       });
     }
     return res.json({
       connected: true,
       tableExists: true,
-      v: '1.2.1-diag',
+      v: APP_VERSION,
       sampleCount: data ? data.length : 0
     });
   } catch (err: any) {
+    console.error('Supabase status check failed:', err.message);
     return res.json({
       connected: false,
-      error: err.message,
-      v: '1.2.1-diag'
+      error: `Timeout or Error: ${err.message}`,
+      v: APP_VERSION
     });
   }
+});
+
+// Deep System Diagnostic Report
+apiRouter.get('/diag/system-report', async (req, res) => {
+  const report: any = {
+    timestamp: new Date().toISOString(),
+    v: APP_VERSION,
+    nodeVersion: process.version,
+    platform: process.platform,
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL,
+      SUPABASE_URL_SET: Boolean(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL),
+      SUPABASE_KEY_SET: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY),
+      FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID
+    },
+    stores: {
+      ordersCount: Object.keys(ordersStore).length,
+      staffsCount: Object.keys(staffsStore).length
+    },
+    connectivity: {
+      supabaseReachable: false,
+      googleReachable: false
+    }
+  };
+
+  try {
+    // 1. Check Internet Connectivity
+    const googlePing = await withTimeout(fetch('https://www.google.com', { method: 'HEAD' }), 3000);
+    report.connectivity.googleReachable = googlePing.ok;
+    
+    // 2. Check Supabase Connectivity (Raw Ping)
+    const supaUrl = SUPABASE_URL.replace('/rest/v1', '');
+    const supaPing = await withTimeout(fetch(supaUrl, { method: 'HEAD' }), 3000);
+    report.connectivity.supabaseReachable = supaPing.ok;
+  } catch (e: any) {
+    report.connectivity.error = e.message;
+  }
+
+  try {
+    // 3. Check Supabase DB Status
+    const client = getSupabaseClient();
+    if (client) {
+    const { error } = (await withTimeout(client.from('orders').select('orderId').limit(1), 4000)) as { error: any };
+      report.database = {
+        supabase: error ? 'ERROR' : 'CONNECTED',
+        error: error?.message,
+        code: error?.code
+      };
+    } else {
+      report.database = { supabase: 'NOT_INITIALIZED' };
+    }
+  } catch (e: any) {
+    report.database = { supabase: 'CRASHED', error: e.message };
+  }
+
+  res.json({ success: true, report });
 });
 
 // Sync orders between memory and Supabase (bi-directional)
@@ -894,9 +996,15 @@ apiRouter.post('/supabase/migrate', async (req, res) => {
 
 // Staffs GET - Syncs live from Supabase
 apiRouter.get('/staffs', async (req, res) => {
-  if (getSupabaseClient()) {
+  const client = getSupabaseClient();
+  if (client) {
     try {
-      const { data: supaStaffs, error } = await getSupabaseClient().from('staffs').select('*');
+      // If we haven't synced yet (common in serverless), do it now
+      if (!hasPerformedInitialSync || Object.keys(staffsStore).length <= INITIAL_STAFFS.length) {
+        await syncFromSupabase();
+      }
+
+      const { data: supaStaffs, error } = (await withTimeout(client.from('staffs').select('*'), 6000)) as { data: any[]; error: any };
       if (!error && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
         const freshMap: Record<string, StaffMember> = {};
         for (const s of supaStaffs) {
@@ -1181,12 +1289,19 @@ apiRouter.post('/auth/login', async (req, res) => {
 
 // Orders GET - Syncs latest orders from Supabase and serves them
 apiRouter.get('/orders', async (req, res) => {
-  if (getSupabaseClient()) {
+  const client = getSupabaseClient();
+  if (client) {
     try {
-      const { data: supaOrders, error } = await getSupabaseClient()
-        .from('orders')
-        .select('*')
-        .order('createdAt', { ascending: false });
+      // If we haven't synced yet or store is nearly empty, trigger sync
+      if (!hasPerformedInitialSync) {
+        await syncFromSupabase();
+      }
+
+      const { data: supaOrders, error } = (await withTimeout(
+        client.from('orders').select('*').order('createdAt', { ascending: false }),
+        8000
+      )) as { data: any[]; error: any };
+      
       if (!error && Array.isArray(supaOrders)) {
         if (supaOrders.length > 0) {
           const freshOrdersMap: Record<string, OrderRecord> = {};

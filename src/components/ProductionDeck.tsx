@@ -369,18 +369,25 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
   const checkSupabaseHealth = async () => {
     setSupabaseDiag(p => ({ ...p, checking: true, error: undefined }));
+    
+    // Create a local timeout to prevent the UI from staying in "Checking" state if server hangs
+    const timeoutId = setTimeout(() => {
+      setSupabaseDiag(p => p.checking ? { ...p, checking: false, error: 'Health check timed out (6s). Server may be offline.' } : p);
+    }, 6000);
+
     try {
-      // Add a timeout signal to safeFetchJson if it supported it, but we can wrap it
       const res = await safeFetchJson('/api/supabase/status');
+      clearTimeout(timeoutId);
       setSupabaseDiag({ 
         connected: Boolean(res?.connected), 
         tableExists: Boolean(res?.tableExists), 
         checking: false,
         error: res?.error || (res?.connected ? undefined : 'Disconnected'),
-        v: res?.v || 'v1.2.1'
+        v: res?.v || 'v1.2.2'
       });
       if (onRefreshOrders) onRefreshOrders();
     } catch (err: any) {
+      clearTimeout(timeoutId);
       setSupabaseDiag({ connected: false, checking: false, error: err.message, v: 'error' });
     }
   };
