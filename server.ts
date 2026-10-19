@@ -132,6 +132,14 @@ async function sendTelegramUpdate(record: OrderRecord) {
 
 dotenv.config();
 
+// Global Process Error Handlers to prevent silent crashes in serverless env
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: Uncaught Exception:', err);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -144,11 +152,17 @@ function sanitizeString(str: any): string {
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-');
 }
 
-// Enable CORS for all origins and headers
+// Enable CORS and disable caching for API
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Explicitly disable caching for all API responses to fix deployment update issues
+  res.header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.header('Pragma', 'no-cache');
+  res.header('Expires', '0');
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -157,11 +171,11 @@ app.use((req, res, next) => {
 
 // Configure multer for binary uploads
 const upload = multer({
-  limits: { fileSize: 2000 * 1024 * 1024 } // 2 GB limit
+  limits: { fileSize: 100 * 1024 * 1024 } // 100 MB limit (more reasonable for serverless)
 });
 
-app.use(express.json({ limit: '2gb' }));
-app.use(express.urlencoded({ extended: true, limit: '2gb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Initialize Firebase App safely for both local server and Vercel serverless env
 let firebaseApp: any = null;
@@ -224,14 +238,22 @@ let supabaseServer: any = null;
 let isSupabaseReady = false;
 
 try {
+  console.log('Supabase Init Check:', {
+    hasUrl: Boolean(process.env.SUPABASE_URL),
+    hasKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    url: SUPABASE_URL.substring(0, 20) + '...'
+  });
+  
   if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false }
     });
-    console.log('Server initialized Supabase connection:', SUPABASE_URL);
+    console.log('Server initialized Supabase connection successfully.');
+  } else {
+    console.error('Supabase initialization failed: URL or Key missing.');
   }
-} catch (e) {
-  console.error('Error initializing Supabase in server.ts:', e);
+} catch (e: any) {
+  console.error('Error initializing Supabase in server.ts:', e?.message);
 }
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
@@ -382,23 +404,29 @@ function cleanForSupabase(obj: any): any {
   }));
 }
 
-async function saveOrderToSupabase(record: OrderRecord) {
+async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
   if (!supabaseServer) {
     console.warn('Supabase save skipped: Client not initialized.');
-    return;
+    return false;
   }
   try {
     const payload = cleanForSupabase(record);
     const { error } = await supabaseServer.from('orders').upsert(payload, { onConflict: 'orderId' });
     if (error) {
       console.error(`Supabase save error for Order #${record.orderId}:`, error.message, error.code, error.details);
-      if (error.code === '42P01') console.error('HINT: Table "orders" does not exist in Supabase.');
-      if (error.code === '42703') console.error('HINT: One or more columns are missing from the Supabase table.');
+      if (error.code === '42P01') {
+        console.error('HINT: Table "orders" does not exist in Supabase.');
+      } else if (error.code === '42703') {
+        console.error('HINT: One or more columns are missing from the Supabase table.');
+      }
+      return false;
     } else {
       isSupabaseReady = true;
+      return true;
     }
   } catch (err: any) {
     console.error('Supabase save exception:', err?.message);
+    return false;
   }
 }
 
@@ -431,30 +459,42 @@ async function saveSettingsToSupabase(sett: AppSettings) {
 }
 
 async function syncFromSupabase() {
-  if (!supabaseServer) return;
+  if (!supabaseServer) {
+    console.warn('Initial sync skipped: Supabase client not initialized.');
+    return;
+  }
   try {
+    console.log('Starting initial sync from Supabase...');
     const { data: ords, error: ordErr } = await supabaseServer.from('orders').select('*').order('createdAt', { ascending: false });
-    if (!ordErr && Array.isArray(ords)) {
+    if (ordErr) {
+      console.error('Initial sync error (orders):', ordErr.message, ordErr.code);
+    } else if (Array.isArray(ords)) {
       isSupabaseReady = true;
       for (const o of ords) {
         if (o.orderId) ordersStore[o.orderId] = o;
       }
-      console.log(`Synced ${ords.length} orders from Supabase.`);
+      console.log(`Synced ${ords.length} orders from Supabase successfully.`);
     }
 
     const { data: stfs, error: stfErr } = await supabaseServer.from('staffs').select('*');
-    if (!stfErr && Array.isArray(stfs)) {
+    if (stfErr) {
+      console.error('Initial sync error (staffs):', stfErr.message);
+    } else if (Array.isArray(stfs)) {
       for (const s of stfs) {
         if (s.id) staffsStore[s.id] = s;
       }
+      console.log(`Synced ${stfs.length} staff members from Supabase.`);
     }
 
     const { data: sett, error: settErr } = await supabaseServer.from('settings').select('*').eq('id', 'config').maybeSingle();
-    if (!settErr && sett) {
+    if (settErr) {
+      console.error('Initial sync error (settings):', settErr.message);
+    } else if (sett) {
       settings = { ...settings, ...sett };
+      console.log('Synced system settings from Supabase.');
     }
   } catch (err: any) {
-    console.warn('Supabase initial sync notice:', err?.message);
+    console.warn('Supabase initial sync CRITICAL failure:', err?.message);
   }
 }
 
@@ -587,6 +627,7 @@ apiRouter.get('/', (req, res) => {
 apiRouter.get('/health', (req, res) => {
   res.json({
     status: 'ok',
+    v: '1.2.0-diag',
     firebaseConnected: Boolean(firestoreDb),
     timestamp: new Date().toISOString()
   });
@@ -642,49 +683,61 @@ apiRouter.post('/settings', async (req, res) => {
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
 });
 
+// Simple text ping to verify raw connectivity bypassing JSON
+apiRouter.get('/diag/ping-text', (req, res) => {
+  res.send('Zuboc Server is REACHABLE (Text Mode)');
+});
+
 // Detailed System Diagnostic Report
 apiRouter.get('/diag/system-report', async (req, res) => {
-  const report: any = {
-    timestamp: new Date().toISOString(),
-    environment: {
-      nodeVersion: process.version,
-      platform: process.platform,
-      env: process.env.NODE_ENV,
-      port: PORT,
-      hasSupabaseUrl: Boolean(SUPABASE_URL),
-      hasSupabaseKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
-      hasFirebaseConfig: Boolean(firebaseApp),
-      hasTelegramToken: Boolean(settings.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN),
-    },
-    database: {
-      supabaseInitialized: Boolean(supabaseServer),
-      firebaseInitialized: Boolean(firestoreDb),
-      isSupabaseReady,
-      firestoreQuotaExceeded,
-    },
-    storage: {
-      dataFileExists: fs.existsSync(DATA_FILE),
-      tmpDataFileExists: fs.existsSync(TMP_DATA_FILE),
-      cwd: process.cwd(),
-      dirname: __dirname,
-    },
-    connectivity: {}
-  };
-
-  // Test Network
   try {
-    const start = Date.now();
-    const netRes = await fetch('https://api.supabase.com/health', { method: 'GET' });
-    report.connectivity.supabaseApi = {
-      ok: netRes.ok,
-      status: netRes.status,
-      latencyMs: Date.now() - start
+    const report: any = {
+      timestamp: new Date().toISOString(),
+      environment: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        env: process.env.NODE_ENV,
+        port: PORT,
+        hasSupabaseUrl: Boolean(SUPABASE_URL),
+        hasSupabaseKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+        hasFirebaseConfig: Boolean(firebaseApp),
+      },
+      database: {
+        supabaseInitialized: Boolean(supabaseServer),
+        firebaseInitialized: Boolean(firestoreDb),
+        isSupabaseReady,
+        firestoreQuotaExceeded,
+      },
+      storage: {
+        cwd: process.cwd(),
+        dirname: __dirname,
+      }
     };
-  } catch (e: any) {
-    report.connectivity.supabaseApi = { ok: false, error: e.message };
-  }
 
-  res.json({ success: true, report });
+    // Very safe network check
+    try {
+      if (typeof fetch !== 'undefined') {
+        const start = Date.now();
+        const netRes = await fetch('https://www.google.com', { method: 'HEAD' });
+        report.connectivity = {
+          googleHead: {
+            ok: netRes.ok,
+            status: netRes.status,
+            latencyMs: Date.now() - start
+          }
+        };
+      } else {
+        report.connectivity = { error: 'Global fetch not available in this Node runtime.' };
+      }
+    } catch (e: any) {
+      report.connectivity = { error: `Network test failed: ${e.message}` };
+    }
+
+    res.json({ success: true, report });
+  } catch (err: any) {
+    console.error('SYSTEM_REPORT_CRASH:', err);
+    res.json({ success: false, error: err.message, stack: err.stack });
+  }
 });
 
 // Server-side Supabase Test (Detailed Diagnostic)
@@ -752,7 +805,8 @@ apiRouter.post('/supabase/test-server', async (req, res) => {
       success: true, 
       message: 'Server-side Supabase connection is fully healthy (Read/Write/Delete verified).',
       project: SUPABASE_URL.split('://')[1]?.split('.')[0] || 'hidden',
-      usingServiceRole: true
+      usingServiceRole: true,
+      v: '1.2.0-diag'
     });
 
   } catch (err: any) {
@@ -784,16 +838,19 @@ apiRouter.get('/supabase/status', async (req, res) => {
     return res.json({
       connected: true,
       tableExists: true,
+      v: '1.2.0-diag',
       sampleCount: data ? data.length : 0
     });
   } catch (err: any) {
     return res.json({
       connected: false,
-      tableExists: false,
-      error: err?.message || 'Error checking Supabase status'
+      error: err.message,
+      v: '1.2.0-diag'
     });
   }
 });
+
+// Sync orders between memory and Supabase (bi-directional)
 
 // Push/Migrate all current in-memory orders, staffs, and settings to Supabase
 apiRouter.post('/supabase/migrate', async (req, res) => {
@@ -1253,9 +1310,8 @@ apiRouter.post('/orders', async (req, res) => {
     }
   }
 
-  await saveOrderToSupabase(record);
-
-  res.json({ success: true, record });
+  const supaSynced = await saveOrderToSupabase(record);
+  res.json({ success: true, record, supaSynced });
 });
 
 // Bulk import orders (e.g. from Shopify CSV)

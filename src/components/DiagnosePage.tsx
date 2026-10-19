@@ -172,6 +172,7 @@ export const DiagnosePage: React.FC = () => {
     tableExists?: boolean;
     sampleCount?: number;
     message?: string;
+    v?: string;
   }>({ loading: false });
   const [isMigrating, setIsMigrating] = useState(false);
   const [showSql, setShowSql] = useState(false);
@@ -206,7 +207,8 @@ export const DiagnosePage: React.FC = () => {
         connected: Boolean(res?.connected),
         tableExists: Boolean(res?.tableExists),
         sampleCount: res?.sampleCount || 0,
-        message: res?.message || res?.error
+        message: res?.message || res?.error,
+        v: res?.v
       });
       if (res?.connected && res?.tableExists) {
         addLog('Supabase connected and tables verified ready.', 'success');
@@ -441,6 +443,11 @@ export const DiagnosePage: React.FC = () => {
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Unlimited Quota Mode
                   </span>
+                  {supabaseState.v && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      Server: {supabaseState.v}
+                    </span>
+                  )}
                 </div>
                 <span className="text-[11px] font-mono text-stone-500">
                   Project ID: bdfgscjiuqccoidkeaqh &bull; https://bdfgscjiuqccoidkeaqh.supabase.co

@@ -48,6 +48,7 @@ import {
   ZubocTimeline, 
   PaymentGateInfo 
 } from '../types';
+import { safeFetchJson } from '../utils/api';
 import { getCurrentISTString } from '../utils/time';
 import { BrowserQRCodeSvgWriter } from '@zxing/library';
 
@@ -364,16 +365,23 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     };
   }, [isAutoScrollActive, isUserHovering, scrollSpeed]);
 
-  const [supabaseDiag, setSupabaseDiag] = useState<{ connected?: boolean; tableExists?: boolean; checking?: boolean }>({});
+  const [supabaseDiag, setSupabaseDiag] = useState<{ connected?: boolean; tableExists?: boolean; checking?: boolean; error?: string; v?: string }>({});
 
   const checkSupabaseHealth = async () => {
-    setSupabaseDiag(p => ({ ...p, checking: true }));
+    setSupabaseDiag(p => ({ ...p, checking: true, error: undefined }));
     try {
-      const res = await fetch('/api/supabase/status').then(r => r.json());
-      setSupabaseDiag({ connected: res.connected, tableExists: res.tableExists, checking: false });
+      // Add a timeout signal to safeFetchJson if it supported it, but we can wrap it
+      const res = await safeFetchJson('/api/supabase/status');
+      setSupabaseDiag({ 
+        connected: Boolean(res?.connected), 
+        tableExists: Boolean(res?.tableExists), 
+        checking: false,
+        error: res?.error || (res?.connected ? undefined : 'Disconnected'),
+        v: res?.v || 'v1.1'
+      });
       if (onRefreshOrders) onRefreshOrders();
-    } catch {
-      setSupabaseDiag({ connected: false, checking: false });
+    } catch (err: any) {
+      setSupabaseDiag({ connected: false, checking: false, error: err.message, v: 'error' });
     }
   };
 
@@ -617,11 +625,17 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
                 type="button"
                 onClick={checkSupabaseHealth}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-stone-50 border-stone-200 text-xs font-bold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
-                title="Live Supabase Connection & Diagnostics"
+                title={supabaseDiag.error || 'Live Supabase Connection & Diagnostics'}
               >
-                <span className={`w-2 h-2 rounded-full ${supabaseDiag.connected && supabaseDiag.tableExists ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <span className={`w-2 h-2 rounded-full ${
+                  supabaseDiag.checking ? 'bg-amber-400 animate-pulse' :
+                  supabaseDiag.connected && supabaseDiag.tableExists ? 'bg-emerald-500 animate-pulse' : 
+                  'bg-rose-500'
+                }`} />
                 <span className="font-mono text-[11px]">
-                  {supabaseDiag.checking ? 'Checking DB...' : supabaseDiag.connected && supabaseDiag.tableExists ? 'Supabase DB Live' : 'Checking DB'}
+                  {supabaseDiag.checking ? 'Checking DB...' : 
+                   supabaseDiag.connected && supabaseDiag.tableExists ? `Supabase Live (${supabaseDiag.v})` : 
+                   supabaseDiag.error ? 'DB Error' : 'Offline'}
                 </span>
                 <RefreshCw className={`w-3.5 h-3.5 text-stone-500 ${supabaseDiag.checking ? 'animate-spin' : ''}`} />
               </button>

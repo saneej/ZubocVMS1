@@ -39,7 +39,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const [deliveredDate, setDeliveredDate] = useState('');
   const [notes, setNotes] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [sendToProductionDeck, setSendToProductionDeck] = useState(false);
+  const [sendToProductionDeck, setSendToProductionDeck] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -499,16 +499,16 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
             {/* Production TV Deck Toggle */}
             <div className="pt-1">
-              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#832f5e]/5 border border-[#832f5e]/20 cursor-pointer font-bold text-slate-900 text-xs">
+              <label className="flex items-center gap-3 p-4 rounded-xl bg-indigo-50 border border-indigo-200 cursor-pointer font-bold text-slate-900 text-xs shadow-sm">
                 <input
                   type="checkbox"
                   checked={sendToProductionDeck}
                   onChange={(e) => setSendToProductionDeck(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#832f5e] focus:ring-[#832f5e] cursor-pointer"
+                  className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
                 <div className="flex flex-col">
-                  <span className="font-bold text-[#832f5e]">Display on Production TV Deck Schedule</span>
-                  <span className="text-[10px] font-normal text-stone-500">Enable if this order requires workshop sub-assembly and 55&quot; TV monitoring</span>
+                  <span className="font-black text-indigo-950 uppercase tracking-wide">Display on Production TV Deck Schedule</span>
+                  <span className="text-[10px] font-bold text-indigo-700/70">Enable this to track workshop sub-assembly and 55&quot; TV live monitoring</span>
                 </div>
               </label>
             </div>
