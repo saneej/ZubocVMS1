@@ -19,7 +19,11 @@ import {
   ChevronUp,
   Plane,
   Mail,
-  Download
+  Download,
+  Sparkles,
+  Bot,
+  Send,
+  Loader2
 } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { 
@@ -221,6 +225,44 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
   const [copiedQuote, setCopiedQuote] = useState(false);
   const [savedToOrderMsg, setSavedToOrderMsg] = useState<string | null>(null);
   const [showAuditTable, setShowAuditTable] = useState(false);
+
+  // IFM.ai Assistant State
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+    { role: 'assistant', content: 'Hello! I am your IFM.ai K2-Horizon Shipping Advisor (Model: IFM/K2-Horizon-375B-A23B). Ask me anything about courier rates, zones, or packaging optimization!' }
+  ]);
+  const [aiInput, setAiInput] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const handleSendAiMessage = async (promptText?: string) => {
+    const textToSend = promptText || aiInput.trim();
+    if (!textToSend || isAiLoading) return;
+
+    const newMessages = [...aiMessages, { role: 'user' as const, content: textToSend }];
+    setAiMessages(newMessages);
+    if (!promptText) setAiInput('');
+    setIsAiLoading(true);
+
+    try {
+      const res = await fetch('/api/ifm/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
+        })
+      });
+      const data = await res.json();
+      if (data && data.success && data.data?.choices?.[0]?.message?.content) {
+        const reply = data.data.choices[0].message.content;
+        setAiMessages([...newMessages, { role: 'assistant', content: reply }]);
+      } else {
+        throw new Error(data?.error || 'Failed to receive response from IFM AI');
+      }
+    } catch (err: any) {
+      setAiMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message || 'Unable to reach IFM AI API.'}` }]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   // Pincode Validation
   const isValidPincode = useMemo(() => {
@@ -1016,6 +1058,72 @@ Estimated Transit: ${selectedResult.transitTime}
               )}
             </div>
 
+          </div>
+
+          {/* IFM.ai K2-Horizon Shipping Advisor Card */}
+          <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl space-y-4 border border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Bot className="w-5 h-5 text-purple-400" />
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-200">
+                  IFM.ai K2-Horizon Advisor
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold uppercase">
+                375B Model
+              </span>
+            </div>
+
+            {/* Chat Messages Box */}
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1 text-xs font-sans">
+              {aiMessages.map((msg, idx) => (
+                <div key={idx} className={`p-3 rounded-2xl ${msg.role === 'user' ? 'bg-slate-800 text-slate-200 ml-4' : 'bg-purple-950/40 border border-purple-900/40 text-purple-100 mr-4'}`}>
+                  <div className="text-[10px] font-bold text-slate-400 mb-1">{msg.role === 'user' ? 'You' : 'IFM.ai K2-Horizon'}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                </div>
+              ))}
+              {isAiLoading && (
+                <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-900/40 text-purple-200 flex items-center gap-2 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                  <span>IFM K2-Horizon is reasoning...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Quick AI Prompt Buttons */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <button
+                onClick={() => handleSendAiMessage(`Recommend the best courier for ${deadWeight}kg package to ${pincode} (${activeZone.name}) with estimated cost ₹${selectedResult.totalPayable}.`)}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-purple-300 font-medium transition-all cursor-pointer border border-slate-700"
+              >
+                ⚡ Recommend Courier Strategy
+              </button>
+              <button
+                onClick={() => handleSendAiMessage(`How can I optimize volumetric weight for dimensions ${lengthCm}x${widthCm}x${heightCm}cm to reduce freight cost?`)}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-purple-300 font-medium transition-all cursor-pointer border border-slate-700"
+              >
+                📦 Volumetric & Packaging Advice
+              </button>
+            </div>
+
+            {/* Input Box */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+              <input
+                type="text"
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSendAiMessage(); }}
+                placeholder="Ask IFM.ai about shipping rates, zones..."
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 font-sans"
+              />
+              <button
+                onClick={() => handleSendAiMessage()}
+                disabled={isAiLoading || !aiInput.trim()}
+                className="p-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white transition-all cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
         </div>

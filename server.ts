@@ -1934,6 +1934,50 @@ apiRouter.post('/telegram/detect-chat-id', async (req, res) => {
   }
 });
 
+// IFM AI Chat Completion Proxy for Shipping Rate Calculator
+apiRouter.post('/ifm/chat', async (req, res) => {
+  const { messages } = req.body;
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'messages array is required' });
+  }
+
+  const apiKey = process.env.IFM_API_KEY || 'IFM-v1_d4sAGkIRgbpx7-PjHCqNJdpxTdjAVETb0sxzHd1DYFV7zPasHQnnS00CFePOaMsN';
+  const apiUrl = 'https://api.ifm.ai/v1/chat/completions';
+  const modelName = 'IFM/K2-Horizon-375B-A23B';
+
+  const latestMessage = messages[messages.length - 1] || { role: 'user', content: 'Hello' };
+  const payloadMessages = [
+    {
+      role: 'user',
+      content: typeof latestMessage.content === 'string' ? latestMessage.content : JSON.stringify(latestMessage.content)
+    }
+  ];
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messages: payloadMessages,
+        model: modelName
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error?.message || data?.message || `IFM API error status ${response.status}`);
+    }
+
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('IFM AI API error:', err);
+    res.status(500).json({ error: err.message || 'Failed to communicate with IFM AI API' });
+  }
+});
+
 // Attach API Router under /api
 app.use('/api', apiRouter);
 

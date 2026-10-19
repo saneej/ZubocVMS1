@@ -129,6 +129,28 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </button>
           )}
 
+          {/* Hard Refresh & Clear Browser Cache */}
+          <button
+            onClick={async () => {
+              try {
+                if ('caches' in window) {
+                  const names = await caches.keys();
+                  await Promise.all(names.map(n => caches.delete(n)));
+                }
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(regs.map(r => r.unregister()));
+                }
+              } catch {}
+              window.location.href = window.location.pathname + '?clear_cache=' + Date.now();
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+            title="Hard Refresh & Clear Cache instantly"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+            <span className="hidden xl:inline">Clear Cache</span>
+          </button>
+
           {/* PWA Install Button */}
           <PWAInstallButton />
 

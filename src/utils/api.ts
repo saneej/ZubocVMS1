@@ -661,6 +661,37 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       }
       return { success: true, message: `Staff member ${id} removed successfully` };
     }
+
+    if (cleanPath.includes('/ifm/chat')) {
+      const messages = body.messages;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        throw new Error('messages array is required');
+      }
+      const latestMessage = messages[messages.length - 1] || { role: 'user', content: 'Hello' };
+      const payloadMessages = [
+        {
+          role: 'user',
+          content: typeof latestMessage.content === 'string' ? latestMessage.content : JSON.stringify(latestMessage.content)
+        }
+      ];
+
+      const response = await fetch('https://api.ifm.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer IFM-v1_d4sAGkIRgbpx7-PjHCqNJdpxTdjAVETb0sxzHd1DYFV7zPasHQnnS00CFePOaMsN',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages: payloadMessages,
+          model: 'IFM/K2-Horizon-375B-A23B'
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error?.message || data?.message || 'IFM API error');
+      }
+      return { success: true, data };
+    }
   }
 
   return undefined;
