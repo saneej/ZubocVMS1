@@ -479,8 +479,7 @@ function cleanTelegramCredential(str: string): string {
   return str.trim().replace(/^["']|["']$/g, '');
 }
 
-syncSettingsFromFirestore();
-syncOrdersWithFirestore();
+// syncSettingsFromFirestore and syncOrdersWithFirestore are disabled on cold boot to prevent burning daily read quota
 
 // API Router supporting both /api/... and direct serverless paths
 const apiRouter = express.Router();
@@ -724,16 +723,8 @@ apiRouter.post('/auth/login', async (req, res) => {
   });
 });
 
-// Orders GET
+// Orders GET - Serves fast from server memory, consuming ZERO Firestore read units
 apiRouter.get('/orders', async (req, res) => {
-  if (firestoreDb && !firestoreQuotaExceeded) {
-    try {
-      await syncOrdersWithFirestore();
-    } catch (e) {
-      console.error('Error syncing orders in GET /orders:', e);
-    }
-  }
-
   const orders = Object.values(ordersStore).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -790,11 +781,16 @@ apiRouter.post('/orders', async (req, res) => {
       await sendTelegramUpdate(record);
   }
 
-  if (firestoreDb) {
+  if (firestoreDb && !firestoreQuotaExceeded) {
     try {
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
-    } catch (e) {
-      console.error('Error writing order record to Firestore:', e);
+    } catch (e: any) {
+      if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+        firestoreQuotaExceeded = true;
+        console.warn('Firestore write quota limit reached. Safely persisting to server storage.');
+      } else {
+        console.error('Error writing order record to Firestore:', e);
+      }
     }
   }
 
@@ -907,12 +903,16 @@ apiRouter.post('/orders/:orderId', async (req, res) => {
       await sendTelegramUpdate(record);
   }
 
-  if (firestoreDb) {
+  if (firestoreDb && !firestoreQuotaExceeded) {
     try {
-      console.log('Writing to Firestore order:', orderId, 'Data:', JSON.stringify(record));
       await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
-    } catch (e) {
-      console.error('Error updating order record in Firestore:', e);
+    } catch (e: any) {
+      if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+        firestoreQuotaExceeded = true;
+        console.warn('Firestore write quota limit reached. Safely persisting to server storage.');
+      } else {
+        console.error('Error updating order record in Firestore:', e);
+      }
     }
   }
 
@@ -929,11 +929,15 @@ apiRouter.delete('/orders/:orderId', async (req, res) => {
   delete ordersStore[orderId];
   saveLocalBackup();
 
-  if (firestoreDb) {
+  if (firestoreDb && !firestoreQuotaExceeded) {
     try {
       await deleteDoc(doc(firestoreDb, 'orders', orderId));
-    } catch (e) {
-      console.error('Error deleting order from Firestore:', e);
+    } catch (e: any) {
+      if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+        firestoreQuotaExceeded = true;
+      } else {
+        console.error('Error deleting order from Firestore:', e);
+      }
     }
   }
 

@@ -579,16 +579,7 @@ class UploadQueueManager {
       console.warn('LocalStorage save warning:', e);
     }
 
-    // 2. Update Firestore database
-    if (db) {
-      try {
-        await setDoc(doc(db, 'orders', task.orderId), cleanForFirestore(updatedRecord), { merge: true });
-      } catch (e) {
-        console.warn('Firestore order save warning:', e);
-      }
-    }
-
-    // 3. Post to backend server API silently
+    // 2. Post to backend server API (handles single-source persistence & avoids duplicate writes)
     try {
       safeFetchJson('/api/orders', {
         method: 'POST',

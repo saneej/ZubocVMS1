@@ -79,28 +79,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     };
     try {
       if (onUpdateOrder) {
-        onUpdateOrder(orderRecord);
+        await onUpdateOrder(orderRecord);
       }
-      const res = await safeFetchJson("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderRecord)
-      });
-      if (res && res.success) {
-        onRefreshOrders();
-        setIsAddOrderOpen(false);
-        setNewOrderId("");
-        setNewCustomer("");
-        setNewAwb("");
-        setNewSku("");
-        setNewWeight("");
-        setNewItemCount("1");
-        setNewOrderTotal("");
-        setNewNotes("");
-        setNewRemarks("");
-      } else {
-        alert("Failed to save pre-entered order");
-      }
+      setIsAddOrderOpen(false);
+      setNewOrderId("");
+      setNewCustomer("");
+      setNewAwb("");
+      setNewSku("");
+      setNewWeight("");
+      setNewItemCount("1");
+      setNewOrderTotal("");
+      setNewNotes("");
+      setNewRemarks("");
     } catch (err) {
       console.error("Error pre-entering order:", err);
       alert("Error pre-entering order");

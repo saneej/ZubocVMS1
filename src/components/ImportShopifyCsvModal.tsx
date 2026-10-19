@@ -198,22 +198,6 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
         })
       });
 
-      setImportProgress(75);
-
-      // 2. Also ensure Firestore setDoc for client persistence
-      for (const rec of formattedPayload) {
-        if (!rec.orderId) continue;
-        const exists = existingSet.has(rec.orderId.toLowerCase());
-        if (exists && conflictStrategy === 'skip') continue;
-
-        try {
-          const docRef = doc(db, 'orders', rec.orderId);
-          await setDoc(docRef, cleanForFirestore(rec), { merge: true });
-        } catch (fsErr) {
-          console.warn('Firestore bulk client write warning:', fsErr);
-        }
-      }
-
       setImportProgress(100);
 
       if (res && res.stats) {

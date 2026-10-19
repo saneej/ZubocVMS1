@@ -157,22 +157,9 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
   if (cleanPath.includes('/orders')) {
     if (method === 'GET') {
       let orders: any[] = [];
-      if (db) {
-        try {
-          const snap = await getDocs(collection(db, 'orders'));
-          const fsOrders: any[] = [];
-          snap.forEach(d => fsOrders.push(d.data()));
-          orders = fsOrders;
-          localStorage.setItem('zuboc_orders_store', JSON.stringify(orders));
-        } catch (e) {
-          console.warn('Error fetching orders from Firestore in client fallback:', e);
-        }
-      }
-      if (orders.length === 0) {
-        const localOrders = localStorage.getItem('zuboc_orders_store');
-        if (localOrders) {
-          try { orders = JSON.parse(localOrders); } catch {}
-        }
+      const localOrders = localStorage.getItem('zuboc_orders_cache') || localStorage.getItem('zuboc_orders_store');
+      if (localOrders) {
+        try { orders = JSON.parse(localOrders); } catch {}
       }
       return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (method === 'POST') {

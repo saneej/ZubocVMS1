@@ -210,18 +210,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       localStorage.setItem('zuboc_telegram_chatid', sanitizedChatId);
       localStorage.setItem('zuboc_station_id', sanitizedStationId);
 
-      if (db) {
-        try {
-          await setDoc(doc(db, 'settings', 'config'), cleanForFirestore({
-            telegramBotToken: localStorage.getItem('zuboc_telegram_token') || sanitizedToken,
-            telegramChatId: sanitizedChatId,
-            stationId: sanitizedStationId,
-            autoUpload: true,
-            updatedAt: new Date().toISOString()
-          }), { merge: true });
-        } catch {}
-      }
-
       try {
         await safeFetchJson('/api/settings', {
           method: 'POST',

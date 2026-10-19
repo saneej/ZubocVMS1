@@ -97,15 +97,6 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       updatedAt: now
     };
 
-    let fsCreated = false;
-    try {
-      const docRef = doc(db, 'orders', cleanId);
-      await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
-      fsCreated = true;
-    } catch (fsErr) {
-      console.error('Firestore client create error:', fsErr);
-    }
-
     try {
       const res = await safeFetchJson('/api/orders', {
         method: 'POST',
@@ -116,10 +107,12 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setSuccessMsg(`Order ${cleanId} added successfully!`);
       if (onSuccess) onSuccess((res && res.record) ? res.record : newRecord as OrderRecord);
     } catch (err) {
-      if (fsCreated) {
+      try {
+        const docRef = doc(db, 'orders', cleanId);
+        await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
         setSuccessMsg(`Order ${cleanId} added successfully!`);
         if (onSuccess) onSuccess(newRecord as OrderRecord);
-      } else {
+      } catch (fsErr) {
         console.error('Error adding order record:', err);
         setError('Failed to save order record. Please check your network connection.');
         setIsSubmitting(false);

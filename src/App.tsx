@@ -57,15 +57,20 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
-    // 1. Always try loading from cache first
+    // 1. Always try loading from cache first (0 network, 0 quota)
     const cached = localStorage.getItem('zuboc_orders_cache');
+    let hasCached = false;
     if (cached) {
       try {
-        setOrders(JSON.parse(cached));
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setOrders(parsed);
+          hasCached = true;
+        }
       } catch {}
     }
 
-    // 2. Try server API
+    // 2. Try server API (consumes 0 Firestore reads because server serves from memory)
     try {
       const response = await safeFetchJson('/api/orders');
       if (response && Array.isArray(response) && response.length > 0) {
@@ -75,18 +80,20 @@ const AppContent: React.FC = () => {
       }
     } catch {}
 
-    // 3. Fallback to direct Firestore, but handle quota exhaustion explicitly
-    try {
-      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
-      const snap = await getDocs(q);
-      const fsOrders = snap.docs.map((d: any) => d.data() as OrderRecord);
-      setOrders(fsOrders);
-      localStorage.setItem('zuboc_orders_cache', JSON.stringify(fsOrders));
-      setIsFirestoreQuotaExceeded(false);
-    } catch (e: any) {
-      if (e?.code === 'resource-exhausted') {
-        setIsFirestoreQuotaExceeded(true);
-        console.warn('Firestore quota exceeded. Using cached data.');
+    // 3. Only query direct Firestore if cache was completely empty and quota not exceeded
+    if (!hasCached && !isFirestoreQuotaExceeded) {
+      try {
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(25));
+        const snap = await getDocs(q);
+        const fsOrders = snap.docs.map((d: any) => d.data() as OrderRecord);
+        if (fsOrders.length > 0) {
+          setOrders(fsOrders);
+          localStorage.setItem('zuboc_orders_cache', JSON.stringify(fsOrders));
+        }
+      } catch (e: any) {
+        if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
+          setIsFirestoreQuotaExceeded(true);
+        }
       }
     }
   };
@@ -129,6 +136,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleOrderCompleted = async (newRecord: OrderRecord) => {
+    // 1. Update React state and browser cache immediately (Instant UI)
     setOrders(prev => {
       const next = [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)];
       try {
@@ -137,15 +145,7 @@ const AppContent: React.FC = () => {
       return next;
     });
 
-    try {
-      const docRef = doc(db, 'orders', newRecord.orderId);
-      await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
-    } catch (fsErr: any) {
-      if (fsErr?.message?.includes('Quota') || fsErr?.code === 'resource-exhausted') {
-        setIsFirestoreQuotaExceeded(true);
-      }
-    }
-
+    // 2. Single-source persistence via server (eliminates duplicate Firestore writes)
     try {
       await safeFetchJson('/api/orders', {
         method: 'POST',
@@ -156,6 +156,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
+    // 1. Update React state and browser cache immediately
     setOrders(prev => {
       const next = prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o);
       try {
@@ -164,15 +165,7 @@ const AppContent: React.FC = () => {
       return next;
     });
 
-    try {
-      const docRef = doc(db, 'orders', updatedOrder.orderId);
-      await setDoc(docRef, cleanForFirestore(updatedOrder), { merge: true });
-    } catch (fsErr: any) {
-      if (fsErr?.message?.includes('Quota') || fsErr?.code === 'resource-exhausted') {
-        setIsFirestoreQuotaExceeded(true);
-      }
-    }
-
+    // 2. Single-source persistence via server
     try {
       await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
         method: 'POST',
@@ -190,9 +183,6 @@ const AppContent: React.FC = () => {
       } catch {}
       return next;
     });
-    try {
-      await deleteDoc(doc(db, 'orders', orderId));
-    } catch (fsErr: any) {}
     try {
       await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
     } catch (apiErr) {}

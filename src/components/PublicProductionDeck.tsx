@@ -14,9 +14,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { OrderRecord, ProductionStage, ZubocCustomisations } from '../types';
-import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
 import { getCurrentISTString } from '../utils/time';
+import { safeFetchJson } from '../utils/api';
 
 interface StageConfig {
   id: ProductionStage;
@@ -138,21 +137,22 @@ export const PublicProductionDeck: React.FC = () => {
   const fetchPublicOrders = async () => {
     setIsSyncing(true);
     try {
+      // 1. Try local cache first for instant display
       const cached = localStorage.getItem('zuboc_orders_cache');
       if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setOrders(parsed.filter((o: OrderRecord) => o.isProductionDeckOrder));
-        }
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setOrders(parsed.filter((o: OrderRecord) => o.isProductionDeckOrder));
+          }
+        } catch {}
       }
 
-      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
-      const snap = await getDocs(q);
-      const fsOrders = snap.docs.map((d: any) => d.data() as OrderRecord);
-      if (fsOrders.length > 0) {
-        const deckOrders = fsOrders.filter(o => o.isProductionDeckOrder);
-        setOrders(deckOrders);
-        localStorage.setItem('zuboc_orders_cache', JSON.stringify(fsOrders));
+      // 2. Fetch from server API (reads from server memory, 0 Firestore quota used)
+      const res = await safeFetchJson('/api/orders');
+      if (res && Array.isArray(res) && res.length > 0) {
+        setOrders(res.filter((o: OrderRecord) => o.isProductionDeckOrder));
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(res));
       }
     } catch (e) {
       console.warn('Public fetch warning:', e);
