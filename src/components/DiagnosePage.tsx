@@ -527,10 +527,14 @@ export const DiagnosePage: React.FC = () => {
                 {/* Connectivity Section */}
                 <div className="space-y-1">
                   <div className="text-amber-400 font-bold border-b border-slate-800 mb-1">CONNECTIVITY</div>
+                  <div className="flex justify-between"><span className="text-slate-500">Node fetch:</span> <span className={systemReport.data.report?.connectivity?.hasFetch ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{systemReport.data.report?.connectivity?.hasFetch ? 'YES' : 'NO'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Internet (Google):</span> <span className={systemReport.data.report?.connectivity?.googleReachable ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{systemReport.data.report?.connectivity?.googleReachable ? 'ONLINE ✅' : 'OFFLINE ❌'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">Supabase API:</span> <span className={systemReport.data.report?.connectivity?.supabaseReachable ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{systemReport.data.report?.connectivity?.supabaseReachable ? 'ONLINE ✅' : 'OFFLINE ❌'}</span></div>
-                  {systemReport.data.report?.connectivity?.error && (
-                    <div className="text-rose-400 text-[10px] mt-1 break-words">Error: {systemReport.data.report?.connectivity?.error}</div>
+                  {systemReport.data.report?.connectivity?.googleError && (
+                    <div className="text-rose-400 text-[10px] mt-1 break-words">Google Err: {systemReport.data.report?.connectivity?.googleError}</div>
+                  )}
+                  {systemReport.data.report?.connectivity?.supabasePingError && (
+                    <div className="text-rose-400 text-[10px] mt-1 break-words">Supa Ping Err: {systemReport.data.report?.connectivity?.supabasePingError}</div>
                   )}
                 </div>
               </div>

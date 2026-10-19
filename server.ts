@@ -278,12 +278,29 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 8000): Pr
     const result = await Promise.race([promise, timeoutPromise]);
     return result;
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
 let isSupabaseReady = false;
 let hasPerformedInitialSync = false;
+let syncPromise: Promise<void> | null = null;
+
+// Ensure initial sync happens exactly once, even in serverless environments
+async function ensureInitialSync() {
+  if (hasPerformedInitialSync) return;
+  if (syncPromise) return syncPromise;
+  
+  syncPromise = syncFromSupabase().then(() => {
+    hasPerformedInitialSync = true;
+    syncPromise = null;
+  }).catch(err => {
+    console.error('Background sync failed:', err);
+    syncPromise = null;
+  });
+  
+  return syncPromise;
+}
 
 const DATA_FILE = path.join(__dirname, 'vms_data.json');
 const TMP_DATA_FILE = '/tmp/vms_data.json';
@@ -924,29 +941,38 @@ apiRouter.get('/diag/system-report', async (req, res) => {
       staffsCount: Object.keys(staffsStore).length
     },
     connectivity: {
+      googleReachable: false,
       supabaseReachable: false,
-      googleReachable: false
+      hasFetch: typeof fetch !== 'undefined'
     }
   };
 
+  // 1. Check Internet Connectivity
   try {
-    // 1. Check Internet Connectivity
-    const googlePing = await withTimeout(fetch('https://www.google.com', { method: 'HEAD' }), 3000);
-    report.connectivity.googleReachable = googlePing.ok;
-    
-    // 2. Check Supabase Connectivity (Raw Ping)
-    const supaUrl = SUPABASE_URL.replace('/rest/v1', '');
-    const supaPing = await withTimeout(fetch(supaUrl, { method: 'HEAD' }), 3000);
-    report.connectivity.supabaseReachable = supaPing.ok;
+    if (typeof fetch !== 'undefined') {
+      const googlePing = await withTimeout(fetch('https://www.google.com', { method: 'HEAD' }), 3000);
+      report.connectivity.googleReachable = googlePing.ok;
+    }
   } catch (e: any) {
-    report.connectivity.error = e.message;
+    report.connectivity.googleError = e.message;
+  }
+    
+  // 2. Check Supabase Connectivity (Raw Ping)
+  try {
+    if (typeof fetch !== 'undefined') {
+      const supaUrl = (SUPABASE_URL || '').split('.co')[0] + '.co';
+      const supaPing = await withTimeout(fetch(supaUrl, { method: 'HEAD' }), 3000);
+      report.connectivity.supabaseReachable = supaPing.ok;
+    }
+  } catch (e: any) {
+    report.connectivity.supabasePingError = e.message;
   }
 
   try {
     // 3. Check Supabase DB Status
     const client = getSupabaseClient();
     if (client) {
-    const { error } = (await withTimeout(client.from('orders').select('orderId').limit(1), 4000)) as { error: any };
+      const { error } = (await withTimeout(client.from('orders').select('orderId').limit(1), 4000)) as { error: any };
       report.database = {
         supabase: error ? 'ERROR' : 'CONNECTED',
         error: error?.message,
@@ -2286,7 +2312,15 @@ apiRouter.post('/ifm/chat', async (req, res) => {
 });
 
 // Attach API Router under /api
-app.use('/api', apiRouter);
+// Add warmup middleware for serverless/cold-starts
+app.use('/api', async (req, res, next) => {
+  try {
+    await ensureInitialSync();
+  } catch (e) {
+    console.error('API Warmup error:', e);
+  }
+  next();
+}, apiRouter);
 
 // Global Express Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
