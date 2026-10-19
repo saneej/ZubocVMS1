@@ -99,7 +99,9 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
   if (cleanPath.includes('/supabase/status')) {
     try {
       const { createClient } = await import('@supabase/supabase-js');
-      const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+      const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U', {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
       const { data, error } = await client.from('orders').select('orderId').limit(1);
       if (error) {
         return { connected: false, tableExists: false, message: error.message };
@@ -125,7 +127,9 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       // Direct Supabase Verification
       try {
         const { createClient } = await import('@supabase/supabase-js');
-        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U', {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
         const { data: supaStaffs } = await client.from('staffs').select('*');
         if (Array.isArray(supaStaffs) && supaStaffs.length > 0) {
           const found = supaStaffs.find((s: any) => {
@@ -308,7 +312,9 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       }
       try {
         const { createClient } = await import('@supabase/supabase-js');
-        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U', {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
         await client.from('orders').upsert(record, { onConflict: 'orderId' });
       } catch {}
       return { success: true, record };

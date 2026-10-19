@@ -1934,9 +1934,8 @@ apiRouter.post('/telegram/detect-chat-id', async (req, res) => {
   }
 });
 
-// Attach API Router under both /api and / for Vercel Serverless Functions
+// Attach API Router under /api
 app.use('/api', apiRouter);
-app.use('/', apiRouter);
 
 // Global Express Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
