@@ -270,10 +270,47 @@ export const DiagnosePage: React.FC = () => {
     }
   };
 
-  const handleClearCache = () => {
-    localStorage.removeItem('zuboc_orders_cache');
+  const handleClearCache = async () => {
+    // 1. Clear all relevant local storage keys
+    const keysToRemove = [
+      'zuboc_orders_cache', 
+      'zuboc_orders_store', 
+      'zuboc_staffs_cache', 
+      'zuboc_staffs_store', 
+      'zuboc_auth_user',
+      'zuboc_selected_camera',
+      'zuboc_station_id',
+      'zuboc_telegram_token',
+      'zuboc_telegram_chatid',
+      'zuboc_auto_upload',
+      'zuboc_tv_capacity_limit',
+      'zuboc_diag_reads',
+      'zuboc_diag_writes'
+    ];
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    addLog('Local storage cleared. Attempting to purge Service Worker cache...', 'warn');
+
+    // 2. Unregister Service Workers (Fixes the "browser not updating" issue)
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+        addLog('Service Worker unregistered. Update will pull on next reload.', 'success');
+      } catch (e: any) {
+        addLog(`Failed to unregister SW: ${e.message}`, 'error');
+      }
+    }
+
+    // 3. Force reload
     updateCacheStats();
-    addLog('Local storage orders cache cleared.', 'warn');
+    addLog('Hard reloading application in 2 seconds to fetch latest updates...', 'info');
+    
+    setTimeout(() => {
+      // Clear cache and hard reload
+      window.location.href = window.location.origin + '?cache_bust=' + Date.now();
+    }, 2000);
   };
 
   const handleResetCounters = () => {

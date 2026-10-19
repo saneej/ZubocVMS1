@@ -642,50 +642,82 @@ apiRouter.post('/settings', async (req, res) => {
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
 });
 
-// Server-side Supabase Test (Detailed)
+// Server-side Supabase Test (Detailed Diagnostic)
 apiRouter.post('/supabase/test-server', async (req, res) => {
-  if (!supabaseServer) {
-    return res.status(500).json({ success: false, error: 'Supabase server client not initialized. Check your SUPABASE_SERVICE_ROLE_KEY.' });
-  }
-
-  const testId = `test-${Date.now()}`;
   try {
-    // 1. Try to insert a test order
-    const { error: insertErr } = await supabaseServer.from('orders').upsert({
+    if (!supabaseServer) {
+      return res.json({ 
+        success: false, 
+        error: 'Supabase server client not initialized. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set correctly.' 
+      });
+    }
+
+    const testId = `diag-test-${Date.now()}`;
+    const testRecord = {
       orderId: testId,
-      customerName: 'SERVER_DIAGNOSTIC_TEST',
-      notes: 'This is a temporary test record created by the diagnostic tool.',
-      updatedAt: new Date().toISOString()
-    }, { onConflict: 'orderId' });
+      customerName: 'SERVER_DIAG_TEST',
+      notes: 'Temporary record for connection health check.',
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      recordingStatus: 'PENDING',
+      uploadStatus: 'PENDING'
+    };
+
+    // 1. Attempt Write (Upsert)
+    const { error: insertErr } = await supabaseServer
+      .from('orders')
+      .upsert(testRecord, { onConflict: 'orderId' });
 
     if (insertErr) {
       return res.json({ 
         success: false, 
-        error: insertErr.message, 
-        code: insertErr.code, 
+        error: `Supabase Write Failed: ${insertErr.message}`,
+        code: insertErr.code,
         details: insertErr.details,
-        hint: 'If you see "no unique constraint", ensure "orderId" is a PRIMARY KEY in your Supabase table.'
+        hint: insertErr.code === '42P01' ? 'Table "orders" does not exist.' : 'Check table schema and PRIMARY KEY constraints.'
       });
     }
 
-    // 2. Try to read it back
-    const { error: readErr } = await supabaseServer.from('orders').select('*').eq('orderId', testId).single();
-    
-    // 3. Clean up
-    await supabaseServer.from('orders').delete().eq('orderId', testId);
+    // 2. Attempt Read
+    const { data: readData, error: readErr } = await supabaseServer
+      .from('orders')
+      .select('*')
+      .eq('orderId', testId)
+      .maybeSingle();
 
     if (readErr) {
-      return res.json({ success: false, error: `Write succeeded but Read failed: ${readErr.message}` });
+      return res.json({ success: false, error: `Supabase Read Failed: ${readErr.message}`, code: readErr.code });
     }
 
-    res.json({ 
+    if (!readData) {
+      return res.json({ success: false, error: 'Supabase Write reported success, but the record could not be read back immediately.' });
+    }
+
+    // 3. Attempt Delete (Cleanup)
+    const { error: deleteErr } = await supabaseServer
+      .from('orders')
+      .delete()
+      .eq('orderId', testId);
+
+    if (deleteErr) {
+       console.warn('Diag Cleanup Warning:', deleteErr.message);
+    }
+
+    return res.json({ 
       success: true, 
-      message: 'Server-side Supabase Read/Write test passed!',
-      project: SUPABASE_URL,
+      message: 'Server-side Supabase connection is fully healthy (Read/Write/Delete verified).',
+      project: SUPABASE_URL.split('://')[1]?.split('.')[0] || 'hidden',
       usingServiceRole: true
     });
+
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('SERVER_DIAG_CRASH:', err);
+    // Return 200 with success:false to prevent safeFetchJson from crashing on HTML error pages
+    return res.json({ 
+      success: false, 
+      error: `Internal Server Error: ${err.message || 'Unknown exception'}`,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 

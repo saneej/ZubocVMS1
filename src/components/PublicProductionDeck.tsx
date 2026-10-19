@@ -499,7 +499,14 @@ export const PublicProductionDeck: React.FC = () => {
 
       {/* Footer */}
       <footer className="py-4 px-6 bg-white border-t border-stone-200 text-center text-xs text-stone-400 flex items-center justify-between">
-        <span className="font-mono text-[11px] font-semibold text-stone-500">Zuboc Luxury Stationery • Public Live Schedule</span>
+        <a 
+          href="https://saneejified.me" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="font-mono text-[10px] font-medium text-stone-400 hover:text-[#832f5e] transition-colors"
+        >
+          crafted by saneejified
+        </a>
         <span className="font-mono text-[11px] font-bold text-slate-700">{currentTime || 'Synced'}</span>
       </footer>
 
