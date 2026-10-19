@@ -58,6 +58,8 @@ interface ProductionDeckProps {
   settings: AppSettings;
   onOpenSettings?: () => void;
   onSaveCapacityLimit?: (limit: number) => void;
+  isTvWallMode?: boolean;
+  setIsTvWallMode?: (active: boolean) => void;
 }
 
 // Stage configuration definition
@@ -260,10 +262,14 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   onRefreshOrders,
   currentStaff,
   settings,
-  onSaveCapacityLimit
+  onSaveCapacityLimit,
+  isTvWallMode: externalIsTvWallMode,
+  setIsTvWallMode: externalSetIsTvWallMode
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [isTvWallMode, setIsTvWallMode] = useState<boolean>(false);
+  const [internalTvMode, setInternalTvMode] = useState<boolean>(false);
+  const isTvWallMode = externalIsTvWallMode !== undefined ? externalIsTvWallMode : internalTvMode;
+  const setIsTvWallMode = externalSetIsTvWallMode || setInternalTvMode;
   const [isAutoScrollActive, setIsAutoScrollActive] = useState<boolean>(true);
   const [scrollSpeed, setScrollSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
   const [isUserHovering, setIsUserHovering] = useState<boolean>(false);

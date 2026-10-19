@@ -13,6 +13,7 @@ import { AddOrderModal } from './components/AddOrderModal';
 import { UploadQueueBanner } from './components/UploadQueueBanner';
 import { LoginPage } from './components/LoginPage';
 import { ProductionDeck } from './components/ProductionDeck';
+import { PublicProductionDeck } from './components/PublicProductionDeck';
 import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -344,7 +345,10 @@ const AppContent: React.FC = () => {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <Routes>
+        <Route path="/public-deck" element={<PublicProductionDeck />} />
+        <Route path="*" element={<AppContent />} />
+      </Routes>
     </BrowserRouter>
   );
 }
