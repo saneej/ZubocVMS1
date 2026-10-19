@@ -23,7 +23,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '../firebase';
-import { getCurrentISTString } from '../utils/time';
+import { safeFetchJson } from '../utils/api';
 
 const SUPABASE_FULL_SQL = `-- 1. Create STAFFS Table
 CREATE TABLE IF NOT EXISTS public.staffs (
@@ -181,18 +181,18 @@ export const DiagnosePage: React.FC = () => {
     setSupabaseState(prev => ({ ...prev, loading: true }));
     addLog('Checking Supabase connection and tables status...', 'info');
     try {
-      const res = await fetch('/api/supabase/status').then(r => r.json());
+      const res = await safeFetchJson('/api/supabase/status');
       setSupabaseState({
         loading: false,
-        connected: res.connected,
-        tableExists: res.tableExists,
-        sampleCount: res.sampleCount,
-        message: res.message
+        connected: Boolean(res?.connected),
+        tableExists: Boolean(res?.tableExists),
+        sampleCount: res?.sampleCount || 0,
+        message: res?.message || res?.error
       });
-      if (res.connected && res.tableExists) {
+      if (res?.connected && res?.tableExists) {
         addLog('Supabase connected and tables verified ready.', 'success');
       } else {
-        addLog(`Supabase connected, but tables not created yet (${res.message || 'PGRST205'}).`, 'warn');
+        addLog(`Supabase connected, but tables not created yet (${res?.message || res?.error || 'PGRST205'}).`, 'warn');
       }
     } catch (err: any) {
       setSupabaseState({ loading: false, connected: false, message: err.message });
@@ -204,12 +204,12 @@ export const DiagnosePage: React.FC = () => {
     setIsMigrating(true);
     addLog('Starting 1-click data migration to Supabase...', 'info');
     try {
-      const res = await fetch('/api/supabase/migrate', { method: 'POST' }).then(r => r.json());
-      if (res.success) {
+      const res = await safeFetchJson('/api/supabase/migrate', { method: 'POST' });
+      if (res?.success) {
         addLog(res.message, 'success');
         checkSupabaseStatus();
       } else {
-        addLog(`Migration failed: ${res.error}`, 'error');
+        addLog(`Migration failed: ${res?.error || 'Unknown error'}`, 'error');
       }
     } catch (err: any) {
       addLog(`Migration error: ${err.message}`, 'error');

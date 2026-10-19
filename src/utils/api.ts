@@ -95,6 +95,21 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     };
   }
 
+  // Supabase Status Fallback
+  if (cleanPath.includes('/supabase/status')) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+      const { data, error } = await client.from('orders').select('orderId').limit(1);
+      if (error) {
+        return { connected: false, tableExists: false, message: error.message };
+      }
+      return { connected: true, tableExists: true, sampleCount: data ? data.length : 0 };
+    } catch (e: any) {
+      return { connected: false, tableExists: false, error: e?.message };
+    }
+  }
+
   // 2. Settings GET / POST
   if (cleanPath.endsWith('/settings')) {
     if (method === 'GET') {

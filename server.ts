@@ -644,20 +644,28 @@ apiRouter.get('/supabase/status', async (req, res) => {
   if (!supabaseServer) {
     return res.json({ connected: false, error: 'No client initialized' });
   }
-  const { data, error } = await supabaseServer.from('orders').select('orderId').limit(1);
-  if (error) {
+  try {
+    const { data, error } = await supabaseServer.from('orders').select('orderId').limit(1);
+    if (error) {
+      return res.json({
+        connected: false,
+        tableExists: false,
+        code: error.code,
+        message: error.message
+      });
+    }
+    return res.json({
+      connected: true,
+      tableExists: true,
+      sampleCount: data ? data.length : 0
+    });
+  } catch (err: any) {
     return res.json({
       connected: false,
       tableExists: false,
-      code: error.code,
-      message: error.message
+      error: err?.message || 'Error checking Supabase status'
     });
   }
-  return res.json({
-    connected: true,
-    tableExists: true,
-    sampleCount: data ? data.length : 0
-  });
 });
 
 // Push/Migrate all current in-memory orders, staffs, and settings to Supabase
