@@ -19,6 +19,7 @@ import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
+import { supabase } from './supabase';
 import { cleanForFirestore } from './utils/firestoreHelper';
 import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
 import { INITIAL_STAFFS } from './utils/initialStaffs';
@@ -57,20 +58,18 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
-    // 1. Always try loading from cache first (0 network, 0 quota)
+    // 1. Try loading from cache first
     const cached = localStorage.getItem('zuboc_orders_cache');
-    let hasCached = false;
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setOrders(parsed);
-          hasCached = true;
         }
       } catch {}
     }
 
-    // 2. Try server API (consumes 0 Firestore reads because server serves from memory)
+    // 2. Try server API
     try {
       const response = await safeFetchJson('/api/orders');
       if (response && Array.isArray(response) && response.length > 0) {
@@ -80,21 +79,19 @@ const AppContent: React.FC = () => {
       }
     } catch {}
 
-    // 3. Only query direct Firestore if cache was completely empty, db is initialized, and quota not exceeded
-    if (!hasCached && !isFirestoreQuotaExceeded && db) {
-      try {
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(25));
-        const snap = await getDocs(q);
-        const fsOrders = snap.docs.map((d: any) => d.data() as OrderRecord);
-        if (fsOrders.length > 0) {
-          setOrders(fsOrders);
-          localStorage.setItem('zuboc_orders_cache', JSON.stringify(fsOrders));
-        }
-      } catch (e: any) {
-        if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
-          setIsFirestoreQuotaExceeded(true);
-        }
+    // 3. Direct Supabase client query (guarantees fetching orders directly from Supabase DB)
+    try {
+      const { data: supaOrders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      if (!error && Array.isArray(supaOrders) && supaOrders.length > 0) {
+        setOrders(supaOrders);
+        localStorage.setItem('zuboc_orders_cache', JSON.stringify(supaOrders));
+        return;
       }
+    } catch (supaErr) {
+      console.warn('Direct Supabase fetch notice:', supaErr);
     }
   };
 
