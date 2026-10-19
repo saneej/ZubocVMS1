@@ -106,6 +106,7 @@ export interface OrderRecord {
   promisedDeliveryDate?: string;
   paymentGate?: PaymentGateInfo;
   productionStage?: ProductionStage;
+  stageDueDates?: Record<string, string>;
   productionNotes?: string;
   isProductionDeckOrder?: boolean;
 

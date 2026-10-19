@@ -458,6 +458,27 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     await onUpdateOrder(updated);
   };
 
+  const handleDropOnStage = async (targetStage: ProductionStage, orderId: string) => {
+    const matchedItem = normalizedList.find(item => item.raw.orderId === orderId);
+    if (!matchedItem) return;
+    const order = matchedItem.raw;
+    const norm = matchedItem.norm;
+
+    if (targetStage === 'DISPATCHED' && !norm.isBalancePaid && !norm.payment.adminDispatchOverride) {
+      setDispatchOverrideOrder(order);
+      return;
+    }
+
+    const updated: OrderRecord = {
+      ...order,
+      productionStage: targetStage,
+      fulfillmentStatus: targetStage === 'DISPATCHED' ? 'Shipped' : targetStage === 'QC_PACKED' ? 'Packed' : 'Pending',
+      updatedAt: new Date().toISOString()
+    };
+
+    await onUpdateOrder(updated);
+  };
+
   const handleConfirmDispatchOverride = async () => {
     if (!dispatchOverrideOrder) return;
     const now = new Date().toISOString();
@@ -747,7 +768,15 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
                 </div>
 
                 {/* Cards List */}
-                <div className="flex-1 p-3 space-y-3 min-h-[500px]">
+                <div 
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const orderId = e.dataTransfer.getData('text/plain');
+                    if (orderId) handleDropOnStage(stage.id, orderId);
+                  }}
+                  className="flex-1 p-3 space-y-3 min-h-[500px] transition-colors hover:bg-slate-50/50 rounded-b-2xl"
+                >
                   {columnItems.length === 0 ? (
                     <div className={`h-40 flex flex-col items-center justify-center border border-dashed rounded-xl p-4 text-center ${
                       isTvWallMode ? 'border-slate-800 text-slate-600' : 'border-stone-200 text-stone-400'
@@ -951,10 +980,14 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
 
   return (
     <div 
+      draggable={true}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', order.orderId);
+      }}
       className={`
-        group rounded-xl border transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer overflow-hidden p-3.5 space-y-2.5
+        group rounded-xl border transition-all duration-150 shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing overflow-hidden p-3.5 space-y-2.5
         ${isTvWallMode 
-          ? 'bg-slate-800/80 border-slate-700/80 hover:border-slate-500 text-slate-100' 
+          ? 'bg-slate-800/90 border-slate-700 hover:border-slate-500 text-slate-100' 
           : 'bg-white border-stone-200 hover:border-stone-300 text-slate-900'
         }
       `}
@@ -966,6 +999,13 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
         </span>
         {renderDuePill()}
       </div>
+
+      {order.stageDueDates?.[currentStage] && (
+        <div className="text-[10px] font-mono bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
+          <Clock className="w-3 h-3 text-amber-600" />
+          <span>Step Target: {order.stageDueDates[currentStage]}</span>
+        </div>
+      )}
 
       <div>
         <h3 className="font-bold text-sm tracking-tight leading-snug">
@@ -1068,6 +1108,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
   const [balanceAmount, setBalanceAmount] = useState<number>(norm.balance);
   const [balanceStatus, setBalanceStatus] = useState<'COMPLETED' | 'PENDING'>(norm.payment.balanceStatus || 'PENDING');
   const [remarks, setRemarks] = useState<string>(norm.notes);
+  const [stageDueDates, setStageDueDates] = useState<Record<string, string>>(order.stageDueDates || {});
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -1111,6 +1152,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
       customisations,
       subAssemblyProgress: subAssembly,
       productionStage: currentStage,
+      stageDueDates,
       timeline,
       promisedDeliveryDate,
       dispatchDate: promisedDeliveryDate,
@@ -1172,6 +1214,24 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
                 >
                   Step {i + 1}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Step Target / Due Dates */}
+          <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+            <label className="font-bold uppercase text-stone-700">Step Target / Due Dates</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {STAGES.map((s) => (
+                <div key={s.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-stone-200">
+                  <span className="text-[11px] font-bold text-stone-700 truncate max-w-[130px]" title={s.title}>{s.title}</span>
+                  <input
+                    type="date"
+                    value={stageDueDates[s.id] || ''}
+                    onChange={(e) => setStageDueDates({ ...stageDueDates, [s.id]: e.target.value })}
+                    className="px-2 py-1 rounded border border-stone-300 text-[11px] font-mono"
+                  />
+                </div>
               ))}
             </div>
           </div>
