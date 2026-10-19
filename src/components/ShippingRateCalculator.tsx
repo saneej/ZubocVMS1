@@ -227,11 +227,13 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
   const [showAuditTable, setShowAuditTable] = useState(false);
 
   // IFM.ai Assistant State
-  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; thinking?: string }>>([
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; thinking?: string; reasoning_content?: string; thought?: string }>>([
     { 
       role: 'assistant', 
       content: 'Hello! I am your IFM.ai K2-Horizon Shipping Advisor (Model: IFM/K2-Horizon-375B-A23B). Ask me anything about courier rates, zones, or packaging optimization!',
-      thinking: 'I am initialized and ready to assist with shipping-related queries.'
+      thinking: 'I am initialized and ready to assist with shipping-related queries.',
+      reasoning_content: 'I am initialized and ready to assist with shipping-related queries.',
+      thought: 'I am initialized and ready to assist with shipping-related queries.'
     }
   ]);
   const [aiInput, setAiInput] = useState('');
@@ -251,10 +253,9 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ 
-            role: m.role, 
-            content: m.content,
-            ...(m.role === 'assistant' ? { thinking: m.thinking || '' } : {})
+          messages: newMessages.map(m => ({
+            role: m.role,
+            content: m.content
           }))
         })
       });

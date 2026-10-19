@@ -2292,11 +2292,10 @@ apiRouter.post('/ifm/chat', async (req, res) => {
   const apiUrl = 'https://api.ifm.ai/v1/chat/completions';
   const modelName = 'IFM/K2-Horizon-375B-A23B';
 
-  // Support multi-turn by passing full history with required 'thinking' field for assistant role
+  // Support multi-turn by passing full history
   const payloadMessages = messages.map((m: any) => ({
     role: m.role,
-    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-    ...(m.role === 'assistant' ? { thinking: m.thinking || '' } : {})
+    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
   }));
 
   try {

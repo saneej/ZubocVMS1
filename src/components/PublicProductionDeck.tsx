@@ -312,7 +312,7 @@ export const PublicProductionDeck: React.FC = () => {
             <p className="text-xs font-mono font-bold uppercase tracking-widest text-stone-500">Loading Live Schedule...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 min-w-[1300px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
             {STAGES.map((stage) => {
               const columnItems = stageColumns[stage.id] || [];
               const Icon = stage.icon;
