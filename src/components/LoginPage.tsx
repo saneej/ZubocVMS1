@@ -14,13 +14,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleVerifyAccess = async (codeToVerify?: string) => {
-    const targetCode = (codeToVerify !== undefined ? codeToVerify : accessCode).trim();
+  const handleVerifyAccess = async () => {
+    const targetCode = accessCode.trim();
     setErrorMessage(null);
     setSuccessMessage(null);
 
     if (!targetCode) {
-      setErrorMessage('Please enter your Access Code.');
+      setErrorMessage('Please enter your Station Access Phrase.');
       return;
     }
 
@@ -39,7 +39,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           onLoginSuccess(res.staff);
         }, 300);
       } else {
-        setErrorMessage(res?.error || 'Invalid Access Code. Access Denied.');
+        setErrorMessage(res?.error || 'Invalid Access Phrase. Access Denied.');
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Authentication error. Please try again.');
@@ -51,20 +51,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleVerifyAccess();
-  };
-
-  const handleKeypadPress = (digit: string) => {
-    const nextCode = accessCode + digit;
-    setAccessCode(nextCode);
-  };
-
-  const handleKeypadClear = () => {
-    setAccessCode('');
-    setErrorMessage(null);
-  };
-
-  const handleKeypadBackspace = () => {
-    setAccessCode(prev => prev.slice(0, -1));
   };
 
   return (
@@ -90,14 +76,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Main Access Card */}
-        <div className="bg-white/95 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 shadow-2xl shadow-black/50 space-y-5">
+        <div className="bg-white/95 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/50 space-y-5">
           
           <form onSubmit={handleSubmit} className="space-y-4">
             
             <div className="border-b border-stone-200 pb-3 flex items-center justify-between">
               <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider font-mono flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-[#832f5e]" />
-                <span>Station Passcode</span>
+                <span>Station Passphrase</span>
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#832f5e]/10 text-[#832f5e] font-mono">
                 ENCRYPTED
@@ -106,7 +92,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
             {/* Feedback Messages */}
             {errorMessage && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-2xl text-xs font-mono flex items-center gap-2 animate-shake">
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-2xl text-xs font-mono flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span className="font-bold">{errorMessage}</span>
               </div>
@@ -119,10 +105,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {/* Access Code Input */}
+            {/* Word Phrase / Access Code Input */}
             <div className="space-y-1.5 font-mono">
               <label className="block text-[11px] font-bold text-stone-700 uppercase tracking-wider">
-                Enter Access Code / PIN
+                Enter Access Phrase or Code
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
@@ -130,64 +116,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   type={showCode ? "text" : "password"}
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Enter word phrase or PIN..."
                   autoFocus
                   required
                   autoComplete="off"
-                  className="w-full bg-stone-50 border border-stone-300 focus:border-[#832f5e] focus:bg-white rounded-2xl pl-10 pr-10 py-3 text-slate-900 text-base font-mono font-bold tracking-widest focus:outline-none transition-all shadow-inner"
+                  className="w-full bg-stone-50 border border-stone-300 focus:border-[#832f5e] focus:bg-white rounded-2xl pl-10 pr-10 py-3 text-slate-900 text-sm font-mono font-bold focus:outline-none transition-all shadow-inner"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCode(!showCode)}
                   className="absolute right-3.5 top-3.5 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+                  title={showCode ? "Hide passphrase" : "Show passphrase"}
                 >
                   {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Numeric Keypad */}
-            <div className="grid grid-cols-3 gap-2 pt-1 font-mono">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => handleKeypadPress(num)}
-                  className="py-2.5 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-slate-800 rounded-xl font-black text-sm transition-all cursor-pointer border border-stone-200"
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={handleKeypadClear}
-                className="py-2.5 bg-stone-100 hover:bg-stone-200 text-rose-600 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border border-stone-200"
-              >
-                CLR
-              </button>
-              <button
-                type="button"
-                onClick={() => handleKeypadPress('0')}
-                className="py-2.5 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-slate-800 rounded-xl font-black text-sm transition-all cursor-pointer border border-stone-200"
-              >
-                0
-              </button>
-              <button
-                type="button"
-                onClick={handleKeypadBackspace}
-                className="py-2.5 bg-stone-100 hover:bg-stone-200 text-slate-700 rounded-xl font-bold text-xs transition-all cursor-pointer border border-stone-200"
-              >
-                ⌫
-              </button>
-            </div>
-
             {/* Verify Button */}
             <button
               type="submit"
               disabled={isLoading || !accessCode.trim()}
-              className="w-full py-3.5 bg-[#832f5e] hover:bg-[#6c234b] disabled:opacity-50 text-white rounded-2xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#832f5e]/30 transition-all mt-2"
+              className="w-full py-3.5 bg-[#832f5e] hover:bg-[#6c234b] disabled:opacity-50 text-white rounded-2xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#832f5e]/30 transition-all mt-3"
             >
-              <span>{isLoading ? 'VERIFYING...' : 'VERIFY & ENTER'}</span>
+              <span>{isLoading ? 'VERIFYING...' : 'ENTER WORKSHOP TERMINAL'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
