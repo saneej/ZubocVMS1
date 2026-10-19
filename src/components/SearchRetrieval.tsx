@@ -163,7 +163,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       fulfillmentFilter === 'ALL' || 
       (order.fulfillmentStatus || 'Pending') === fulfillmentFilter;
 
-    return matchesSearch && matchesUploadStatus && matchesFulfillment && !order.isProductionDeckOrder;
+    return matchesSearch && matchesUploadStatus && matchesFulfillment;
   });
 
   const handleDelete = async (orderId: string) => {
@@ -611,6 +611,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                           <span>{order.orderId}</span>
                           <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
+                        {order.isProductionDeckOrder && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#832f5e]/10 text-[#832f5e] border border-[#832f5e]/20 font-mono shrink-0">
+                            TV DECK
+                          </span>
+                        )}
                         {onStartPacking && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {/* Check if evidence exists in TG/system - check for non-empty values */}

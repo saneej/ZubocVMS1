@@ -16,11 +16,7 @@ import {
   Eye,
   EyeOff,
   User,
-  Activity,
-  HardDrive,
-  Download,
-  Upload,
-  CheckCircle2
+  Activity
 } from 'lucide-react';
 import { AppSettings, StaffMember } from '../types';
 import { safeFetchJson } from '../utils/api';
@@ -49,37 +45,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onStaffUpdated,
   onStaffChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'storage'>('telegram');
-
-  // Storage and Backup State
-  const [storageStats, setStorageStats] = useState<{
-    mode: string;
-    ordersCount: number;
-    staffsCount: number;
-    dataFile: string;
-    fileSizeKb: number;
-    quotaStatus: string;
-  } | null>(null);
-  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
-  const [backupMessage, setBackupMessage] = useState<string | null>(null);
-  const [disableFirebase, setDisableFirebase] = useState<boolean>(() => {
-    return localStorage.getItem('zuboc_disable_firebase') === 'true';
-  });
-
-  const fetchStorageStats = async () => {
-    try {
-      const res = await safeFetchJson('/api/storage/stats');
-      if (res && res.ordersCount !== undefined) {
-        setStorageStats(res);
-      }
-    } catch {}
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchStorageStats();
-    }
-  }, [isOpen]);
+  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs'>('telegram');
 
   // Telegram Config
   const [botToken, setBotToken] = useState(settings.telegramBotToken || '');
@@ -381,49 +347,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleDownloadBackup = () => {
-    window.open('/api/backup/export', '_blank');
-  };
-
-  const handleRestoreBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsRestoringBackup(true);
-    setBackupMessage(null);
-
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-
-      const res = await safeFetchJson('/api/backup/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed)
-      });
-
-      if (res && res.success) {
-        setBackupMessage(`✅ Backup restored successfully! Total Orders: ${res.stats?.totalOrders || 0}, Staff: ${res.stats?.totalStaffs || 0}.`);
-        fetchStorageStats();
-        if (onStaffUpdated) onStaffUpdated();
-      } else {
-        setBackupMessage(res?.message || 'Restore completed.');
-      }
-    } catch (err: any) {
-      setBackupMessage(`❌ Restore failed: ${err.message || 'Invalid JSON file'}`);
-    } finally {
-      setIsRestoringBackup(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleToggleFirebaseMode = (disabled: boolean) => {
-    setDisableFirebase(disabled);
-    localStorage.setItem('zuboc_disable_firebase', String(disabled));
-    setBackupMessage(disabled ? '⚡ Pure Localhost Mode activated. Cloud Firebase queries are bypassed.' : '☁️ Firebase Cloud synchronization enabled.');
-    fetchStorageStats();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn font-sans">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
@@ -476,24 +399,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
-            <span>STAFF MEMBERS ({staffList.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('storage');
-              fetchStorageStats();
-            }}
-            className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-              activeTab === 'storage'
-                ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <HardDrive className="w-3.5 h-3.5" />
-            <span>LOCAL DATA & BACKUPS</span>
+            <Key className="w-3.5 h-3.5 text-blue-600" />
+            <span>ACCESS CODES ({staffList.length})</span>
           </button>
         </div>
 
@@ -719,59 +626,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Action Toolbar */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <span className="font-bold text-slate-700 text-[11px] uppercase">
-                  Active Operators & Staff ({staffList.length})
+                <span className="font-bold text-slate-700 text-[11px] uppercase tracking-wider font-mono">
+                  Authorized Access Codes ({staffList.length})
                 </span>
 
                 <button
                   type="button"
                   onClick={() => setShowAddForm(!showAddForm)}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all text-xs"
+                  className="px-3 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all text-xs font-mono"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>{showAddForm ? 'CANCEL' : '+ ADD STAFF'}</span>
+                  <Key className="w-3.5 h-3.5" />
+                  <span>{showAddForm ? 'CANCEL' : '+ ADD ACCESS CODE'}</span>
                 </button>
               </div>
 
-              {/* ADD STAFF INLINE FORM */}
+              {/* ADD ACCESS CODE INLINE FORM */}
               {showAddForm && (
-                <form onSubmit={handleAddStaff} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <form onSubmit={handleAddStaff} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 font-mono">
                   <h4 className="font-bold text-slate-900 text-xs uppercase flex items-center gap-1.5">
-                    <UserPlus className="w-4 h-4 text-blue-600" />
-                    <span>Create New Staff Member</span>
+                    <Key className="w-4 h-4 text-[#832f5e]" />
+                    <span>Create New Access Code</span>
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Staff ID (Login User ID)</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Access Code / Passphrase *</label>
                       <input
                         type="text"
-                        value={newStaffId}
-                        onChange={(e) => setNewStaffId(e.target.value)}
-                        placeholder="e.g. Staff-03 or EMP-105"
+                        value={newStaffPassword || newStaffId}
+                        onChange={(e) => {
+                          setNewStaffPassword(e.target.value);
+                          if (!newStaffId) setNewStaffId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                        }}
+                        placeholder="e.g. 889911 or ayisha123 or floor99"
                         required
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#832f5e] focus:outline-none font-bold"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Name</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Assigned To (Name / Station) *</label>
                       <input
                         type="text"
                         value={newStaffName}
-                        onChange={(e) => setNewStaffName(e.target.value)}
-                        placeholder="e.g. Michael Scott"
+                        onChange={(e) => {
+                          setNewStaffName(e.target.value);
+                          if (!newStaffId) setNewStaffId(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                        }}
+                        placeholder="e.g. Ayisha or Saneej or Floor Station 1"
                         required
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#832f5e] focus:outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Role</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Permission Role</label>
                       <select
                         value={newStaffRole}
                         onChange={(e) => setNewStaffRole(e.target.value as any)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none cursor-pointer"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#832f5e] focus:outline-none cursor-pointer"
                       >
                         <option value="PACKER">PACKER</option>
                         <option value="SUPERVISOR">SUPERVISOR</option>
@@ -786,19 +699,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         value={newStaffStation}
                         onChange={(e) => setNewStaffStation(e.target.value)}
                         placeholder="e.g. Packing-01"
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Initial Password</label>
-                      <input
-                        type="text"
-                        value={newStaffPassword}
-                        onChange={(e) => setNewStaffPassword(e.target.value)}
-                        placeholder="Default: password123"
-                        required
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-blue-600 focus:outline-none"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#832f5e] focus:outline-none"
                       />
                     </div>
                   </div>
@@ -814,20 +715,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="submit"
                       disabled={isSubmittingStaff}
-                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold cursor-pointer shadow-xs"
+                      className="px-4 py-1.5 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-lg font-bold cursor-pointer shadow-xs"
                     >
-                      {isSubmittingStaff ? 'Adding...' : 'Save Staff'}
+                      {isSubmittingStaff ? 'Saving...' : 'Save Access Code'}
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* STAFF LIST TABLE */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+              {/* ACCESS CODES TABLE */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white font-mono">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
                     <tr>
-                      <th className="p-3">Staff ID / Name</th>
+                      <th className="p-3">Access Code</th>
+                      <th className="p-3">Assigned To</th>
                       <th className="p-3">Role</th>
                       <th className="p-3">Station</th>
                       <th className="p-3 text-right">Actions</th>
@@ -837,8 +739,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {staffList.map((staff) => (
                       <tr key={staff.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="p-3">
-                          <div className="font-bold text-slate-900">{staff.name}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">ID: {staff.id}</div>
+                          <div className="font-bold text-[#832f5e] font-mono text-sm">
+                            {staff.password || staff.id}
+                          </div>
+                          <div className="text-[9px] text-slate-400 font-mono">Code ID: {staff.id}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-extrabold text-slate-900">{staff.name}</div>
                         </td>
                         <td className="p-3">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -849,30 +756,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             {staff.role}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-600">
+                        <td className="p-3 text-slate-600 font-bold">
                           {staff.stationId}
                         </td>
                         <td className="p-3 text-right space-x-1.5">
-                          {/* Reset Password Button */}
+                          {/* Update Code Button */}
                           <button
                             type="button"
                             onClick={() => {
                               setResettingStaffId(resettingStaffId === staff.id ? null : staff.id);
-                              setResetNewPassword('');
+                              setResetNewPassword(staff.password || '');
                             }}
-                            className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[10px] font-bold cursor-pointer"
-                            title="Reset staff password"
+                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold cursor-pointer"
+                            title="Update access code"
                           >
-                            Reset PWD
+                            Update Code
                           </button>
 
-                          {/* Delete Staff Button */}
+                          {/* Delete Code Button */}
                           <button
                             type="button"
                             onClick={() => handleRemoveStaff(staff.id, staff.name)}
                             disabled={staff.id === currentStaff.id}
-                            className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded disabled:opacity-30 cursor-pointer"
-                            title={staff.id === currentStaff.id ? 'Cannot remove yourself' : 'Remove staff member'}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded disabled:opacity-30 cursor-pointer"
+                            title={staff.id === currentStaff.id ? 'Cannot remove currently logged-in access code' : 'Delete access code'}
                           >
                             <Trash2 className="w-3.5 h-3.5 inline" />
                           </button>
@@ -883,12 +790,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </table>
               </div>
 
-              {/* INLINE PASSWORD RESET PANEL */}
+              {/* INLINE UPDATE ACCESS CODE PANEL */}
               {resettingStaffId && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 font-mono">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-amber-900 text-xs">
-                      Reset Password for Staff ID: <strong>{resettingStaffId}</strong>
+                      Update Access Code for Assigned User: <strong>{staffList.find(s => s.id === resettingStaffId)?.name || resettingStaffId}</strong>
                     </span>
                     <button
                       type="button"
@@ -917,131 +824,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               )}
-
-            </div>
-          )}
-
-          {/* TAB: Local Data & Backups */}
-          {activeTab === 'storage' && (
-            <div className="space-y-4">
-              
-              {/* Storage Mode Banner */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-950 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="w-4 h-4 text-emerald-600" />
-                    <span className="font-extrabold text-xs">LOCAL STORAGE ENGINE (OFFLINE-READY)</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-200 text-emerald-900 border border-emerald-300">
-                    {disableFirebase ? 'PURE LOCALHOST' : (storageStats?.mode || 'LOCAL JSON FILE')}
-                  </span>
-                </div>
-                <p className="text-[11px] text-emerald-800 leading-relaxed font-sans">
-                  All orders, packing audit logs, operator profiles, and workstation configurations are stored locally on this machine inside <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono text-[10px]">vms_data.json</code>. No cloud quotas, no Firebase limits, and instant sub-millisecond local responses.
-                </p>
-              </div>
-
-              {/* Status & Stats Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-                  <div className="text-[10px] text-slate-500 font-bold uppercase">Stored Orders</div>
-                  <div className="text-lg font-black text-slate-900 font-mono mt-0.5">
-                    {storageStats?.ordersCount ?? '...'}
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-                  <div className="text-[10px] text-slate-500 font-bold uppercase">Staff Members</div>
-                  <div className="text-lg font-black text-slate-900 font-mono mt-0.5">
-                    {storageStats?.staffsCount ?? '...'}
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-                  <div className="text-[10px] text-slate-500 font-bold uppercase">Data File Size</div>
-                  <div className="text-lg font-black text-slate-900 font-mono mt-0.5">
-                    {storageStats?.fileSizeKb ? `${storageStats.fileSizeKb} KB` : '...'}
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl">
-                  <div className="text-[10px] text-slate-500 font-bold uppercase">Quota Limit</div>
-                  <div className="text-xs font-black text-emerald-600 font-mono mt-1.5 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 inline text-emerald-600" />
-                    <span>UNLIMITED</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pure Localhost Mode Toggle */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs">Run Fully Offline / Pure Localhost</div>
-                    <div className="text-[11px] text-slate-500 font-sans mt-0.5">
-                      Bypasses Firebase Cloud Firestore completely. Zero quota usage, no remote network calls.
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={disableFirebase}
-                      onChange={(e) => handleToggleFirebaseMode(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Backup & Restore Controls */}
-              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
-                <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                  <Download className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Download &amp; Restore Machine Backups</span>
-                </div>
-                <div className="text-[11px] text-slate-600 font-sans">
-                  Export your full database to a single JSON file for offline safekeeping or to migrate between local PCs.
-                </div>
-
-                <div className="flex flex-wrap gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleDownloadBackup}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center gap-2 cursor-pointer shadow-2xs"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download Backup (JSON)</span>
-                  </button>
-
-                  <label className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold text-xs flex items-center gap-2 cursor-pointer transition-colors shadow-2xs">
-                    <Upload className="w-3.5 h-3.5 text-slate-600" />
-                    <span>{isRestoringBackup ? 'Restoring...' : 'Restore from JSON File'}</span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleRestoreBackupFile}
-                      disabled={isRestoringBackup}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                {backupMessage && (
-                  <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-mono">
-                    {backupMessage}
-                  </div>
-                )}
-              </div>
-
-              {/* Localhost Setup Instructions */}
-              <div className="border border-stone-200 rounded-xl p-3 bg-stone-50 text-[11px] text-stone-600 font-mono space-y-1">
-                <div className="font-bold text-stone-800">🚀 To Run On Any Local Machine:</div>
-                <div>1. In terminal: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-900">npm install</code></div>
-                <div>2. Start server: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-900">npm run dev</code></div>
-                <div>3. Open browser: <code className="bg-stone-200 px-1 py-0.5 rounded text-stone-900">http://localhost:3000</code></div>
-                <div className="text-[10px] text-stone-500 pt-0.5 font-sans">Optional: Set <code className="font-mono text-stone-700">DISABLE_FIREBASE=true</code> in <code className="font-mono text-stone-700">.env</code> to ensure zero Firebase connections permanently.</div>
-              </div>
 
             </div>
           )}
