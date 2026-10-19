@@ -20,14 +20,39 @@ export default defineConfig(() => {
           theme_color: '#2563eb',
           background_color: '#f8fafc',
           display: 'standalone',
+          orientation: 'any',
           start_url: '/',
           scope: '/',
           icons: [
             {
-              src: 'https://i.ibb.co/LhSXsZ2G/zuboc-logo-1.png',
-              sizes: '192x192 512x512',
+              src: '/pwa-192x192.png',
+              sizes: '192x192',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any'
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable'
+            }
+          ],
+          shortcuts: [
+            {
+              name: 'Packing Station',
+              url: '/packing',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
+            },
+            {
+              name: 'Production Deck',
+              url: '/deck',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
             }
           ]
         },

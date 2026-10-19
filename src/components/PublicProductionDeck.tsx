@@ -264,20 +264,19 @@ export const PublicProductionDeck: React.FC = () => {
       
       {/* Header Bar */}
       <header className="px-6 py-4 bg-white border-b border-stone-200 flex items-center justify-between shadow-xs sticky top-0 z-30">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[#832f5e] text-white flex items-center justify-center font-bold shadow-xs">
-            <Tv className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm tracking-tight font-serif text-[#832f5e]">zuboc</span>
-              <span className="text-stone-300">|</span>
-              <h1 className="text-xs sm:text-sm font-black uppercase tracking-wider text-stone-700">
-                Live Production Schedule
-              </h1>
-            </div>
+        <div className="flex items-center gap-4">
+          <img 
+            src="https://i.ibb.co/LhSXsZ2G/zuboc-logo-1.png" 
+            alt="Zuboc Logo" 
+            className="h-10 w-auto object-contain"
+          />
+          <div className="hidden sm:block h-8 w-px bg-stone-200 mx-1" />
+          <div className="hidden sm:block">
+            <h1 className="text-xs font-black uppercase tracking-widest text-stone-700">
+              Live Production Schedule
+            </h1>
             <p className="text-[10px] text-stone-400 font-medium">
-              Real-time workshop sub-assembly, proofing &amp; dispatch tracking
+              Real-time workshop sub-assembly & tracking
             </p>
           </div>
         </div>
