@@ -25,19 +25,19 @@ export default defineConfig(() => {
           scope: '/',
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: 'https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=192',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/pwa-512x512.png',
+              src: 'https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=512',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/pwa-512x512.png',
+              src: 'https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=512',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
