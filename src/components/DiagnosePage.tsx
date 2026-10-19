@@ -176,6 +176,25 @@ export const DiagnosePage: React.FC = () => {
   const [isMigrating, setIsMigrating] = useState(false);
   const [showSql, setShowSql] = useState(false);
   const [sqlCopied, setSqlCopied] = useState(false);
+  const [serverTestState, setServerTestState] = useState<{ loading: boolean; result?: any }>({ loading: false });
+
+  const handleTestServerSupabase = async () => {
+    setServerTestState({ loading: true });
+    addLog('Running deep server-side Supabase Read/Write test...', 'info');
+    try {
+      const res = await safeFetchJson('/api/supabase/test-server', { method: 'POST' });
+      setServerTestState({ loading: false, result: res });
+      if (res.success) {
+        addLog(`Backend Test Success: ${res.message}`, 'success');
+      } else {
+        addLog(`Backend Test Failed: ${res.error || 'Unknown error'} (Code: ${res.code})`, 'error');
+        if (res.hint) addLog(`Hint: ${res.hint}`, 'warn');
+      }
+    } catch (err: any) {
+      setServerTestState({ loading: false, result: { success: false, error: err.message } });
+      addLog(`Backend communication error: ${err.message}`, 'error');
+    }
+  };
 
   const checkSupabaseStatus = async () => {
     setSupabaseState(prev => ({ ...prev, loading: true }));
@@ -400,6 +419,15 @@ export const DiagnosePage: React.FC = () => {
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${supabaseState.loading ? 'animate-spin' : ''}`} />
                 <span>Check Status</span>
+              </button>
+
+              <button
+                onClick={handleTestServerSupabase}
+                disabled={serverTestState.loading}
+                className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-indigo-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border border-indigo-100 shadow-xs"
+              >
+                <Database className={`w-3.5 h-3.5 ${serverTestState.loading ? 'animate-bounce' : ''}`} />
+                <span>Test Backend (Write/Read)</span>
               </button>
 
               <button

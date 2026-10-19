@@ -667,13 +667,13 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       if (!Array.isArray(messages) || messages.length === 0) {
         throw new Error('messages array is required');
       }
-      const latestMessage = messages[messages.length - 1] || { role: 'user', content: 'Hello' };
-      const payloadMessages = [
-        {
-          role: 'user',
-          content: typeof latestMessage.content === 'string' ? latestMessage.content : JSON.stringify(latestMessage.content)
-        }
-      ];
+      
+      // Support multi-turn by passing full history with required 'thinking' field for assistant role
+      const payloadMessages = messages.map((m: any) => ({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+        ...(m.role === 'assistant' ? { thinking: m.thinking || '' } : {})
+      }));
 
       const response = await fetch('https://api.ifm.ai/v1/chat/completions', {
         method: 'POST',

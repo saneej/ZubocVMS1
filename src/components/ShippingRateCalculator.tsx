@@ -227,8 +227,12 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
   const [showAuditTable, setShowAuditTable] = useState(false);
 
   // IFM.ai Assistant State
-  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
-    { role: 'assistant', content: 'Hello! I am your IFM.ai K2-Horizon Shipping Advisor (Model: IFM/K2-Horizon-375B-A23B). Ask me anything about courier rates, zones, or packaging optimization!' }
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; thinking?: string }>>([
+    { 
+      role: 'assistant', 
+      content: 'Hello! I am your IFM.ai K2-Horizon Shipping Advisor (Model: IFM/K2-Horizon-375B-A23B). Ask me anything about courier rates, zones, or packaging optimization!',
+      thinking: 'I am initialized and ready to assist with shipping-related queries.'
+    }
   ]);
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -247,18 +251,26 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
+          messages: newMessages.map(m => ({ 
+            role: m.role, 
+            content: m.content,
+            ...(m.role === 'assistant' ? { thinking: m.thinking || '' } : {})
+          }))
         })
       });
       const data = await res.json();
-      if (data && data.success && data.data?.choices?.[0]?.message?.content) {
-        const reply = data.data.choices[0].message.content;
-        setAiMessages([...newMessages, { role: 'assistant', content: reply }]);
+      if (data && data.success && data.data?.choices?.[0]?.message) {
+        const msg = data.data.choices[0].message;
+        setAiMessages([...newMessages, { 
+          role: 'assistant', 
+          content: msg.content,
+          thinking: msg.thinking || msg.reasoning_content || ''
+        }]);
       } else {
         throw new Error(data?.error || 'Failed to receive response from IFM AI');
       }
     } catch (err: any) {
-      setAiMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message || 'Unable to reach IFM AI API.'}` }]);
+      setAiMessages([...newMessages, { role: 'assistant', content: `Error: ${err.message || 'Unable to reach IFM AI API.'}`, thinking: 'An error occurred during communication.' }]);
     } finally {
       setIsAiLoading(false);
     }

@@ -383,19 +383,22 @@ function cleanForSupabase(obj: any): any {
 }
 
 async function saveOrderToSupabase(record: OrderRecord) {
-  if (!supabaseServer) return;
+  if (!supabaseServer) {
+    console.warn('Supabase save skipped: Client not initialized.');
+    return;
+  }
   try {
     const payload = cleanForSupabase(record);
     const { error } = await supabaseServer.from('orders').upsert(payload, { onConflict: 'orderId' });
     if (error) {
-      if (error.code !== 'PGRST205') {
-        console.warn('Supabase save order warning:', error.message);
-      }
+      console.error(`Supabase save error for Order #${record.orderId}:`, error.message, error.code, error.details);
+      if (error.code === '42P01') console.error('HINT: Table "orders" does not exist in Supabase.');
+      if (error.code === '42703') console.error('HINT: One or more columns are missing from the Supabase table.');
     } else {
       isSupabaseReady = true;
     }
   } catch (err: any) {
-    console.error('Supabase save error:', err?.message);
+    console.error('Supabase save exception:', err?.message);
   }
 }
 
@@ -637,6 +640,53 @@ apiRouter.post('/settings', async (req, res) => {
   await saveSettingsToSupabase(settings);
 
   res.json({ success: true, settings: { ...settings, telegramBotTokenMasked: '***' } });
+});
+
+// Server-side Supabase Test (Detailed)
+apiRouter.post('/supabase/test-server', async (req, res) => {
+  if (!supabaseServer) {
+    return res.status(500).json({ success: false, error: 'Supabase server client not initialized. Check your SUPABASE_SERVICE_ROLE_KEY.' });
+  }
+
+  const testId = `test-${Date.now()}`;
+  try {
+    // 1. Try to insert a test order
+    const { error: insertErr } = await supabaseServer.from('orders').upsert({
+      orderId: testId,
+      customerName: 'SERVER_DIAGNOSTIC_TEST',
+      notes: 'This is a temporary test record created by the diagnostic tool.',
+      updatedAt: new Date().toISOString()
+    }, { onConflict: 'orderId' });
+
+    if (insertErr) {
+      return res.json({ 
+        success: false, 
+        error: insertErr.message, 
+        code: insertErr.code, 
+        details: insertErr.details,
+        hint: 'If you see "no unique constraint", ensure "orderId" is a PRIMARY KEY in your Supabase table.'
+      });
+    }
+
+    // 2. Try to read it back
+    const { error: readErr } = await supabaseServer.from('orders').select('*').eq('orderId', testId).single();
+    
+    // 3. Clean up
+    await supabaseServer.from('orders').delete().eq('orderId', testId);
+
+    if (readErr) {
+      return res.json({ success: false, error: `Write succeeded but Read failed: ${readErr.message}` });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Server-side Supabase Read/Write test passed!',
+      project: SUPABASE_URL,
+      usingServiceRole: true
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Supabase Status check endpoint
@@ -1945,13 +1995,12 @@ apiRouter.post('/ifm/chat', async (req, res) => {
   const apiUrl = 'https://api.ifm.ai/v1/chat/completions';
   const modelName = 'IFM/K2-Horizon-375B-A23B';
 
-  const latestMessage = messages[messages.length - 1] || { role: 'user', content: 'Hello' };
-  const payloadMessages = [
-    {
-      role: 'user',
-      content: typeof latestMessage.content === 'string' ? latestMessage.content : JSON.stringify(latestMessage.content)
-    }
-  ];
+  // Support multi-turn by passing full history with required 'thinking' field for assistant role
+  const payloadMessages = messages.map((m: any) => ({
+    role: m.role,
+    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+    ...(m.role === 'assistant' ? { thinking: m.thinking || '' } : {})
+  }));
 
   try {
     const response = await fetch(apiUrl, {
