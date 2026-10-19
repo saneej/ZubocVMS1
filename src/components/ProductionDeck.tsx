@@ -151,7 +151,8 @@ function normalizeOrder(order: OrderRecord): {
     }
   }
 
-  const dueDate = order.promisedDeliveryDate || order.dispatchDate || order.deliveredDate || order.orderReceivedDate || '';
+  const stageSpecificDueDate = order.stageDueDates?.[stage];
+  const dueDate = stageSpecificDueDate || order.promisedDeliveryDate || order.dispatchDate || order.deliveredDate || order.orderReceivedDate || '';
   let dueStatus: 'DUE_TODAY' | 'DUE_TOMORROW' | 'DAYS_LEFT' | 'OVERDUE' | 'NO_DATE' = 'NO_DATE';
   let dueDays = 0;
 
@@ -1476,6 +1477,13 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
       productionStage: 'PRE_PRODUCTION',
       promisedDeliveryDate,
       dispatchDate: promisedDeliveryDate,
+      stageDueDates: {
+        PRE_PRODUCTION: promisedDeliveryDate,
+        CURATION_ASSEMBLY: promisedDeliveryDate,
+        PHOTOSHOOT: promisedDeliveryDate,
+        QC_PACKED: promisedDeliveryDate,
+        DISPATCHED: promisedDeliveryDate
+      },
       paymentGate: { 
         totalBillingAmount, 
         advanceReceived, 
