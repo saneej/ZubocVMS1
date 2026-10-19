@@ -899,12 +899,12 @@ apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
     await syncStaffsFromFirestore();
   }
 
-  // 2. Check matched staff by passphrase, ID, or name
+  // 2. Check matched staff by exact password or ID (Strict security: rejecting random text)
   const matchedStaff = Object.values(staffsStore).find(s => {
     const p = String(s.password || '').trim().toLowerCase();
     const id = String(s.id || '').trim().toLowerCase();
-    const name = String(s.name || '').trim().toLowerCase();
-    return p === cleanCode || id === cleanCode || name === cleanCode;
+    if (!cleanCode || cleanCode.length < 2) return false;
+    return (p && p === cleanCode) || (id && id === cleanCode);
   });
 
   if (matchedStaff) {

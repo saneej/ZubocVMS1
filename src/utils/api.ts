@@ -121,37 +121,41 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
 
     let staff: any = null;
 
-    // Direct Supabase Verification
-    try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
-      const { data: supaStaffs } = await client.from('staffs').select('*');
-      if (Array.isArray(supaStaffs) && supaStaffs.length > 0) {
-        const found = supaStaffs.find((s: any) => 
-          String(s.password || '').trim().toLowerCase() === cleanCode || 
-          String(s.id || '').trim().toLowerCase() === cleanCode ||
-          String(s.name || '').trim().toLowerCase() === cleanCode
-        );
-        if (found) staff = found;
-      }
-    } catch {}
-
-    // Local Cache Backup Check
-    if (!staff) {
+    if (cleanCode && cleanCode.length >= 2) {
+      // Direct Supabase Verification
       try {
-        const cachedStaffs = localStorage.getItem('zuboc_staffs_cache');
-        if (cachedStaffs) {
-          const list = JSON.parse(cachedStaffs);
-          if (Array.isArray(list)) {
-            const found = list.find((s: any) => 
-              String(s.password || '').trim().toLowerCase() === cleanCode || 
-              String(s.id || '').trim().toLowerCase() === cleanCode ||
-              String(s.name || '').trim().toLowerCase() === cleanCode
-            );
-            if (found) staff = found;
-          }
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+        const { data: supaStaffs } = await client.from('staffs').select('*');
+        if (Array.isArray(supaStaffs) && supaStaffs.length > 0) {
+          const found = supaStaffs.find((s: any) => {
+            const p = String(s.password || '').trim().toLowerCase();
+            const id = String(s.id || '').trim().toLowerCase();
+            if (!p && !id) return false;
+            return (p && p === cleanCode) || (id && id === cleanCode);
+          });
+          if (found) staff = found;
         }
       } catch {}
+
+      // Local Cache Backup Check
+      if (!staff) {
+        try {
+          const cachedStaffs = localStorage.getItem('zuboc_staffs_cache');
+          if (cachedStaffs) {
+            const list = JSON.parse(cachedStaffs);
+            if (Array.isArray(list)) {
+              const found = list.find((s: any) => {
+                const p = String(s.password || '').trim().toLowerCase();
+                const id = String(s.id || '').trim().toLowerCase();
+                if (!p && !id) return false;
+                return (p && p === cleanCode) || (id && id === cleanCode);
+              });
+              if (found) staff = found;
+            }
+          }
+        } catch {}
+      }
     }
 
     if (staff) {
@@ -302,6 +306,11 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
           await setDoc(doc(db, 'orders', orderId), cleanForFirestore(record), { merge: true });
         } catch {}
       }
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U');
+        await client.from('orders').upsert(record, { onConflict: 'orderId' });
+      } catch {}
       return { success: true, record };
     } else if (method === 'DELETE') {
       const parts = cleanPath.split('/');
