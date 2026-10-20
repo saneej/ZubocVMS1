@@ -823,9 +823,9 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
           order={activeEditingOrder}
           currentStaff={currentStaff}
           onClose={() => setActiveEditingOrder(null)}
-          onSave={async (updated) => {
+          onSave={async (updated, close = true) => {
             await onUpdateOrder(updated);
-            setActiveEditingOrder(null);
+            if (close) setActiveEditingOrder(null);
           }}
         />
       )}
@@ -1100,7 +1100,7 @@ interface OperatorUpdateDrawerProps {
   order: OrderRecord;
   currentStaff: StaffMember;
   onClose: () => void;
-  onSave: (order: OrderRecord) => Promise<void>;
+  onSave: (updated: OrderRecord, close?: boolean) => Promise<void>;
 }
 
 const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
@@ -1141,7 +1141,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
     }
   }, [chatNotes]);
 
-  const handleSendNote = () => {
+  const handleSendNote = async () => {
     if (!newChatNote.trim()) return;
     const note: ChatNote = {
       id: Date.now().toString(),
@@ -1150,8 +1150,47 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
       staffName: currentStaff.name,
       timestamp: new Date().toISOString()
     };
-    setChatNotes([...chatNotes, note]);
+    
+    const updatedNotes = [...chatNotes, note];
+    setChatNotes(updatedNotes);
     setNewChatNote('');
+
+    // Persist immediately in background
+    const updatedRecord: OrderRecord = {
+      ...order,
+      clientName,
+      product,
+      customerName: clientName,
+      productSku: product,
+      formFillingDate,
+      preparedBy,
+      checkedBy,
+      customisations,
+      subAssemblyProgress: subAssembly,
+      productionStage: currentStage,
+      stageDueDates,
+      timeline,
+      promisedDeliveryDate,
+      dispatchDate: promisedDeliveryDate,
+      productionNotes: remarks,
+      remarks,
+      notes: remarks,
+      paymentGate: {
+        totalBillingAmount,
+        advanceReceived,
+        balanceAmount,
+        balanceStatus
+      },
+      chatNotes: updatedNotes,
+      fulfillmentStatus: currentStage === 'DISPATCHED' ? 'Shipped' : currentStage === 'QC_PACKED' ? 'Packed' : 'Pending',
+      updatedAt: new Date().toISOString()
+    };
+    
+    try {
+      await onSave(updatedRecord, false);
+    } catch (err) {
+      console.error('Failed to auto-save chat note:', err);
+    }
   };
 
   useEffect(() => {
@@ -1211,7 +1250,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
     };
 
     try {
-      await onSave(updatedRecord);
+      await onSave(updatedRecord, true);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } finally {
