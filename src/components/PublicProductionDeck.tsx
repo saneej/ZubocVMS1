@@ -401,33 +401,39 @@ export const PublicProductionDeck: React.FC = () => {
                           {/* Craft / Customisation Badges */}
                           <div className="flex flex-wrap gap-1 pt-0.5">
                             {norm.customisations.goldFoil && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200/80 flex items-center gap-0.5">
-                                ✨ Gold Foil
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200/80 flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span>Gold Foil</span>
                               </span>
                             )}
                             {norm.customisations.screenPrinting && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5">
-                                🖨️ Screen Print
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-1">
+                                <Layers className="w-2.5 h-2.5" />
+                                <span>Screen Print</span>
                               </span>
                             )}
                             {norm.customisations.dieCutting && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5">
-                                ✂️ Die Cut
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-1">
+                                <Scissors className="w-2.5 h-2.5" />
+                                <span>Die Cut</span>
                               </span>
                             )}
                             {norm.customisations.waxStamp && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 flex items-center gap-0.5">
-                                🕯️ Wax Seal
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 flex items-center gap-1">
+                                <Flame className="w-2.5 h-2.5" />
+                                <span>Wax Seal</span>
                               </span>
                             )}
                             {norm.customisations.digitalPrinting && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
-                                📄 Digital
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-700 border border-slate-200/60 flex items-center gap-1">
+                                <Printer className="w-2.5 h-2.5" />
+                                <span>Digital</span>
                               </span>
                             )}
                             {norm.customisations.seals && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-700 border border-teal-200/60">
-                                🏷️ Seals
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-700 border border-teal-200/60 flex items-center gap-1">
+                                <Award className="w-2.5 h-2.5" />
+                                <span>Seals</span>
                               </span>
                             )}
                           </div>
@@ -564,17 +570,29 @@ const PublicOrderDetailsModal: React.FC<PublicOrderDetailsModalProps> = ({ order
         <div className="space-y-2">
           <h4 className="text-[11px] font-black uppercase text-stone-500 tracking-wider">Craft &amp; Customisations</h4>
           <div className="grid grid-cols-2 gap-2 font-medium">
-            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.goldFoil ? 'bg-amber-50 border-amber-200 text-amber-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
-              <span>✨ Gold Foil</span>
+            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.goldFoil ? 'bg-amber-50 border-amber-200 text-amber-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Sparkles className={`w-4 h-4 ${norm.customisations.goldFoil ? 'text-amber-500' : ''}`} />
+              <span>Gold Foil</span>
             </div>
-            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.screenPrinting ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
-              <span>🖨️ Screen Print</span>
+            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.screenPrinting ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Layers className={`w-4 h-4 ${norm.customisations.screenPrinting ? 'text-blue-500' : ''}`} />
+              <span>Screen Print</span>
             </div>
-            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.dieCutting ? 'bg-purple-50 border-purple-200 text-purple-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
-              <span>✂️ Die Cutting</span>
+            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.dieCutting ? 'bg-purple-50 border-purple-200 text-purple-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Scissors className={`w-4 h-4 ${norm.customisations.dieCutting ? 'text-purple-500' : ''}`} />
+              <span>Die Cutting</span>
             </div>
-            <div className={`p-2 rounded-xl border flex items-center gap-2 ${norm.customisations.waxStamp ? 'bg-rose-50 border-rose-200 text-rose-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
-              <span>🕯️ Wax Seal</span>
+            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.waxStamp ? 'bg-rose-50 border-rose-200 text-rose-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Flame className={`w-4 h-4 ${norm.customisations.waxStamp ? 'text-rose-500' : ''}`} />
+              <span>Wax Seal</span>
+            </div>
+            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.digitalPrinting ? 'bg-slate-100 border-slate-200 text-slate-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Printer className={`w-4 h-4 ${norm.customisations.digitalPrinting ? 'text-slate-500' : ''}`} />
+              <span>Digital</span>
+            </div>
+            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.seals ? 'bg-teal-50 border-teal-200 text-teal-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Award className={`w-4 h-4 ${norm.customisations.seals ? 'text-teal-500' : ''}`} />
+              <span>Seals</span>
             </div>
           </div>
         </div>

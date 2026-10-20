@@ -15,6 +15,7 @@ import { LoginPage } from './components/LoginPage';
 import { ProductionDeck } from './components/ProductionDeck';
 import { PublicProductionDeck } from './components/PublicProductionDeck';
 import { DiagnosePage } from './components/DiagnosePage';
+import { SalesReports } from './components/SalesReports';
 import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -25,7 +26,7 @@ import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
 import { INITIAL_STAFFS } from './utils/initialStaffs';
 
 const AppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck'>('station');
+  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales'>('station');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,6 +37,7 @@ const AppContent: React.FC = () => {
     else if (path.includes('/calculator')) setActiveTab('calculator');
     else if (path.includes('/admin') || path.includes('/insights')) setActiveTab('admin');
     else if (path.includes('/history')) setActiveTab('history');
+    else if (path.includes('/sales')) setActiveTab('sales');
     else setActiveTab('search');
   }, [location]);
 
@@ -433,6 +435,11 @@ const AppContent: React.FC = () => {
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffName={currentStaff?.name}
+              />
+            } />
+            <Route path="/sales" element={
+              <SalesReports
+                orders={orders}
               />
             } />
             <Route path="*" element={<Navigate to="/orders" replace />} />

@@ -9,13 +9,14 @@ import {
   Calculator,
   Tv,
   Activity,
-  ExternalLink
+  ExternalLink,
+  TrendingUp
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 
 interface SidebarProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck';
-  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck') => void;
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales';
+  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales') => void;
   currentStaff: StaffMember;
   setCurrentStaff: (staff: StaffMember) => void;
   settings: AppSettings;
@@ -53,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
     { id: 'history', label: 'Recording History', icon: History },
     { id: 'admin', label: 'Insights', icon: BarChart3 },
+    { id: 'sales', label: 'Sales Reports', icon: TrendingUp },
   ];
 
   return (

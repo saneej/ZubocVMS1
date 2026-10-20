@@ -36,7 +36,8 @@ import {
   Camera,
   PackageCheck,
   PackagePlus,
-  ExternalLink
+  ExternalLink,
+  Activity
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -557,180 +558,169 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     <div className={`flex flex-col min-h-screen font-sans antialiased selection:bg-[#832f5e] selection:text-white ${isTvWallMode ? 'bg-slate-950 text-slate-100' : 'bg-[#F4F6F9] text-slate-900'}`}>
       
       {!isTvWallMode && (
-        <header className="sticky top-0 z-40 px-6 py-4 bg-white/95 backdrop-blur-md border-b border-slate-200 text-slate-900 shadow-xs">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <header className="sticky top-0 z-40 px-6 py-4 bg-[#F9F8F6]/95 backdrop-blur-md border-b border-stone-200/60 text-slate-900 shadow-3xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             
-            {/* Left Title */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#832f5e] text-white flex items-center justify-center shadow-sm">
-                <Tv className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base sm:text-lg font-black tracking-tight font-sans">
-                    Production TV Deck
-                  </h1>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#832f5e]/10 text-[#832f5e] font-mono border border-[#832f5e]/20">
-                    55&quot; TV MONITOR
-                  </span>
+            {/* Left Section: Info & Main Stats */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-[#832f5e] text-white flex items-center justify-center shadow-md">
+                  <Tv className="w-5 h-5" />
                 </div>
-                <p className="text-[11px] text-stone-500 font-medium">
-                  Live workshop sub-assembly &amp; dispatch schedule
-                </p>
-              </div>
-            </div>
-
-            {/* Center Metrics & Capacity Bar */}
-            <div className="flex flex-wrap items-center gap-3">
-              
-              {/* Active Jobs */}
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border bg-stone-50 border-stone-200">
-                <span className="text-[10px] font-bold uppercase text-stone-500">Active</span>
-                <span className="text-base font-black font-mono leading-none">{activeOrdersCount}</span>
-              </div>
-
-              {/* Urgent / Due Today */}
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${
-                urgentDueTodayCount > 0 
-                  ? 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse'
-                  : 'bg-stone-50 border-stone-200 text-stone-700'
-              }`}>
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="font-bold uppercase text-[10px]">Due Today:</span>
-                  <span className="font-black font-mono">{urgentDueTodayCount}</span>
+                <div>
+                  <h1 className="text-lg font-black tracking-tight font-sans leading-none">Production TV Deck</h1>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-stone-200 text-stone-600 uppercase tracking-widest border border-stone-300/50">
+                      55&quot; TV MODE
+                    </span>
+                    <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wide">Live Workshop Monitor</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Daily Capacity Tracker */}
-              <div 
-                onClick={() => setIsCapacityModalOpen(true)}
-                className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border cursor-pointer hover:border-[#832f5e] transition-colors bg-stone-50 border-stone-200"
-                title="Click to adjust daily capacity limit"
-              >
-                <div className="flex flex-col min-w-[130px]">
-                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-1">
-                    <span className="text-stone-500">Dispatches Today:</span>
-                    <span className={`font-mono font-bold ${isCapacityFull ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {dispatchesScheduledToday}/{maxDailyDispatches}
+              {/* Minimal Unified Stats Bar */}
+              <div className="hidden xl:flex items-center gap-1 bg-white border border-stone-200/80 rounded-2xl p-1 shadow-2xs">
+                <div className="flex items-center gap-2 px-3 py-1.5 border-r border-stone-100">
+                  <Activity className="w-3.5 h-3.5 text-blue-500" />
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[8px] font-black text-slate-400 uppercase">Active</span>
+                    <span className="text-xs font-black font-mono text-slate-900">{activeOrdersCount}</span>
+                  </div>
+                </div>
+
+                <div className={`flex items-center gap-2 px-3 py-1.5 border-r border-stone-100 ${urgentDueTodayCount > 0 ? 'bg-rose-50/50' : ''}`}>
+                  <AlertTriangle className={`w-3.5 h-3.5 ${urgentDueTodayCount > 0 ? 'text-rose-500 animate-pulse' : 'text-stone-300'}`} />
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[8px] font-black text-slate-400 uppercase">Due</span>
+                    <span className={`text-xs font-black font-mono ${urgentDueTodayCount > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{urgentDueTodayCount}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 px-3 py-1.5 cursor-pointer hover:bg-stone-50 transition-colors rounded-xl group" onClick={() => setIsCapacityModalOpen(true)}>
+                  <div className="flex flex-col leading-none min-w-[80px]">
+                    <span className="text-[8px] font-black text-slate-400 uppercase">Dispatched</span>
+                    <span className={`text-xs font-black font-mono ${isCapacityFull ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {dispatchesScheduledToday} / {maxDailyDispatches}
                     </span>
                   </div>
-                  <div className="w-full rounded-full h-1.5 overflow-hidden bg-stone-200">
+                  <div className="w-12 h-1.5 bg-stone-100 rounded-full overflow-hidden border border-stone-200/50">
                     <div 
-                      className={`h-full rounded-full ${isCapacityFull ? 'bg-rose-600' : 'bg-emerald-500'}`}
-                      style={{ width: `${Math.min(100, (dispatchesScheduledToday / maxDailyDispatches) * 100)}%` }}
+                      className={`h-full transition-all duration-1000 ${isCapacityFull ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${capacityPercent}%` }}
                     />
                   </div>
                 </div>
               </div>
-
             </div>
 
-            {/* Right Action Tools */}
+            {/* Right Section: Compact Actions */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={checkSupabaseHealth}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border bg-stone-50 border-stone-200 text-xs font-bold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
-                title={supabaseDiag.error || 'Live Supabase Connection & Diagnostics'}
-              >
-                <span className={`w-2 h-2 rounded-full ${
-                  supabaseDiag.checking ? 'bg-amber-400 animate-pulse' :
-                  supabaseDiag.connected && supabaseDiag.tableExists ? 'bg-emerald-500 animate-pulse' : 
-                  'bg-rose-500'
-                }`} />
-                <span className="font-mono text-[11px]">
-                  {supabaseDiag.checking ? 'Checking DB...' : 
-                   supabaseDiag.connected && supabaseDiag.tableExists ? `Supabase Live (${supabaseDiag.v})` : 
-                   supabaseDiag.error ? 'DB Error' : 'Offline'}
-                </span>
-                <RefreshCw className={`w-3.5 h-3.5 text-stone-500 ${supabaseDiag.checking ? 'animate-spin' : ''}`} />
-              </button>
+              
+              {/* Search Capsule */}
+              <div className="relative group hidden sm:block">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-[#832f5e] transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Find orders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-2 rounded-xl border border-stone-200 bg-white text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-[#832f5e]/10 focus:border-[#832f5e]/40 transition-all w-48 focus:w-64 placeholder-stone-300"
+                />
+              </div>
+
+              {/* Status & Sync Capsule */}
+              <div className="flex items-center bg-white border border-stone-200 rounded-xl p-0.5 gap-0.5 shadow-2xs">
+                <button
+                  onClick={checkSupabaseHealth}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-stone-50 transition-colors cursor-pointer group"
+                  title={supabaseDiag.error || 'Database Status'}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    supabaseDiag.checking ? 'bg-amber-400 animate-pulse' :
+                    supabaseDiag.connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-rose-500'
+                  }`} />
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest hidden lg:inline">Live</span>
+                  <RefreshCw className={`w-3 h-3 text-stone-300 group-hover:text-[#832f5e] transition-colors ${supabaseDiag.checking ? 'animate-spin' : ''}`} />
+                </button>
+
+                <div className="w-px h-4 bg-stone-100 mx-1" />
+
+                <button
+                  onClick={() => { if (onRefreshOrders) onRefreshOrders(); setAutoRefreshCountdown(30); }}
+                  className="px-2.5 py-1.5 rounded-lg hover:bg-stone-50 text-stone-400 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Clock className="w-3.5 h-3.5 opacity-50" />
+                  <span className="font-mono text-[10px] font-black">{autoRefreshCountdown}s</span>
+                </button>
+              </div>
+
+              {/* Controls Capsule */}
+              <div className="flex items-center bg-white border border-stone-200 rounded-xl p-0.5 gap-0.5 shadow-2xs">
+                <button
+                  onClick={() => setIsAutoScrollActive(!isAutoScrollActive)}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    isAutoScrollActive ? 'text-emerald-600 bg-emerald-50' : 'text-stone-300 hover:text-slate-900 hover:bg-stone-50'
+                  }`}
+                  title="Auto-Scroll"
+                >
+                  {isAutoScrollActive ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => setIsTvWallMode(!isTvWallMode)}
+                  className="p-1.5 rounded-lg text-stone-300 hover:text-slate-900 hover:bg-stone-50 transition-all cursor-pointer"
+                  title="Toggle Dark Wall Mode"
+                >
+                  <Tv className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={toggleFullscreen}
+                  className="p-1.5 rounded-lg text-stone-300 hover:text-slate-900 hover:bg-stone-50 transition-all cursor-pointer"
+                  title="Fullscreen"
+                >
+                  {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                </button>
+              </div>
 
               <button
                 onClick={() => setIsNewOrderModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-[10px] font-black uppercase tracking-widest shadow-md hover:shadow-[#832f5e]/20 transition-all cursor-pointer flex items-center gap-2"
               >
                 <PackagePlus className="w-4 h-4" />
-                <span className="hidden sm:inline">New Job</span>
-              </button>
-
-              <button
-                onClick={() => setIsAutoScrollActive(!isAutoScrollActive)}
-                className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-1 transition-all cursor-pointer ${
-                  isAutoScrollActive 
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                    : 'bg-white border-stone-200 text-stone-600'
-                }`}
-                title="Toggle Auto-Scroll"
-              >
-                {isAutoScrollActive ? <Play className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600" /> : <Pause className="w-3.5 h-3.5" />}
-              </button>
-
-              <button
-                onClick={() => {
-                  if (onRefreshOrders) onRefreshOrders();
-                  setAutoRefreshCountdown(30);
-                }}
-                className="p-2 rounded-xl border text-xs flex items-center gap-1 transition-all cursor-pointer bg-white border-stone-200 text-stone-600"
-                title="Refresh Orders"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span className="font-mono text-[11px]">{autoRefreshCountdown}s</span>
-              </button>
-
-              <button
-                onClick={() => setIsTvWallMode(!isTvWallMode)}
-                className="p-2 rounded-xl border text-xs transition-all cursor-pointer bg-white border-stone-200 text-stone-600 hover:text-stone-900"
-                title="Toggle Wall TV Dark Mode"
-              >
-                <Tv className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 rounded-xl border text-xs transition-all cursor-pointer bg-white border-stone-200 text-stone-600"
-                title="Fullscreen"
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                <span>New Job</span>
               </button>
             </div>
-
           </div>
 
-          {/* Sub-bar: Search & Urgency Filters */}
-          <div className="mt-3 pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs border-stone-200/80">
-            <div className="flex items-center gap-2 flex-1 max-w-sm">
-              <div className="relative w-full">
-                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search orders, client name, product..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border text-xs focus:outline-none focus:border-[#832f5e] bg-white border-stone-200 text-slate-800 placeholder-stone-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
+          {/* Sub-Header: Clean Filter Tabs */}
+          <div className="mt-5 flex items-center justify-between border-t border-stone-200/40 pt-4">
+            <div className="flex items-center bg-stone-100/80 p-1 rounded-xl border border-stone-200/50 gap-1">
               {[
-                { id: 'all', label: `All (${filteredList.length})` },
-                { id: 'dueToday', label: `Due Today (${urgentDueTodayCount})` },
-                { id: 'balancePending', label: 'Balance Pending' }
+                { id: 'all', label: `All Jobs`, count: normalizedList.length },
+                { id: 'dueToday', label: `Due Today`, count: urgentDueTodayCount, urgent: true },
+                { id: 'balancePending', label: 'Payment Pending', count: normalizedList.filter(o => !o.norm.isBalancePaid).length }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setSelectedUrgencyFilter(tab.id as any)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
                     selectedUrgencyFilter === tab.id
-                      ? 'bg-[#832f5e] text-white shadow-xs'
-                      : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-300'
+                      ? 'bg-white text-[#832f5e] shadow-sm border border-stone-200/60'
+                      : 'text-stone-400 hover:text-stone-600'
                   }`}
                 >
-                  {tab.label}
+                  <span className={tab.urgent && tab.count > 0 ? 'text-rose-500' : ''}>{tab.label}</span>
+                  <span className={`px-1.5 py-0.5 rounded-md font-mono text-[9px] ${
+                    selectedUrgencyFilter === tab.id ? 'bg-[#832f5e] text-white' : 'bg-stone-200 text-stone-500'
+                  }`}>
+                    {tab.count}
+                  </span>
                 </button>
               ))}
+            </div>
+
+            <div className="hidden lg:flex items-center gap-4 text-[9px] font-black text-stone-400 uppercase tracking-[0.2em]">
+              <span>Workshop Floor Monitoring</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
           </div>
         </header>
