@@ -408,14 +408,18 @@ const AppContent: React.FC = () => {
               />
             } />
             <Route path="/admin" element={
-              <AdminDashboard
-                orders={orders}
-                settings={settings}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                onUpdateOrder={handleUpdateOrder}
-                currentStaffId={currentStaff?.id}
-                currentStaffName={currentStaff?.name}
-              />
+              currentStaff.role === 'ADMIN' ? (
+                <AdminDashboard
+                  orders={orders}
+                  settings={settings}
+                  onOpenSettings={() => setIsSettingsOpen(true)}
+                  onUpdateOrder={handleUpdateOrder}
+                  currentStaffId={currentStaff?.id}
+                  currentStaffName={currentStaff?.name}
+                />
+              ) : (
+                <Navigate to="/orders" replace />
+              )
             } />
             <Route path="/production-deck" element={
               <ProductionDeck
