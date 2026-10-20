@@ -8,7 +8,8 @@ import {
   LogOut,
   User,
   PackagePlus,
-  Tv
+  Tv,
+  Activity
 } from 'lucide-react';
 import { StaffMember, AppSettings } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -60,102 +61,107 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const title = pageTitles[activeTab] || 'Dashboard';
 
   return (
-    <header className="sticky top-0 z-30 bg-[#F9F8F6]/90 backdrop-blur-md border-b border-stone-200/80 text-slate-800 px-6 py-3.5 shadow-2xs">
+    <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 text-slate-800 px-6 py-4 shadow-sm shadow-slate-200/10">
       <div className="flex items-center justify-between gap-4">
         
         {/* Left Side: Page Title & Mobile Toggle */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="lg:hidden p-2 rounded-xl bg-white border border-stone-200 text-slate-600 hover:text-slate-900"
+            className="lg:hidden p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm active:scale-95 transition-all"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-lg font-extrabold text-slate-900 font-sans tracking-tight">
+          <div className="flex flex-col">
+            <h1 className="text-xl font-black text-slate-950 font-sans tracking-tight leading-tight">
               {title}
             </h1>
-            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#832f5e]/10 text-[#832f5e] border border-[#832f5e]/20">
-              STATION: {settings.stationId || 'Packing-01'}
-            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
+                <Activity className="w-3 h-3" />
+                {settings.stationId || 'Packing-01'}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-slate-300" />
+              <span className="text-[10px] font-black uppercase tracking-[0.1em] text-purple-600">Active Session</span>
+            </div>
           </div>
         </div>
 
         {/* Right Side: Action Tools */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-3">
           
           {/* Quick Actions Group */}
-          <div className="flex items-center bg-white/50 border border-stone-200/60 p-1 rounded-2xl gap-1">
+          <div className="flex items-center bg-slate-100/50 p-1 rounded-2xl gap-1.5">
             {onOpenAddOrder && (
               <button
                 onClick={onOpenAddOrder}
-                className="p-2 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white transition-all cursor-pointer shadow-sm"
-                title="Add New Order"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white transition-all cursor-pointer shadow-lg shadow-slate-950/20 active:scale-95"
               >
                 <PackagePlus className="w-4 h-4" />
+                <span className="text-[11px] font-black uppercase tracking-widest hidden sm:inline">New Order</span>
               </button>
             )}
 
             {onOpenDeck && (
               <button
                 onClick={onOpenDeck}
-                className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-sm ${
                   activeTab === 'deck' 
-                    ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white hover:bg-stone-50 text-slate-600 border-stone-200'
+                    ? 'bg-purple-600 text-white border-purple-500 shadow-purple-600/20'
+                    : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
                 }`}
                 title="Launch TV Deck"
               >
-                <Tv className={`w-4 h-4 ${activeTab === 'deck' ? 'text-amber-400' : ''}`} />
+                <Tv className={`w-4 h-4 ${activeTab === 'deck' ? 'text-white' : ''}`} />
               </button>
             )}
           </div>
 
           {/* Utilities Group */}
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/50 border border-stone-200/60 text-[11px] font-mono text-slate-500 font-bold">
-            <Clock className="w-3.5 h-3.5 text-[#832f5e]/60" />
-            <span>{timeIst.split(' ')[0]}</span>
+          <div className="hidden md:flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/60 text-[11px] font-black text-slate-600 tracking-tight">
+            <Clock className="w-4 h-4 text-purple-600" />
+            <span>{timeIst}</span>
           </div>
 
           <div className="flex items-center gap-1">
             {onRefreshOrders && (
               <button
                 onClick={onRefreshOrders}
-                className="p-2 rounded-xl hover:bg-white hover:text-[#832f5e] text-slate-400 transition-colors cursor-pointer"
+                className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-950 transition-all cursor-pointer active:scale-90"
                 title="Sync Data"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4.5 h-4.5" />
               </button>
             )}
 
             <button
               onClick={onOpenSettings}
-              className="p-2 rounded-xl hover:bg-white hover:text-[#832f5e] text-slate-400 transition-colors cursor-pointer"
+              className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-950 transition-all cursor-pointer active:scale-90"
               title="Settings"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-4.5 h-4.5" />
             </button>
           </div>
 
           {/* User Account Capsule */}
-          <div className="flex items-center gap-1 pl-1.5 border-l border-stone-200/80 ml-1">
-            <div className="flex items-center gap-2 pr-1 py-1 rounded-2xl bg-white border border-stone-200/80 shadow-3xs group cursor-default">
-              <div className="w-7 h-7 rounded-xl bg-stone-100 text-[#832f5e] flex items-center justify-center font-black text-[10px]">
+          <div className="flex items-center gap-1 pl-3 border-l border-slate-200 ml-1">
+            <div className="flex items-center gap-3 pr-1.5 py-1.5 rounded-2xl bg-white border border-slate-200 shadow-sm group cursor-default">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-[12px] shadow-sm">
                 {currentStaff.name.charAt(0)}
               </div>
-              <div className="hidden sm:flex flex-col pr-3 leading-tight">
-                <span className="text-[10px] font-black text-slate-900 truncate max-w-[80px]">{currentStaff.name}</span>
-                <span className="text-[8px] font-bold text-[#832f5e] uppercase tracking-widest">{currentStaff.role}</span>
+              <div className="hidden sm:flex flex-col pr-2 leading-none">
+                <span className="text-[11px] font-black text-slate-950 truncate max-w-[90px]">{currentStaff.name}</span>
+                <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest mt-1">{currentStaff.role}</span>
               </div>
               
               {onLogout && (
                 <button
                   onClick={onLogout}
-                  className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer mr-0.5"
+                  className="p-2 rounded-xl hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
                   title="Sign Out"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-4 h-4" />
                 </button>
               )}
             </div>
