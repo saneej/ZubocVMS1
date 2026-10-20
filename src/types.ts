@@ -7,11 +7,18 @@ export interface ChatNote {
 }
 
 export type ProductionStage = 
-  | 'PRE_PRODUCTION'      // 1. Pre-Production & Print (Die Cutting / Digital / Screen / Foiling / Stamp Making)
-  | 'CURATION_ASSEMBLY'   // 2. In-House Curation & Assembly (Pasting, folding, ribbon work, wax sealing)
-  | 'PHOTOSHOOT'          // 3. Photography Table (Photoshoot in progress)
-  | 'QC_PACKED'           // 4. QC & Packed (Awaiting Dispatch)
-  | 'DISPATCHED';         // 5. Dispatched
+  | 'ORDER_CONFIRMATION'        // 1. Order Confirmation Date
+  | 'DESIGNING_OUT'             // 2. Designing Out
+  | 'CLIENT_APPROVAL'           // 3. Client Approval
+  | 'PRODUCTION_SEND'           // 4. Production (Send)
+  | 'PRODUCTION_CURATION'       // 5. Production (Arrival)/Curation
+  | 'PHOTOSHOOT'                // 6. Photoshoot
+  | 'DISPATCH'                  // 7. Dispatch
+  // Legacy aliases for backward compatibility
+  | 'PRE_PRODUCTION'
+  | 'CURATION_ASSEMBLY'
+  | 'QC_PACKED'
+  | 'DISPATCHED';
 
 export interface ZubocCustomisations {
   goldFoil?: boolean;

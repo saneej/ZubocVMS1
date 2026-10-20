@@ -66,11 +66,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <div className="text-center space-y-4">
           <div className="flex justify-center mb-2">
             <div className="bg-white/5 p-4 rounded-[2.5rem] backdrop-blur-2xl border border-white/10 shadow-2xl ring-1 ring-white/10 group transition-all hover:ring-white/20">
-              <img 
-                src="/zuboc-com-svg-1-1.png" 
-                alt="Zuboc Flow Logo" 
-                className="h-14 w-auto object-contain max-w-[220px] brightness-[2.5] transition-transform duration-500 group-hover:scale-[1.02]"
-              />
+              <span className="text-2xl font-black uppercase tracking-[0.25em] text-white">
+                Zuboc Flow
+              </span>
             </div>
           </div>
           <div className="space-y-1">

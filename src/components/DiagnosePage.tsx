@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     "timeline" JSONB DEFAULT '{}'::jsonb,
     "promisedDeliveryDate" TEXT,
     "paymentGate" JSONB DEFAULT '{}'::jsonb,
-    "productionStage" TEXT DEFAULT 'PRE_PRODUCTION',
+    "productionStage" TEXT DEFAULT 'ORDER_CONFIRMATION',
     "stageDueDates" JSONB DEFAULT '{}'::jsonb,
     "productionNotes" TEXT,
     "isProductionDeckOrder" BOOLEAN DEFAULT FALSE,

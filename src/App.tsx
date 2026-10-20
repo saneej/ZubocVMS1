@@ -62,7 +62,7 @@ const AppContent: React.FC = () => {
   const fetchOrdersAPI = async () => {
     try {
       const serverResponse = await safeFetchJson('/api/orders');
-      if (Array.isArray(serverResponse) && serverResponse.length > 0) {
+      if (Array.isArray(serverResponse)) {
         setOrders(serverResponse);
         try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(serverResponse)); } catch {}
         return;
@@ -70,11 +70,11 @@ const AppContent: React.FC = () => {
     } catch {}
 
     try {
-      const { data: supaOrders } = await supabase
+      const { data: supaOrders, error: supaErr } = await supabase
         .from('orders')
         .select('*')
         .order('createdAt', { ascending: false });
-      if (Array.isArray(supaOrders) && supaOrders.length > 0) {
+      if (!supaErr && Array.isArray(supaOrders)) {
         setOrders(supaOrders);
         try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(supaOrders)); } catch {}
       }
@@ -303,8 +303,15 @@ const AppContent: React.FC = () => {
     });
     try {
       await safeFetchJson(`/api/orders/${orderId}`, { method: 'DELETE' });
-      broadcastSync();
-    } catch (apiErr) {}
+    } catch (apiErr) {
+      console.warn('API delete notice:', apiErr);
+    }
+    try {
+      await supabase.from('orders').delete().eq('orderId', orderId);
+    } catch (supaErr) {
+      console.warn('Supabase direct delete notice:', supaErr);
+    }
+    broadcastSync();
   };
 
   if (isLoading) {
@@ -357,8 +364,8 @@ const AppContent: React.FC = () => {
         )}
         <main className="flex-1 pb-16">
           <Routes>
-            <Route path="/" element={<Navigate to="/orders" replace />} />
-            <Route path="/station" element={
+            <Route index element={<Navigate to="orders" replace />} />
+            <Route path="station" element={
               <PackingStation
                 currentStaff={currentStaff}
                 settings={settings}
@@ -369,7 +376,7 @@ const AppContent: React.FC = () => {
                 onClearSelectedPackingOrder={() => setSelectedOrderForPacking(null)}
               />
             } />
-            <Route path="/orders" element={
+            <Route path="orders" element={
               <SearchRetrieval
                 orders={orders}
                 onRefreshOrders={fetchOrdersAPI}
@@ -384,7 +391,7 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/order/:orderId" element={
+            <Route path="order/:orderId" element={
               <OrderDetailsPage
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -392,7 +399,7 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/orders/:orderId" element={
+            <Route path="orders/:orderId" element={
               <OrderDetailsPage
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -400,14 +407,14 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/history" element={
+            <Route path="history" element={
               <RecordingHistory
                 orders={orders}
                 onRefresh={fetchOrdersAPI}
                 onDeleteOrder={handleDeleteOrder}
               />
             } />
-            <Route path="/admin" element={
+            <Route path="admin" element={
               <AdminDashboard
                 orders={orders}
                 settings={settings}
@@ -417,7 +424,7 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/production-deck" element={
+            <Route path="production-deck" element={
               <ProductionDeck
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -430,19 +437,19 @@ const AppContent: React.FC = () => {
                 }}
               />
             } />
-            <Route path="/calculator" element={
+            <Route path="calculator" element={
               <ShippingRateCalculator
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/sales" element={
+            <Route path="sales" element={
               <SalesReports
                 orders={orders}
               />
             } />
-            <Route path="*" element={<Navigate to="/orders" replace />} />
+            <Route path="*" element={<Navigate to="orders" replace />} />
           </Routes>
         </main>
         <UploadQueueBanner />
@@ -479,7 +486,7 @@ export default function App() {
       <Routes>
         <Route path="/public-deck" element={<PublicProductionDeck />} />
         <Route path="/diagnose" element={<DiagnosePage />} />
-        <Route path="*" element={<AppContent />} />
+        <Route path="/*" element={<AppContent />} />
       </Routes>
     </BrowserRouter>
   );

@@ -24,7 +24,10 @@ import {
   Award,
   Zap,
   Info,
-  MessageSquare
+  MessageSquare,
+  CalendarCheck,
+  Palette,
+  CheckCheck
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -48,43 +51,59 @@ interface StageConfig {
 
 const STAGES: StageConfig[] = [
   {
-    id: 'PRE_PRODUCTION',
-    title: '1. Pre-Production',
-    subtitle: 'Die Cutting / Digital / Screen',
+    id: 'ORDER_CONFIRMATION',
+    title: '1. Order Confirmation Date',
+    subtitle: 'Booking & Order Confirmed',
     badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
     badgeText: 'text-amber-700',
-    icon: Sparkles
+    icon: CalendarCheck
   },
   {
-    id: 'CURATION_ASSEMBLY',
-    title: '2. Curation & Assembly',
-    subtitle: 'Pasting, folding & sealing',
+    id: 'DESIGNING_OUT',
+    title: '2. Designing Out',
+    subtitle: 'Layout, Proofing & Artwork',
     badgeBg: 'bg-purple-50 text-purple-700 border-purple-200',
     badgeText: 'text-purple-700',
+    icon: Palette
+  },
+  {
+    id: 'CLIENT_APPROVAL',
+    title: '3. Client Approval',
+    subtitle: 'Proof Approved by Client',
+    badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+    badgeText: 'text-blue-700',
+    icon: CheckCheck
+  },
+  {
+    id: 'PRODUCTION_SEND',
+    title: '4. Production (Send)',
+    subtitle: 'Sent to Press / Die Cut / Foil',
+    badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+    badgeText: 'text-orange-700',
+    icon: Flame
+  },
+  {
+    id: 'PRODUCTION_CURATION',
+    title: '5. Production (Arrival)/Curation',
+    subtitle: 'Pasting, folding & wax sealing',
+    badgeBg: 'bg-teal-50 text-teal-700 border-teal-200',
+    badgeText: 'text-teal-700',
     icon: Layers
   },
   {
     id: 'PHOTOSHOOT',
-    title: '3. Photography',
-    subtitle: 'High-res proofing',
+    title: '6. Photoshoot',
+    subtitle: 'High-res photography table',
     badgeBg: 'bg-sky-50 text-sky-700 border-sky-200',
     badgeText: 'text-sky-700',
     icon: Camera
   },
   {
-    id: 'QC_PACKED',
-    title: '4. QC & Packed',
-    subtitle: 'Final inspection',
+    id: 'DISPATCH',
+    title: '7. Dispatch',
+    subtitle: 'Packed, QC & courier transit',
     badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     badgeText: 'text-emerald-700',
-    icon: PackageCheck
-  },
-  {
-    id: 'DISPATCHED',
-    title: '5. Dispatched',
-    subtitle: 'In transit / courier',
-    badgeBg: 'bg-stone-100 text-stone-700 border-stone-200',
-    badgeText: 'text-stone-700',
     icon: Truck
   }
 ];
@@ -93,14 +112,19 @@ function normalizeOrder(order: OrderRecord) {
   const clientName = order.clientName || order.customerName || order.contactPerson || `Client #${order.orderId}`;
   const product = order.product || order.productSku || 'Bespoke Luxury Stationery';
 
-  let stage: ProductionStage = order.productionStage || 'PRE_PRODUCTION';
-  if (!order.productionStage) {
+  let stage: ProductionStage = order.productionStage || 'ORDER_CONFIRMATION';
+  // Map legacy stages to 7 new steps
+  if (stage === 'PRE_PRODUCTION') stage = 'PRODUCTION_SEND';
+  else if (stage === 'CURATION_ASSEMBLY') stage = 'PRODUCTION_CURATION';
+  else if (stage === 'QC_PACKED') stage = 'PRODUCTION_CURATION';
+  else if (stage === 'DISPATCHED') stage = 'DISPATCH';
+  else if (!order.productionStage) {
     if (order.fulfillmentStatus === 'Shipped' || order.fulfillmentStatus === 'Delivered') {
-      stage = 'DISPATCHED';
+      stage = 'DISPATCH';
     } else if (order.fulfillmentStatus === 'Packed' || order.recordingStatus === 'COMPLETED') {
-      stage = 'QC_PACKED';
+      stage = 'PHOTOSHOOT';
     } else {
-      stage = 'PRE_PRODUCTION';
+      stage = 'ORDER_CONFIRMATION';
     }
   }
 
@@ -141,13 +165,13 @@ function normalizeOrder(order: OrderRecord) {
   };
 
   const subAssembly: SubAssemblyProgress = order.subAssemblyProgress || {
-    envelopeDieCutting: stage !== 'PRE_PRODUCTION',
-    screenPrinting: stage !== 'PRE_PRODUCTION',
-    goldFoiling: stage !== 'PRE_PRODUCTION',
-    waxSealApplied: stage === 'PHOTOSHOOT' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    curationCompleted: stage === 'PHOTOSHOOT' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    photoshootCompleted: stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    qcPackedCompleted: stage === 'QC_PACKED' || stage === 'DISPATCHED'
+    envelopeDieCutting: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
+    screenPrinting: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
+    goldFoiling: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
+    waxSealApplied: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    curationCompleted: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    photoshootCompleted: stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    qcPackedCompleted: stage === 'DISPATCH' || stage === 'DISPATCHED'
   };
 
   const completedTasks = Object.values(subAssembly).filter(Boolean).length;
@@ -243,9 +267,16 @@ export const PublicProductionDeck: React.FC = () => {
 
   const stageColumns = useMemo(() => {
     const map: Record<ProductionStage, { raw: OrderRecord; norm: ReturnType<typeof normalizeOrder> }[]> = {
+      ORDER_CONFIRMATION: [],
+      DESIGNING_OUT: [],
+      CLIENT_APPROVAL: [],
+      PRODUCTION_SEND: [],
+      PRODUCTION_CURATION: [],
+      PHOTOSHOOT: [],
+      DISPATCH: [],
+      // legacy support
       PRE_PRODUCTION: [],
       CURATION_ASSEMBLY: [],
-      PHOTOSHOOT: [],
       QC_PACKED: [],
       DISPATCHED: []
     };
@@ -254,6 +285,8 @@ export const PublicProductionDeck: React.FC = () => {
       const norm = normalizeOrder(ord);
       if (map[norm.stage]) {
         map[norm.stage].push({ raw: ord, norm });
+      } else {
+        map.ORDER_CONFIRMATION.push({ raw: ord, norm });
       }
     });
 
@@ -281,11 +314,9 @@ export const PublicProductionDeck: React.FC = () => {
         {/* Center Section: Primary Brand */}
         <div className="flex-1 flex justify-center">
           <div className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-            <img 
-              src="/zuboc-com-svg-1-1.png" 
-              alt="Zuboc Flow Logo" 
-              className="h-11 w-auto object-contain max-w-[200px]"
-            />
+            <span className="text-xl font-black uppercase tracking-[0.2em] text-slate-900">
+              Zuboc Flow
+            </span>
           </div>
         </div>
 
@@ -323,7 +354,7 @@ export const PublicProductionDeck: React.FC = () => {
             <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Synchronizing Flow State...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 w-full max-w-[2000px] mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6 min-w-[1900px] mx-auto">
             {STAGES.map((stage) => {
               const columnItems = stageColumns[stage.id] || [];
               const Icon = stage.icon;

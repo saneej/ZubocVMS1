@@ -491,11 +491,21 @@ async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
   }
 }
 
-async function deleteOrderFromSupabase(orderId: string) {
-  if (!getSupabaseClient()) return;
+async function deleteOrderFromSupabase(orderId: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
   try {
-    await getSupabaseClient().from('orders').delete().eq('orderId', orderId);
-  } catch {}
+    const { error } = await client.from('orders').delete().eq('orderId', orderId);
+    if (error) {
+      console.error(`Supabase order delete error for #${orderId}:`, error.message, error.code);
+      return false;
+    }
+    console.log(`Deleted order #${orderId} from Supabase successfully.`);
+    return true;
+  } catch (err: any) {
+    console.error(`Supabase order delete exception for #${orderId}:`, err?.message);
+    return false;
+  }
 }
 
 async function saveStaffToSupabase(staff: StaffMember) {
@@ -536,11 +546,17 @@ async function syncFromSupabase() {
 
     if (ordersRes.status === 'fulfilled') {
       const { data: ords, error: ordErr } = ordersRes.value as any;
-      if (ordErr) console.error('Sync error (orders):', ordErr.message);
-      else if (Array.isArray(ords)) {
+      if (ordErr) {
+        console.error('Sync error (orders):', ordErr.message);
+      } else if (Array.isArray(ords)) {
         isSupabaseReady = true;
-        for (const o of ords) if (o.orderId) ordersStore[o.orderId] = o;
-        console.log(`Synced ${ords.length} orders.`);
+        const freshOrdersMap: Record<string, OrderRecord> = {};
+        for (const o of ords) {
+          if (o.orderId) freshOrdersMap[o.orderId] = o;
+        }
+        ordersStore = freshOrdersMap;
+        saveLocalBackup();
+        console.log(`Synced ${ords.length} orders from Supabase.`);
       }
     }
 
@@ -1355,14 +1371,12 @@ apiRouter.get('/orders', async (req, res) => {
       )) as { data: any[]; error: any };
       
       if (!error && Array.isArray(supaOrders)) {
-        if (supaOrders.length > 0) {
-          const freshOrdersMap: Record<string, OrderRecord> = {};
-          for (const o of supaOrders) {
-            if (o.orderId) freshOrdersMap[o.orderId] = o;
-          }
-          ordersStore = freshOrdersMap;
-          saveLocalBackup();
+        const freshOrdersMap: Record<string, OrderRecord> = {};
+        for (const o of supaOrders) {
+          if (o.orderId) freshOrdersMap[o.orderId] = o;
         }
+        ordersStore = freshOrdersMap;
+        saveLocalBackup();
       }
     } catch (e: any) {
       console.warn('Supabase sync warning on GET /orders:', e?.message);
@@ -1633,6 +1647,8 @@ apiRouter.delete('/orders/:orderId', async (req, res) => {
   }
 
   delete ordersStore[orderId];
+  delete ordersStore[orderId.replace(/^#/, '')];
+  delete ordersStore[`#${orderId.replace(/^#/, '')}`];
   saveLocalBackup();
 
   if (firestoreDb && !firestoreQuotaExceeded) {

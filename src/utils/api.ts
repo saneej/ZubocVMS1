@@ -333,6 +333,13 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
           await deleteDoc(doc(db, 'orders', orderId));
         } catch {}
       }
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U', {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+        await client.from('orders').delete().eq('orderId', orderId);
+      } catch {}
       return { success: true, message: `Order ${orderId} deleted` };
     }
   }

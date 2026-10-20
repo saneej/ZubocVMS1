@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Tv, 
   Flame, 
@@ -39,7 +40,10 @@ import {
   ExternalLink,
   Activity,
   MessageSquare,
-  Send
+  Send,
+  CalendarCheck,
+  Palette,
+  CheckCheck
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -79,48 +83,66 @@ interface StageConfig {
 
 const STAGES: StageConfig[] = [
   {
-    id: 'PRE_PRODUCTION',
-    title: '1. Pre-Production & Print',
-    subtitle: 'Die Cutting / Digital / Screen / Foiling',
+    id: 'ORDER_CONFIRMATION',
+    title: '1. Order Confirmation Date',
+    subtitle: 'Booking & Order Confirmed',
     badgeBg: 'bg-amber-50 text-amber-700',
     badgeText: 'text-amber-700 border-amber-200',
     headerBorder: 'border-amber-200',
-    icon: Sparkles
+    icon: CalendarCheck
   },
   {
-    id: 'CURATION_ASSEMBLY',
-    title: '2. Curation & Assembly',
-    subtitle: 'Pasting, folding, ribbon & wax sealing',
+    id: 'DESIGNING_OUT',
+    title: '2. Designing Out',
+    subtitle: 'Layout, Proofing & Artwork',
     badgeBg: 'bg-purple-50 text-purple-700',
     badgeText: 'text-purple-700 border-purple-200',
     headerBorder: 'border-purple-200',
+    icon: Palette
+  },
+  {
+    id: 'CLIENT_APPROVAL',
+    title: '3. Client Approval',
+    subtitle: 'Proof Approved by Client',
+    badgeBg: 'bg-blue-50 text-blue-700',
+    badgeText: 'text-blue-700 border-blue-200',
+    headerBorder: 'border-blue-200',
+    icon: CheckCheck
+  },
+  {
+    id: 'PRODUCTION_SEND',
+    title: '4. Production (Send)',
+    subtitle: 'Sent to Press / Die Cut / Foil',
+    badgeBg: 'bg-orange-50 text-orange-700',
+    badgeText: 'text-orange-700 border-orange-200',
+    headerBorder: 'border-orange-200',
+    icon: Flame
+  },
+  {
+    id: 'PRODUCTION_CURATION',
+    title: '5. Production (Arrival)/Curation',
+    subtitle: 'Pasting, folding & wax sealing',
+    badgeBg: 'bg-teal-50 text-teal-700',
+    badgeText: 'text-teal-700 border-teal-200',
+    headerBorder: 'border-teal-200',
     icon: Layers
   },
   {
     id: 'PHOTOSHOOT',
-    title: '3. Photography Table',
-    subtitle: 'High-res proofing in progress',
+    title: '6. Photoshoot',
+    subtitle: 'High-res photography table',
     badgeBg: 'bg-sky-50 text-sky-700',
     badgeText: 'text-sky-700 border-sky-200',
     headerBorder: 'border-sky-200',
     icon: Camera
   },
   {
-    id: 'QC_PACKED',
-    title: '4. QC & Packed',
-    subtitle: 'Final inspection & ready',
+    id: 'DISPATCH',
+    title: '7. Dispatch',
+    subtitle: 'Packed, QC & courier transit',
     badgeBg: 'bg-emerald-50 text-emerald-700',
     badgeText: 'text-emerald-700 border-emerald-200',
     headerBorder: 'border-emerald-200',
-    icon: PackageCheck
-  },
-  {
-    id: 'DISPATCHED',
-    title: '5. Dispatched',
-    subtitle: 'Handed over to courier / transit',
-    badgeBg: 'bg-stone-100 text-stone-700',
-    badgeText: 'text-stone-700 border-stone-200',
-    headerBorder: 'border-stone-200',
     icon: Truck
   }
 ];
@@ -146,14 +168,19 @@ function normalizeOrder(order: OrderRecord): {
   const clientName = order.clientName || order.customerName || order.contactPerson || `Client #${order.orderId}`;
   const product = order.product || order.productSku || 'Bespoke Luxury Stationery';
 
-  let stage: ProductionStage = order.productionStage || 'PRE_PRODUCTION';
-  if (!order.productionStage) {
+  let stage: ProductionStage = order.productionStage || 'ORDER_CONFIRMATION';
+  // Map legacy stages to 7 new steps
+  if (stage === 'PRE_PRODUCTION') stage = 'PRODUCTION_SEND';
+  else if (stage === 'CURATION_ASSEMBLY') stage = 'PRODUCTION_CURATION';
+  else if (stage === 'QC_PACKED') stage = 'PRODUCTION_CURATION';
+  else if (stage === 'DISPATCHED') stage = 'DISPATCH';
+  else if (!order.productionStage) {
     if (order.fulfillmentStatus === 'Shipped' || order.fulfillmentStatus === 'Delivered') {
-      stage = 'DISPATCHED';
+      stage = 'DISPATCH';
     } else if (order.fulfillmentStatus === 'Packed' || order.recordingStatus === 'COMPLETED') {
-      stage = 'QC_PACKED';
+      stage = 'PHOTOSHOOT';
     } else {
-      stage = 'PRE_PRODUCTION';
+      stage = 'ORDER_CONFIRMATION';
     }
   }
 
@@ -198,13 +225,13 @@ function normalizeOrder(order: OrderRecord): {
   };
 
   const subAssembly: SubAssemblyProgress = order.subAssemblyProgress || {
-    envelopeDieCutting: stage !== 'PRE_PRODUCTION',
-    screenPrinting: stage !== 'PRE_PRODUCTION',
-    goldFoiling: stage !== 'PRE_PRODUCTION',
-    waxSealApplied: stage === 'PHOTOSHOOT' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    curationCompleted: stage === 'PHOTOSHOOT' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    photoshootCompleted: stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    qcPackedCompleted: stage === 'QC_PACKED' || stage === 'DISPATCHED'
+    envelopeDieCutting: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
+    screenPrinting: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
+    goldFoiling: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
+    waxSealApplied: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    curationCompleted: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    photoshootCompleted: stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
+    qcPackedCompleted: stage === 'DISPATCH' || stage === 'DISPATCHED'
   };
 
   const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '18500').replace(/[^0-9.]/g, '')) || 0;
@@ -457,15 +484,26 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
   const stageColumns = useMemo(() => {
     const map: Record<ProductionStage, typeof normalizedList> = {
+      ORDER_CONFIRMATION: [],
+      DESIGNING_OUT: [],
+      CLIENT_APPROVAL: [],
+      PRODUCTION_SEND: [],
+      PRODUCTION_CURATION: [],
+      PHOTOSHOOT: [],
+      DISPATCH: [],
+      // legacy support
       PRE_PRODUCTION: [],
       CURATION_ASSEMBLY: [],
-      PHOTOSHOOT: [],
       QC_PACKED: [],
       DISPATCHED: []
     };
 
     filteredList.forEach(item => {
-      map[item.norm.stage].push(item);
+      if (map[item.norm.stage]) {
+        map[item.norm.stage].push(item);
+      } else {
+        map.ORDER_CONFIRMATION.push(item);
+      }
     });
 
     return map;
@@ -473,7 +511,15 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
   const handleShiftStage = async (order: OrderRecord, direction: 'prev' | 'next') => {
     const norm = normalizeOrder(order);
-    const stagesOrder: ProductionStage[] = ['PRE_PRODUCTION', 'CURATION_ASSEMBLY', 'PHOTOSHOOT', 'QC_PACKED', 'DISPATCHED'];
+    const stagesOrder: ProductionStage[] = [
+      'ORDER_CONFIRMATION',
+      'DESIGNING_OUT',
+      'CLIENT_APPROVAL',
+      'PRODUCTION_SEND',
+      'PRODUCTION_CURATION',
+      'PHOTOSHOOT',
+      'DISPATCH'
+    ];
     const currentIndex = stagesOrder.indexOf(norm.stage);
     
     let targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
@@ -481,7 +527,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
     const targetStage = stagesOrder[targetIndex];
 
-    if (targetStage === 'DISPATCHED' && !norm.isBalancePaid && !norm.payment.adminDispatchOverride) {
+    if ((targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') && !norm.isBalancePaid && !norm.payment.adminDispatchOverride) {
       setDispatchOverrideOrder(order);
       return;
     }
@@ -489,7 +535,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const updated: OrderRecord = {
       ...order,
       productionStage: targetStage,
-      fulfillmentStatus: targetStage === 'DISPATCHED' ? 'Shipped' : targetStage === 'QC_PACKED' ? 'Packed' : 'Pending',
+      fulfillmentStatus: (targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') ? 'Shipped' : targetStage === 'PHOTOSHOOT' ? 'Packed' : 'Pending',
       updatedAt: new Date().toISOString()
     };
 
@@ -502,7 +548,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const order = matchedItem.raw;
     const norm = matchedItem.norm;
 
-    if (targetStage === 'DISPATCHED' && !norm.isBalancePaid && !norm.payment.adminDispatchOverride) {
+    if ((targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') && !norm.isBalancePaid && !norm.payment.adminDispatchOverride) {
       setDispatchOverrideOrder(order);
       return;
     }
@@ -510,7 +556,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const updated: OrderRecord = {
       ...order,
       productionStage: targetStage,
-      fulfillmentStatus: targetStage === 'DISPATCHED' ? 'Shipped' : targetStage === 'QC_PACKED' ? 'Packed' : 'Pending',
+      fulfillmentStatus: (targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') ? 'Shipped' : targetStage === 'PHOTOSHOOT' ? 'Packed' : 'Pending',
       updatedAt: new Date().toISOString()
     };
 
@@ -522,7 +568,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const now = new Date().toISOString();
     const updated: OrderRecord = {
       ...dispatchOverrideOrder,
-      productionStage: 'DISPATCHED',
+      productionStage: 'DISPATCH',
       fulfillmentStatus: 'Shipped',
       paymentGate: {
         ...(dispatchOverrideOrder.paymentGate || {}),
@@ -579,14 +625,6 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
               </div>
             </div>
 
-            {/* Center Section: Brand */}
-            <div className="flex-1 flex justify-center">
-              <img 
-                src="/zuboc-com-svg-1-1.png" 
-                alt="Zuboc Flow Logo" 
-                className="h-10 w-auto object-contain max-w-[180px]"
-              />
-            </div>
 
             {/* Right Section: Controls & Global Stats */}
             <div className="flex items-center justify-end gap-4 lg:w-1/3">
@@ -759,7 +797,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
         onMouseLeave={() => setIsUserHovering(false)}
         className="flex-1 overflow-x-auto overflow-y-auto p-4 sm:p-6"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 min-w-[1300px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 min-w-[1900px]">
           {STAGES.map((stage) => {
             const columnItems = stageColumns[stage.id] || [];
             const Icon = stage.icon;
@@ -1016,15 +1054,15 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
       onClick={onCardClick}
     >
       <div className="flex items-center justify-between gap-2">
-        <a
-          href={`/order/${order.orderId}`}
+        <Link
+          to={`/order/${encodeURIComponent(order.orderId)}`}
           onClick={(e) => e.stopPropagation()}
           className="font-mono text-xs font-bold text-[#832f5e] hover:underline flex items-center gap-1 group/link cursor-pointer"
           title="Open Full Individual Order Details"
         >
           <span>#{order.orderId}</span>
           <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/link:opacity-100 transition-opacity" />
-        </a>
+        </Link>
         {renderDuePill()}
       </div>
 
@@ -1084,7 +1122,7 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          disabled={currentStage === 'PRE_PRODUCTION'}
+          disabled={currentStage === 'ORDER_CONFIRMATION'}
           onClick={() => onShiftStage('prev')}
           className="p-1 rounded hover:bg-stone-100 disabled:opacity-20 cursor-pointer"
         >
@@ -1094,7 +1132,7 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
         <span className="text-[10px] font-mono text-stone-400">Tap to edit</span>
 
         <button
-          disabled={currentStage === 'DISPATCHED'}
+          disabled={currentStage === 'DISPATCH' || currentStage === 'DISPATCHED'}
           onClick={() => onShiftStage('next')}
           className="p-1 rounded hover:bg-stone-100 disabled:opacity-20 cursor-pointer"
         >
@@ -1302,7 +1340,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
           {/* Stage Selector */}
           <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
             <label className="font-bold uppercase text-stone-700">Production Stage</label>
-            <div className="grid grid-cols-5 gap-1">
+            <div className="grid grid-cols-7 gap-1">
               {STAGES.map((s, i) => (
                 <button
                   key={s.id}
@@ -1638,15 +1676,17 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
           photoshootCompleted: false,
           qcPackedCompleted: false
         },
-        productionStage: 'PRE_PRODUCTION',
+        productionStage: 'ORDER_CONFIRMATION',
         promisedDeliveryDate,
         dispatchDate: promisedDeliveryDate,
         stageDueDates: {
-          PRE_PRODUCTION: promisedDeliveryDate,
-          CURATION_ASSEMBLY: promisedDeliveryDate,
+          ORDER_CONFIRMATION: promisedDeliveryDate,
+          DESIGNING_OUT: promisedDeliveryDate,
+          CLIENT_APPROVAL: promisedDeliveryDate,
+          PRODUCTION_SEND: promisedDeliveryDate,
+          PRODUCTION_CURATION: promisedDeliveryDate,
           PHOTOSHOOT: promisedDeliveryDate,
-          QC_PACKED: promisedDeliveryDate,
-          DISPATCHED: promisedDeliveryDate
+          DISPATCH: promisedDeliveryDate
         },
         paymentGate: { 
           totalBillingAmount, 

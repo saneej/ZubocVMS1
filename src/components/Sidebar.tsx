@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
     { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
     { id: 'history', label: 'Recording History', icon: History },
-    { id: 'admin', label: 'Insights', icon: BarChart3 },
+    ...(currentStaff.role === 'ADMIN' ? [{ id: 'admin', label: 'Insights', icon: BarChart3 }] : []),
     { id: 'sales', label: 'Sales Reports', icon: TrendingUp },
   ];
 
@@ -81,11 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="flex items-center gap-3 cursor-pointer select-none transition-transform hover:scale-105 active:scale-95" 
               onClick={() => { setActiveTab('search'); setIsMobileOpen(false); }}
             >
-              <img 
-                src="/zuboc-com-svg-1-1.png" 
-                alt="Zuboc Flow Logo" 
-                className="h-11 w-auto object-contain max-w-[200px]"
-              />
+              <span className="text-xl font-black uppercase tracking-[0.2em] text-slate-900 group-hover:text-purple-600 transition-colors">
+                Zuboc Flow
+              </span>
             </div>
 
             <button 
@@ -149,25 +147,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Section: Operator Account & Settings */}
         <div className="p-4 bg-slate-50/80 border-t border-slate-100/80 space-y-3">
           
-          {/* Quick Settings */}
-          <button
-            onClick={onOpenSettings}
-            className="w-full px-3.5 py-3 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 text-[12px] font-bold flex items-center justify-between transition-all cursor-pointer shadow-sm active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-purple-50">
-                <Settings className="w-4 h-4 text-[#832f5e]" />
+          {/* Quick Settings - Admin Only */}
+          {currentStaff.role === 'ADMIN' && (
+            <button
+              onClick={onOpenSettings}
+              className="w-full px-3.5 py-3 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/60 text-[12px] font-bold flex items-center justify-between transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-purple-50">
+                  <Settings className="w-4 h-4 text-[#832f5e]" />
+                </div>
+                <span>System Config</span>
               </div>
-              <span>System Config</span>
-            </div>
-            <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black tracking-wider ${
-              settings.hasToken 
-                ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
-                : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-            }`}>
-              {settings.hasToken ? 'ONLINE' : 'OFFLINE'}
-            </span>
-          </button>
+              <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black tracking-wider ${
+                settings.hasToken 
+                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
+                  : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+              }`}>
+                {settings.hasToken ? 'ONLINE' : 'OFFLINE'}
+              </span>
+            </button>
+          )}
 
 
           {/* Operator Account */}
@@ -179,20 +179,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">Active Staff</span>
-                  <select
-                    value={currentStaff.id}
-                    onChange={(e) => {
-                      const found = effectiveStaffList.find(s => s.id === e.target.value);
-                      if (found) setCurrentStaff(found);
-                    }}
-                    className="bg-transparent text-[12px] text-slate-900 font-black focus:outline-none cursor-pointer pr-1 max-w-[110px] truncate"
-                  >
-                    {effectiveStaffList.map(st => (
-                      <option key={st.id} value={st.id} className="bg-white text-slate-900">
-                        {st.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="text-[12px] text-slate-900 font-black truncate max-w-[110px]">
+                    {currentStaff.name}
+                  </span>
                 </div>
               </div>
 
