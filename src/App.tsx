@@ -102,7 +102,7 @@ const AppContent: React.FC = () => {
 
   const broadcastSync = () => {
     try {
-      const bc = new BroadcastChannel('zuboc_vms_sync');
+      const bc = new BroadcastChannel('zuboc_flow_sync');
       bc.postMessage({ type: 'SYNC_REFRESH' });
       bc.close();
     } catch {}
@@ -111,7 +111,7 @@ const AppContent: React.FC = () => {
   // Realtime Supabase WebSockets listener + Polling + Focus + BroadcastChannel
   useEffect(() => {
     const channel = supabase
-      .channel('vms-orders-realtime')
+      .channel('flow-orders-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
@@ -147,7 +147,7 @@ const AppContent: React.FC = () => {
       .subscribe();
 
     const staffChannel = supabase
-      .channel('vms-staffs-realtime')
+      .channel('flow-staffs-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'staffs' },
@@ -204,7 +204,7 @@ const AppContent: React.FC = () => {
 
     let bc: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel('zuboc_vms_sync');
+      bc = new BroadcastChannel('zuboc_flow_sync');
       bc.onmessage = (msg) => {
         if (msg.data?.type === 'SYNC_REFRESH') {
           fetchOrdersAPI();

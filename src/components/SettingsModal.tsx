@@ -283,7 +283,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         await fetchStaffs();
         onStaffUpdated?.();
         try {
-          const bc = new BroadcastChannel('zuboc_vms_sync');
+          const bc = new BroadcastChannel('zuboc_flow_sync');
           bc.postMessage({ type: 'SYNC_REFRESH' });
           bc.close();
         } catch {}
@@ -317,7 +317,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         await fetchStaffs();
         onStaffUpdated?.();
         try {
-          const bc = new BroadcastChannel('zuboc_vms_sync');
+          const bc = new BroadcastChannel('zuboc_flow_sync');
           bc.postMessage({ type: 'SYNC_REFRESH' });
           bc.close();
         } catch {}
@@ -354,7 +354,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setResetNewPassword('');
         await fetchStaffs();
         try {
-          const bc = new BroadcastChannel('zuboc_vms_sync');
+          const bc = new BroadcastChannel('zuboc_flow_sync');
           bc.postMessage({ type: 'SYNC_REFRESH' });
           bc.close();
         } catch {}

@@ -125,7 +125,7 @@ const STAGES: StageConfig[] = [
   }
 ];
 
-// Normalize order data to Zuboc Tracking Form standard
+// Normalize order data to Zuboc Flow Tracking Form standard
 function normalizeOrder(order: OrderRecord): {
   clientName: string;
   product: string;
@@ -1268,7 +1268,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-extrabold uppercase">Zuboc Tracking Form</h2>
+              <h2 className="text-sm font-extrabold uppercase">Zuboc Flow Tracking Form</h2>
               <span className="text-xs font-mono text-stone-500">#{order.orderId}</span>
             </div>
           </div>

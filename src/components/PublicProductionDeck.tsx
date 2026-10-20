@@ -267,7 +267,7 @@ export const PublicProductionDeck: React.FC = () => {
       <header className="px-6 py-4 bg-white border-b border-stone-200 flex items-center justify-between shadow-xs sticky top-0 z-30">
         <div className="flex items-center gap-4">
           <img 
-            src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=140" 
+            src="https://i.ibb.co/BFsYkvn/zuboc-com-svg-1-1.png" 
             alt="Zuboc Logo" 
             className="h-8 w-auto object-contain"
           />

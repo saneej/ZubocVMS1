@@ -63,7 +63,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <div className="flex justify-center mb-1">
             <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl">
               <img 
-                src="https://zuboc.com/cdn/shop/files/zuboc_logo_1.svg?v=1748579899&width=140" 
+                src="https://i.ibb.co/BFsYkvn/zuboc-com-svg-1-1.png" 
                 alt="Zuboc Logo" 
                 className="h-9 w-auto object-contain max-w-[180px] brightness-200"
               />
