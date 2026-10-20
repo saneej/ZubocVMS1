@@ -357,8 +357,8 @@ const AppContent: React.FC = () => {
         )}
         <main className="flex-1 pb-16">
           <Routes>
-            <Route path="/" element={<Navigate to="/orders" replace />} />
-            <Route path="/station" element={
+            <Route index element={<Navigate to="orders" replace />} />
+            <Route path="station" element={
               <PackingStation
                 currentStaff={currentStaff}
                 settings={settings}
@@ -369,7 +369,7 @@ const AppContent: React.FC = () => {
                 onClearSelectedPackingOrder={() => setSelectedOrderForPacking(null)}
               />
             } />
-            <Route path="/orders" element={
+            <Route path="orders" element={
               <SearchRetrieval
                 orders={orders}
                 onRefreshOrders={fetchOrdersAPI}
@@ -384,7 +384,7 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/order/:orderId" element={
+            <Route path="order/:orderId" element={
               <OrderDetailsPage
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -392,7 +392,7 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/orders/:orderId" element={
+            <Route path="orders/:orderId" element={
               <OrderDetailsPage
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -400,28 +400,24 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/history" element={
+            <Route path="history" element={
               <RecordingHistory
                 orders={orders}
                 onRefresh={fetchOrdersAPI}
                 onDeleteOrder={handleDeleteOrder}
               />
             } />
-            <Route path="/admin" element={
-              currentStaff.role === 'ADMIN' ? (
-                <AdminDashboard
-                  orders={orders}
-                  settings={settings}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
-                  onUpdateOrder={handleUpdateOrder}
-                  currentStaffId={currentStaff?.id}
-                  currentStaffName={currentStaff?.name}
-                />
-              ) : (
-                <Navigate to="/orders" replace />
-              )
+            <Route path="admin" element={
+              <AdminDashboard
+                orders={orders}
+                settings={settings}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onUpdateOrder={handleUpdateOrder}
+                currentStaffId={currentStaff?.id}
+                currentStaffName={currentStaff?.name}
+              />
             } />
-            <Route path="/production-deck" element={
+            <Route path="production-deck" element={
               <ProductionDeck
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -434,19 +430,19 @@ const AppContent: React.FC = () => {
                 }}
               />
             } />
-            <Route path="/calculator" element={
+            <Route path="calculator" element={
               <ShippingRateCalculator
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffName={currentStaff?.name}
               />
             } />
-            <Route path="/sales" element={
+            <Route path="sales" element={
               <SalesReports
                 orders={orders}
               />
             } />
-            <Route path="*" element={<Navigate to="/orders" replace />} />
+            <Route path="*" element={<Navigate to="orders" replace />} />
           </Routes>
         </main>
         <UploadQueueBanner />
@@ -483,7 +479,7 @@ export default function App() {
       <Routes>
         <Route path="/public-deck" element={<PublicProductionDeck />} />
         <Route path="/diagnose" element={<DiagnosePage />} />
-        <Route path="*" element={<AppContent />} />
+        <Route path="/*" element={<AppContent />} />
       </Routes>
     </BrowserRouter>
   );

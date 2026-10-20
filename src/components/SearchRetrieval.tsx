@@ -609,7 +609,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <Link 
-                          to={`/order/${order.orderId}`}
+                          to={`/order/${encodeURIComponent(order.orderId)}`}
                           className="font-mono font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
                         >
                           <span>{order.orderId}</span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Tv, 
   Flame, 
@@ -1008,15 +1009,15 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
       onClick={onCardClick}
     >
       <div className="flex items-center justify-between gap-2">
-        <a
-          href={`/order/${order.orderId}`}
+        <Link
+          to={`/order/${encodeURIComponent(order.orderId)}`}
           onClick={(e) => e.stopPropagation()}
           className="font-mono text-xs font-bold text-[#832f5e] hover:underline flex items-center gap-1 group/link cursor-pointer"
           title="Open Full Individual Order Details"
         >
           <span>#{order.orderId}</span>
           <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/link:opacity-100 transition-opacity" />
-        </a>
+        </Link>
         {renderDuePill()}
       </div>
 
