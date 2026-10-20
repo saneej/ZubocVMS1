@@ -579,12 +579,6 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
               </div>
             </div>
 
-            {/* Center Section: Brand */}
-            <div className="flex-1 flex justify-center">
-              <span className="text-lg font-black uppercase tracking-[0.2em] text-slate-900">
-                Zuboc Flow
-              </span>
-            </div>
 
             {/* Right Section: Controls & Global Stats */}
             <div className="flex items-center justify-end gap-4 lg:w-1/3">

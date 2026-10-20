@@ -302,7 +302,7 @@
       "orderTotal": "",
       "itemCount": "1",
       "fulfillmentStatus": "Pending",
-      "notes": "hii\nhello",
+      "notes": "hii\nhello\n\n",
       "remarks": "hii\nhello\n\n",
       "chatNotes": [
         {
@@ -441,14 +441,10 @@
       "timeline": {},
       "promisedDeliveryDate": "2026-10-22",
       "paymentGate": {
-        "overrideBy": "saneej",
         "balanceAmount": 12500,
         "balanceStatus": "PENDING",
-        "overrideReason": "Client VIP Credit Term Approved",
         "advanceReceived": 12000,
-        "overrideTimestamp": "2026-10-20T11:35:17.304Z",
-        "totalBillingAmount": 24500,
-        "adminDispatchOverride": true
+        "totalBillingAmount": 24500
       },
       "productionStage": "CURATION_ASSEMBLY",
       "stageDueDates": {
@@ -461,7 +457,7 @@
       "productionNotes": "hii\nhello\n\n",
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-19T15:53:30.06+00:00",
-      "updatedAt": "2026-10-20T15:01:49.047+00:00"
+      "updatedAt": "2026-10-20T15:37:00.937+00:00"
     }
   },
   "settings": {
