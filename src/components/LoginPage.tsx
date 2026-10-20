@@ -69,10 +69,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               />
             </div>
           </div>
-          <div className="flex items-center justify-center gap-1.5 text-stone-300 text-xs font-mono font-bold uppercase tracking-wider">
-            <Lock className="w-3.5 h-3.5 text-[#832f5e]" />
-            <span>Secure Access Terminal</span>
-          </div>
         </div>
 
         {/* Main Access Card */}
@@ -80,15 +76,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            <div className="border-b border-stone-200 pb-3 flex items-center justify-between">
-              <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider font-mono flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#832f5e]" />
-                <span>Station Passphrase</span>
-              </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#832f5e]/10 text-[#832f5e] font-mono">
-                ENCRYPTED
-              </span>
-            </div>
 
             {/* Feedback Messages */}
             {errorMessage && (
@@ -139,7 +126,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               disabled={isLoading || !accessCode.trim()}
               className="w-full py-3.5 bg-[#832f5e] hover:bg-[#6c234b] disabled:opacity-50 text-white rounded-2xl font-bold font-mono text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#832f5e]/30 transition-all mt-3"
             >
-              <span>{isLoading ? 'VERIFYING...' : 'ENTER WORKSHOP TERMINAL'}</span>
+              <span>{isLoading ? 'LOGGING IN...' : 'LOGIN'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -147,10 +134,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         </div>
 
-        {/* Security Footer */}
-        <p className="text-center text-[10px] text-stone-400 font-mono tracking-wider uppercase">
-          Zuboc VMS • Server-Verified Station Terminal
-        </p>
 
       </div>
 

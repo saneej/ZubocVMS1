@@ -23,7 +23,8 @@ import {
   X,
   Save,
   AlertCircle,
-  Download
+  Download,
+  Tv
 } from 'lucide-react';
 import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
@@ -455,6 +456,22 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
             <div className="flex flex-col gap-1 min-w-[140px]">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Fulfillment Status</label>
               <StatusCell order={order} onUpdate={onUpdateOrder} staffName={currentStaffName} />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Deck Visibility</label>
+              <button
+                onClick={() => handleSaveFields({ isProductionDeckOrder: !order.isProductionDeckOrder }, `${!order.isProductionDeckOrder ? 'Enabled' : 'Disabled'} Production Deck listing`)}
+                disabled={isSaving}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-[11px] uppercase tracking-tight transition-all border cursor-pointer ${
+                  order.isProductionDeckOrder 
+                    ? 'bg-purple-50 text-[#832f5e] border-purple-200 shadow-sm shadow-purple-100' 
+                    : 'bg-slate-50 text-slate-400 border-slate-200'
+                }`}
+              >
+                <Tv className={`w-3.5 h-3.5 ${order.isProductionDeckOrder ? 'text-[#832f5e]' : 'text-slate-300'}`} />
+                <span>{order.isProductionDeckOrder ? 'Listed in Production Deck' : 'List in Production Deck'}</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
