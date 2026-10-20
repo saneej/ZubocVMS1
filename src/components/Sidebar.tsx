@@ -79,9 +79,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => { setActiveTab('search'); setIsMobileOpen(false); }}>
               <img 
-                src="https://i.ibb.co/BFsYkvn/zuboc-com-svg-1-1.png" 
+                src="/zuboc-com-svg-1-1.png" 
                 alt="Zuboc Logo" 
-                className="h-8 w-auto object-contain max-w-[160px]"
+                className="h-9 w-auto object-contain max-w-[180px]"
               />
             </div>
 
