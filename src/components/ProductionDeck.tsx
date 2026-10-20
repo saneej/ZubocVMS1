@@ -228,10 +228,10 @@ function normalizeOrder(order: OrderRecord): {
     envelopeDieCutting: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
     screenPrinting: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
     goldFoiling: stage !== 'ORDER_CONFIRMATION' && stage !== 'DESIGNING_OUT' && stage !== 'CLIENT_APPROVAL',
-    waxSealApplied: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    curationCompleted: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    photoshootCompleted: stage === 'PHOTOSHOOT' || stage === 'DISPATCH' || stage === 'QC_PACKED' || stage === 'DISPATCHED',
-    qcPackedCompleted: stage === 'DISPATCH' || stage === 'DISPATCHED'
+    waxSealApplied: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH',
+    curationCompleted: stage === 'PRODUCTION_CURATION' || stage === 'PHOTOSHOOT' || stage === 'DISPATCH',
+    photoshootCompleted: stage === 'PHOTOSHOOT' || stage === 'DISPATCH',
+    qcPackedCompleted: stage === 'DISPATCH'
   };
 
   const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '18500').replace(/[^0-9.]/g, '')) || 0;

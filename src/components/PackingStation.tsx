@@ -146,7 +146,13 @@ export const PackingStation: React.FC<PackingStationProps> = ({
   onClearSelectedPackingOrder
 }) => {
   const [step, setStep] = useState<StationStep>('READY');
-  const [mode, setMode] = useState<EvidenceMode>('both'); // Default: Photo + Video
+  const [mode, setMode] = useState<EvidenceMode>(() => {
+    try {
+      const saved = localStorage.getItem('zuboc_packing_mode') as EvidenceMode;
+      if (saved === 'photo' || saved === 'video' || saved === 'both') return saved;
+    } catch {}
+    return 'photo'; // Default: 1. Photo only
+  });
   const [orderIdInput, setOrderIdInput] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string>('');
 
@@ -1008,37 +1014,15 @@ export const PackingStation: React.FC<PackingStationProps> = ({
           </div>
         </div>
 
-        {/* EVIDENCE MODE SELECTOR: Photo, Video, Photo+Video */}
+        {/* EVIDENCE MODE SELECTOR: 1- Photo Only, 2- Video Only, 3- Photo + Video */}
         <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200 font-mono text-xs">
+          {/* 1- Photo Only */}
           <button
             type="button"
-            onClick={() => setMode('both')}
-            className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
-              mode === 'both'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>PHOTO + VIDEO</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMode('video')}
-            className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
-              mode === 'video'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Video className="w-3.5 h-3.5" />
-            <span>VIDEO ONLY</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMode('photo')}
+            onClick={() => {
+              setMode('photo');
+              try { localStorage.setItem('zuboc_packing_mode', 'photo'); } catch {}
+            }}
             className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
               mode === 'photo'
                 ? 'bg-blue-600 text-white shadow-sm'
@@ -1046,7 +1030,41 @@ export const PackingStation: React.FC<PackingStationProps> = ({
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>PHOTO ONLY</span>
+            <span>1. PHOTO ONLY</span>
+          </button>
+
+          {/* 2- Video Only */}
+          <button
+            type="button"
+            onClick={() => {
+              setMode('video');
+              try { localStorage.setItem('zuboc_packing_mode', 'video'); } catch {}
+            }}
+            className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              mode === 'video'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Video className="w-3.5 h-3.5" />
+            <span>2. VIDEO ONLY</span>
+          </button>
+
+          {/* 3- Photo + Video */}
+          <button
+            type="button"
+            onClick={() => {
+              setMode('both');
+              try { localStorage.setItem('zuboc_packing_mode', 'both'); } catch {}
+            }}
+            className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+              mode === 'both'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>3. PHOTO + VIDEO</span>
           </button>
         </div>
 
