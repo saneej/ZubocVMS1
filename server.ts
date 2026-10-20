@@ -258,7 +258,7 @@ function getSupabaseClient() {
       _supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
         auth: { persistSession: false },
         global: {
-          headers: { 'x-application-name': 'zuboc-vms-server' }
+          headers: { 'x-application-name': 'zuboc-flow-server' }
         }
       });
       return _supabaseServer;
@@ -310,8 +310,8 @@ async function ensureInitialSync() {
   ]);
 }
 
-const DATA_FILE = path.join(__dirname, 'vms_data.json');
-const TMP_DATA_FILE = '/tmp/vms_data.json';
+const DATA_FILE = path.join(__dirname, 'flow_data.json');
+const TMP_DATA_FILE = '/tmp/flow_data.json';
 
 interface ChatNote {
   id: string;
@@ -403,7 +403,7 @@ for (const ord of INITIAL_FALLBACK_ORDERS) {
 try {
   let activeDataPath = DATA_FILE;
   if (!fs.existsSync(activeDataPath)) {
-    const altPath = path.join(process.cwd(), 'vms_data.json');
+    const altPath = path.join(process.cwd(), 'flow_data.json');
     if (fs.existsSync(altPath)) {
       activeDataPath = altPath;
     } else {
@@ -425,7 +425,7 @@ try {
     }
   }
 } catch (e) {
-  console.error('Error loading local vms_data.json:', e);
+  console.error('Error loading local flow_data.json:', e);
 }
 
 function saveLocalBackup() {

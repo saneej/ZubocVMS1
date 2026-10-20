@@ -261,7 +261,7 @@ function getSupabaseClient() {
       _supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
         auth: { persistSession: false },
         global: {
-          headers: { "x-application-name": "zuboc-vms-server" }
+          headers: { "x-application-name": "zuboc-flow-server" }
         }
       });
       return _supabaseServer;
@@ -304,8 +304,8 @@ async function ensureInitialSync() {
     new Promise((resolve) => setTimeout(resolve, 3e3))
   ]);
 }
-var DATA_FILE = path.join(__dirname, "vms_data.json");
-var TMP_DATA_FILE = "/tmp/vms_data.json";
+var DATA_FILE = path.join(__dirname, "flow_data.json");
+var TMP_DATA_FILE = "/tmp/flow_data.json";
 var settings = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "8372063656:AAGc8APzAoq1LH14p5POdBm19qnv-5286gE",
   telegramChatId: process.env.TELEGRAM_CHAT_ID || "-1003940299676",
@@ -325,7 +325,7 @@ for (const ord of INITIAL_FALLBACK_ORDERS) {
 try {
   let activeDataPath = DATA_FILE;
   if (!fs.existsSync(activeDataPath)) {
-    const altPath = path.join(process.cwd(), "vms_data.json");
+    const altPath = path.join(process.cwd(), "flow_data.json");
     if (fs.existsSync(altPath)) {
       activeDataPath = altPath;
     } else {
@@ -347,7 +347,7 @@ try {
     }
   }
 } catch (e) {
-  console.error("Error loading local vms_data.json:", e);
+  console.error("Error loading local flow_data.json:", e);
 }
 function saveLocalBackup() {
   const payload = JSON.stringify({ orders: ordersStore, settings, staffs: staffsStore }, null, 2);
@@ -536,7 +536,7 @@ var apiRouter = express.Router();
 apiRouter.get("/", (req, res) => {
   res.json({
     status: "ok",
-    service: "Zuboc VMS API",
+    service: "Zuboc Flow API",
     firebaseConnected: Boolean(firestoreDb),
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
@@ -967,43 +967,53 @@ apiRouter.post(["/auth/verify-pin", "/auth/access-code"], async (req, res) => {
   const envPackingCode = (process.env.PACKING_ACCESS_CODE || "123456").trim().toLowerCase();
   const masterWord = (process.env.MASTER_WORD || "zuboc").trim().toLowerCase();
   let authenticatedStaff = null;
-  if (getSupabaseClient()) {
+  const client = getSupabaseClient();
+  if (client) {
     try {
-      const { data: supaStaffs } = await getSupabaseClient().from("staffs").select("*");
-      if (supaStaffs && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
-        const freshMap = {};
-        for (const s of supaStaffs) {
-          if (s.id) freshMap[s.id] = s;
-        }
-        staffsStore = freshMap;
+      const { data: matchedStaffs, error } = await withTimeout(
+        client.from("staffs").select("*").or(`password.eq.${cleanCode},id.eq.${cleanCode}`).limit(1),
+        5e3
+      );
+      if (!error && matchedStaffs && matchedStaffs.length > 0) {
+        const matchedStaff = matchedStaffs[0];
+        authenticatedStaff = {
+          id: matchedStaff.id,
+          name: matchedStaff.name,
+          role: matchedStaff.role || "PACKER",
+          stationId: matchedStaff.stationId || "Packing-01",
+          email: matchedStaff.email
+        };
       }
-    } catch {
+    } catch (supaErr) {
+      console.warn("Supabase Auth Query error:", supaErr);
     }
-  } else {
-    await syncStaffsFromFirestore();
   }
-  const matchedStaff = Object.values(staffsStore).find((s) => {
-    const p = String(s.password || "").trim().toLowerCase();
-    const id = String(s.id || "").trim().toLowerCase();
-    if (!cleanCode || cleanCode.length < 2) return false;
-    return p && p === cleanCode || id && id === cleanCode;
-  });
-  if (matchedStaff) {
-    authenticatedStaff = {
-      id: matchedStaff.id,
-      name: matchedStaff.name,
-      role: matchedStaff.role || "PACKER",
-      stationId: matchedStaff.stationId || "Packing-01",
-      email: matchedStaff.email
-    };
-  } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || "zuboc2026").trim().toLowerCase()) {
-    authenticatedStaff = {
-      id: "Zuboc",
-      name: "Zuboc (ADMIN)",
-      role: "ADMIN",
-      stationId: "Packing-01",
-      email: "admin@zuboc.com"
-    };
+  if (!authenticatedStaff) {
+    if (Object.keys(staffsStore).length <= INITIAL_STAFFS.length) {
+      await syncStaffsFromFirestore();
+    }
+    const matchedStaff = Object.values(staffsStore).find((s) => {
+      const p = String(s.password || "").trim().toLowerCase();
+      const id = String(s.id || "").trim().toLowerCase();
+      return p && p === cleanCode || id && id === cleanCode;
+    });
+    if (matchedStaff) {
+      authenticatedStaff = {
+        id: matchedStaff.id,
+        name: matchedStaff.name,
+        role: matchedStaff.role || "PACKER",
+        stationId: matchedStaff.stationId || "Packing-01",
+        email: matchedStaff.email
+      };
+    } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || "zuboc2026").trim().toLowerCase()) {
+      authenticatedStaff = {
+        id: "Zuboc",
+        name: "Zuboc (ADMIN)",
+        role: "ADMIN",
+        stationId: "Packing-01",
+        email: "admin@zuboc.com"
+      };
+    }
   }
   if (authenticatedStaff) {
     loginAttempts.delete(ipKey);
@@ -1791,12 +1801,12 @@ apiRouter.post("/telegram/test-connection", async (req, res) => {
       throw new Error(meData?.description || "Invalid Telegram Bot Token");
     }
     const botUsername = meData.result?.username ? `@${meData.result.username}` : "Bot";
-    const text = `\u{1F7E2} <b>Zuboc VMS (${escapeHtml(botUsername)}) Connected!</b>
+    const text = `\u{1F7E2} <b>Zuboc Flow (${escapeHtml(botUsername)}) Connected!</b>
 
 <b>Station:</b> ${escapeHtml(settings.stationId)}
 <b>Timestamp:</b> ${escapeHtml((/* @__PURE__ */ new Date()).toLocaleString("en-GB"))}
 
-Your Zuboc VMS packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`;
+Your Zuboc Flow packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`;
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1903,8 +1913,7 @@ apiRouter.post("/ifm/chat", async (req, res) => {
   const modelName = "IFM/K2-Horizon-375B-A23B";
   const payloadMessages = messages.map((m) => ({
     role: m.role,
-    content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-    ...m.role === "assistant" ? { thinking: m.thinking || "" } : {}
+    content: typeof m.content === "string" ? m.content : JSON.stringify(m.content)
   }));
   try {
     const response = await fetch(apiUrl, {
@@ -1967,7 +1976,7 @@ async function startServer() {
   }
   if (!process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Zuboc VMS Server (v1.2.1-diag) running on http://localhost:${PORT}`);
+      console.log(`Zuboc Flow Server (v1.2.1-diag) running on http://localhost:${PORT}`);
       syncFromSupabase().catch((e) => console.error("Background sync error:", e));
     });
   }

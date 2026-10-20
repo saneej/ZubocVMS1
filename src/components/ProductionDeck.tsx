@@ -573,9 +573,6 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
                 <div>
                   <h1 className="text-lg font-black tracking-tight font-sans leading-none">Production TV Deck</h1>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-stone-200 text-stone-600 uppercase tracking-widest border border-stone-300/50">
-                      DASHBOARD MODE
-                    </span>
                     <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wide">Live Workshop Monitor</span>
                   </div>
                 </div>

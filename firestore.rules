@@ -11,7 +11,7 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
 
-    // Orders collection for VMS packing evidence
+    // Orders collection for Zuboc Flow packing evidence
     match /orders/{orderId} {
       allow read: if true;
       allow create, update, delete: if isValidId(orderId);

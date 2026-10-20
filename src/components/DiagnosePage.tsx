@@ -788,7 +788,7 @@ export const DiagnosePage: React.FC = () => {
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a');
                       a.href = url;
-                      a.download = `zuboc-diag-report-${Date.now()}.json`;
+                      a.download = `zuboc-flow-diag-report-${Date.now()}.json`;
                       a.click();
                       addLog('System report generated and downloaded successfully.', 'success');
                     } catch (e: any) {

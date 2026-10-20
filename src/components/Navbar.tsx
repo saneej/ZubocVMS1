@@ -97,8 +97,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div>
               <div className="font-extrabold text-base tracking-wider text-white flex items-center gap-2 font-mono">
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-emerald-400 font-black">ZUBOC</span>
-                  Flow v2.4
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-emerald-400 font-black">ZUBOC FLOW</span>
+                  v2.4
               </div>
               <p className="text-[10px] font-mono text-emerald-400/80 uppercase tracking-widest font-semibold">
                 LOGISTICS VIDEO EVIDENCE VAULT

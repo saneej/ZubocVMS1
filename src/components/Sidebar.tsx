@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <img 
                 src="/zuboc-com-svg-1-1.png" 
-                alt="Zuboc Logo" 
+                alt="Zuboc Flow Logo" 
                 className="h-10 w-auto object-contain max-w-[190px]"
               />
             </div>

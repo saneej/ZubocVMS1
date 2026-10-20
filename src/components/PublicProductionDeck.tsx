@@ -269,7 +269,7 @@ export const PublicProductionDeck: React.FC = () => {
           <div className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
             <img 
               src="/zuboc-com-svg-1-1.png" 
-              alt="Zuboc Logo" 
+              alt="Zuboc Flow Logo" 
               className="h-10 w-auto object-contain"
             />
           </div>
