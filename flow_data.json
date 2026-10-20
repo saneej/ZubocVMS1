@@ -347,20 +347,6 @@
           "staffId": "saneej",
           "staffName": "saneej",
           "timestamp": "2026-10-20T10:34:13.923Z"
-        },
-        {
-          "id": "1792510711441",
-          "text": "hiii",
-          "staffId": "saneej",
-          "staffName": "saneej",
-          "timestamp": "2026-10-20T15:38:31.441Z"
-        },
-        {
-          "id": "1792510727818",
-          "text": "hii",
-          "staffId": "Operator-01",
-          "staffName": "Packing Operator",
-          "timestamp": "2026-10-20T15:38:47.818Z"
         }
       ],
       "auditLogs": [
@@ -471,7 +457,7 @@
       "productionNotes": "hii\nhello\n\n",
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-19T15:53:30.06+00:00",
-      "updatedAt": "2026-10-20T15:38:47.422+00:00"
+      "updatedAt": "2026-10-20T15:37:00.937+00:00"
     }
   },
   "settings": {

@@ -96,7 +96,7 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
                       <Link 
-                        to={`/order/${encodeURIComponent(order.orderId)}`}
+                        to={`/order/${order.orderId}`}
                         className="font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
                       >
                         <span>{order.orderId}</span>

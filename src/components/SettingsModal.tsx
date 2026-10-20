@@ -49,8 +49,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onStaffUpdated,
   onStaffChanged
 }) => {
-  const isAdmin = currentStaff.role === 'ADMIN';
-  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'backup'>(isAdmin ? 'telegram' : 'profile');
+  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'backup'>('telegram');
 
   // Telegram Config
   const [botToken, setBotToken] = useState(settings.telegramBotToken || '');
@@ -115,16 +114,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      if (!isAdmin && activeTab !== 'profile') {
-        setActiveTab('profile');
-      }
       setBotToken(settings.telegramBotToken || '');
       setChatId(settings.telegramChatId || '');
       setStationId(settings.stationId || 'Packing-01');
       setProfileName(currentStaff.name || '');
-      if (isAdmin) fetchStaffs();
+      fetchStaffs();
     }
-  }, [isOpen, currentStaff, isAdmin]);
+  }, [isOpen, currentStaff]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -387,20 +383,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Tab Bar */}
         <div className="flex border-b border-slate-200 bg-slate-100/70 px-6 pt-2 font-mono text-xs">
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('telegram')}
-              className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                activeTab === 'telegram'
-                  ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <SettingsIcon className="w-3.5 h-3.5" />
-              <span>TELEGRAM & STATION</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setActiveTab('telegram')}
+            className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'telegram'
+                ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <SettingsIcon className="w-3.5 h-3.5" />
+            <span>TELEGRAM & STATION</span>
+          </button>
 
           <button
             type="button"
@@ -415,20 +409,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <span>MY PROFILE</span>
           </button>
 
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('staffs')}
-              className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                activeTab === 'staffs'
-                  ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Key className="w-3.5 h-3.5 text-blue-600" />
-              <span>ACCESS CODES ({staffList.length})</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setActiveTab('staffs')}
+            className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'staffs'
+                ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Key className="w-3.5 h-3.5 text-blue-600" />
+            <span>ACCESS CODES ({staffList.length})</span>
+          </button>
         </div>
 
         {/* Modal Content Body */}
@@ -859,22 +851,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Modal Footer with Diagnose Portal link */}
         <div className="p-4 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
-          {isAdmin ? (
-            <a
-              href="/diagnose"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-stone-500 hover:text-[#832f5e] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Activity className="w-3.5 h-3.5 text-[#832f5e]" />
-              <span>System &amp; Quota Diagnostics (/diagnose)</span>
-            </a>
-          ) : (
-            <div className="flex items-center gap-1.5 text-stone-400 text-xs font-medium">
-              <Shield className="w-3.5 h-3.5" />
-              <span>Operator Mode Active</span>
-            </div>
-          )}
+          <a
+            href="/diagnose"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-stone-500 hover:text-[#832f5e] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Activity className="w-3.5 h-3.5 text-[#832f5e]" />
+            <span>System &amp; Quota Diagnostics (/diagnose)</span>
+          </a>
           <button
             type="button"
             onClick={onClose}

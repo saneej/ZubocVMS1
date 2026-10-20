@@ -135,15 +135,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </button>
             )}
 
-            {currentStaff.role === 'ADMIN' && (
-              <button
-                onClick={onOpenSettings}
-                className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-950 transition-all cursor-pointer active:scale-90"
-                title="Settings"
-              >
-                <Settings className="w-4.5 h-4.5" />
-              </button>
-            )}
+            <button
+              onClick={onOpenSettings}
+              className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-950 transition-all cursor-pointer active:scale-90"
+              title="Settings"
+            >
+              <Settings className="w-4.5 h-4.5" />
+            </button>
           </div>
 
           {/* User Account Capsule */}
