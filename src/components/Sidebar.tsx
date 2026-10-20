@@ -81,11 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="flex items-center gap-3 cursor-pointer select-none transition-transform hover:scale-105 active:scale-95" 
               onClick={() => { setActiveTab('search'); setIsMobileOpen(false); }}
             >
-              <img 
-                src="/zuboc-com-svg-1-1.png" 
-                alt="Zuboc Flow Logo" 
-                className="h-11 w-auto object-contain max-w-[200px]"
-              />
+              <span className="text-xl font-black uppercase tracking-[0.2em] text-slate-900 group-hover:text-purple-600 transition-colors">
+                Zuboc Flow
+              </span>
             </div>
 
             <button 

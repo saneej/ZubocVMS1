@@ -581,11 +581,9 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
             {/* Center Section: Brand */}
             <div className="flex-1 flex justify-center">
-              <img 
-                src="/zuboc-com-svg-1-1.png" 
-                alt="Zuboc Flow Logo" 
-                className="h-10 w-auto object-contain max-w-[180px]"
-              />
+              <span className="text-lg font-black uppercase tracking-[0.2em] text-slate-900">
+                Zuboc Flow
+              </span>
             </div>
 
             {/* Right Section: Controls & Global Stats */}

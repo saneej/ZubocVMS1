@@ -281,11 +281,9 @@ export const PublicProductionDeck: React.FC = () => {
         {/* Center Section: Primary Brand */}
         <div className="flex-1 flex justify-center">
           <div className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-            <img 
-              src="/zuboc-com-svg-1-1.png" 
-              alt="Zuboc Flow Logo" 
-              className="h-11 w-auto object-contain max-w-[200px]"
-            />
+            <span className="text-xl font-black uppercase tracking-[0.2em] text-slate-900">
+              Zuboc Flow
+            </span>
           </div>
         </div>
 
