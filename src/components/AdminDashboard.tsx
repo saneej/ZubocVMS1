@@ -99,7 +99,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const newChatNote = {
       id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       text: text.trim(),
-      staffId: currentStaffName,
+      staffId: currentStaffId || currentStaffName,
+      staffName: currentStaffName,
       timestamp: nowIso
     };
 

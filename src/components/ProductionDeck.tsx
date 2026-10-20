@@ -37,7 +37,9 @@ import {
   PackageCheck,
   PackagePlus,
   ExternalLink,
-  Activity
+  Activity,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -47,7 +49,8 @@ import {
   ZubocCustomisations, 
   SubAssemblyProgress, 
   ZubocTimeline, 
-  PaymentGateInfo 
+  PaymentGateInfo,
+  ChatNote
 } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { getCurrentISTString } from '../utils/time';
@@ -1124,10 +1127,32 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
   const [balanceStatus, setBalanceStatus] = useState<'COMPLETED' | 'PENDING'>(norm.payment.balanceStatus || 'PENDING');
   const [remarks, setRemarks] = useState<string>(norm.notes);
   const [stageDueDates, setStageDueDates] = useState<Record<string, string>>(order.stageDueDates || {});
+  const [chatNotes, setChatNotes] = useState<ChatNote[]>(order.chatNotes || []);
+  const [newChatNote, setNewChatNote] = useState<string>('');
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const qrRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatNotes]);
+
+  const handleSendNote = () => {
+    if (!newChatNote.trim()) return;
+    const note: ChatNote = {
+      id: Date.now().toString(),
+      text: newChatNote.trim(),
+      staffId: currentStaff.id,
+      staffName: currentStaff.name,
+      timestamp: new Date().toISOString()
+    };
+    setChatNotes([...chatNotes, note]);
+    setNewChatNote('');
+  };
 
   useEffect(() => {
     const calc = Math.max(0, totalBillingAmount - advanceReceived);
@@ -1180,6 +1205,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
         balanceAmount,
         balanceStatus
       },
+      chatNotes,
       fulfillmentStatus: currentStage === 'DISPATCHED' ? 'Shipped' : currentStage === 'QC_PACKED' ? 'Packed' : 'Pending',
       updatedAt: now
     };
@@ -1401,13 +1427,72 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
             </div>
 
             <div>
-              <label className="text-stone-500">Remarks / Notes</label>
+              <label className="text-stone-500">General Remarks</label>
               <textarea
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 rows={2}
                 className="w-full mt-1 px-3 py-1.5 rounded-lg bg-white border border-stone-300"
               />
+            </div>
+          </div>
+
+          {/* 5. Operator Chat / Chronological Remarks */}
+          <div className="p-3.5 rounded-xl bg-white border border-stone-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold uppercase text-[#832f5e] flex items-center gap-2">
+                <MessageSquare className="w-3.5 h-3.5" />
+                Operator Chat / Remarks
+              </h3>
+              <span className="text-[10px] font-mono text-stone-400">Chronological Log</span>
+            </div>
+
+            {/* Chat Box History */}
+            <div className="max-h-48 overflow-y-auto space-y-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+              {chatNotes.length === 0 ? (
+                <p className="text-center py-4 text-stone-400 italic">No specific remarks logged yet.</p>
+              ) : (
+                chatNotes.map((note) => (
+                  <div key={note.id} className={`flex flex-col ${note.staffId === currentStaff.id ? 'items-end' : 'items-start'}`}>
+                    <div className={`max-w-[90%] p-2 rounded-xl text-[11px] shadow-3xs ${
+                      note.staffId === currentStaff.id 
+                        ? 'bg-[#832f5e] text-white rounded-tr-none' 
+                        : 'bg-white border border-stone-200 text-slate-800 rounded-tl-none'
+                    }`}>
+                      <p className="font-medium leading-relaxed">{note.text}</p>
+                      <div className={`flex items-center gap-2 mt-1 text-[9px] ${
+                        note.staffId === currentStaff.id ? 'text-white/70' : 'text-stone-400'
+                      }`}>
+                        <span className="font-black uppercase">{note.staffName}</span>
+                        <span>•</span>
+                        <span>{new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{new Date(note.timestamp).toLocaleDateString([], { day: '2-digit', month: 'short' })}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newChatNote}
+                onChange={(e) => setNewChatNote(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSendNote())}
+                placeholder="Add a remark with name/date..."
+                className="flex-1 px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-[11px] focus:outline-none focus:ring-2 focus:ring-[#832f5e]/10 focus:border-[#832f5e]/40 transition-all"
+              />
+              <button
+                type="button"
+                onClick={handleSendNote}
+                className="p-2 rounded-xl bg-[#832f5e] text-white hover:bg-[#6c234b] transition-colors shadow-md disabled:opacity-50"
+                disabled={!newChatNote.trim()}
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 

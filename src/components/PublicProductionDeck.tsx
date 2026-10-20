@@ -23,7 +23,8 @@ import {
   Flame,
   Award,
   Zap,
-  Info
+  Info,
+  MessageSquare
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -622,6 +623,29 @@ const PublicOrderDetailsModal: React.FC<PublicOrderDetailsModalProps> = ({ order
             <p className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/80 text-stone-700 font-medium text-xs leading-relaxed">
               {norm.notes}
             </p>
+          </div>
+        )}
+
+        {/* Chronological Remarks / Chat Log */}
+        {order.chatNotes && order.chatNotes.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-black uppercase text-[#832f5e] flex items-center gap-2">
+              <MessageSquare className="w-3 h-3" />
+              Live Status Remarks
+            </h4>
+            <div className="space-y-2 p-3 rounded-2xl bg-slate-50 border border-slate-100 max-h-40 overflow-y-auto">
+              {order.chatNotes.map((note) => (
+                <div key={note.id} className="flex flex-col border-b border-white pb-2 last:border-0">
+                  <p className="text-[11px] text-slate-800 leading-relaxed font-medium">{note.text}</p>
+                  <div className="flex items-center gap-2 mt-1 text-[9px] text-stone-400 font-bold uppercase tracking-tight">
+                    <span>{note.staffName}</span>
+                    <span>•</span>
+                    <span>{new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>{new Date(note.timestamp).toLocaleDateString([], { day: '2-digit', month: 'short' })}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

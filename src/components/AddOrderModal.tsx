@@ -67,6 +67,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       id: `note-add-${Date.now()}`,
       text: finalNotes,
       staffId: currentStaffId,
+      staffName: currentStaffName,
       timestamp: now
     }] : [];
 

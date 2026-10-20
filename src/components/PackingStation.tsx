@@ -743,7 +743,8 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     const initialChatNote = finalNotes ? [{
       id: `note-initial-${Date.now()}`,
       text: finalNotes,
-      staffId: currentStaff.name,
+      staffId: currentStaff.id || currentStaff.name,
+      staffName: currentStaff.name,
       timestamp: new Date().toISOString()
     }] : [];
 

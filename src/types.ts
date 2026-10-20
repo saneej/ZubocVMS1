@@ -2,6 +2,7 @@ export interface ChatNote {
   id: string;
   text: string;
   staffId: string;
+  staffName: string;
   timestamp: string;
 }
 
