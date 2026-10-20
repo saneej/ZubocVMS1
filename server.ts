@@ -1223,46 +1223,60 @@ apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
 
   let authenticatedStaff: StaffMember | null = null;
 
-  // 1. Fetch fresh staffs from Supabase
-  if (getSupabaseClient()) {
+  // 1. Direct Supabase Query (Prioritize DB-managed Access Codes)
+  const client = getSupabaseClient();
+  if (client) {
     try {
-      const { data: supaStaffs } = await getSupabaseClient().from('staffs').select('*');
-      if (supaStaffs && Array.isArray(supaStaffs) && supaStaffs.length > 0) {
-        const freshMap: Record<string, StaffMember> = {};
-        for (const s of supaStaffs) {
-          if (s.id) freshMap[s.id] = s;
-        }
-        staffsStore = freshMap;
+      const { data: matchedStaffs, error } = await withTimeout(
+        client.from('staffs').select('*').or(`password.eq.${cleanCode},id.eq.${cleanCode}`).limit(1),
+        5000
+      ) as { data: any[]; error: any };
+
+      if (!error && matchedStaffs && matchedStaffs.length > 0) {
+        const matchedStaff = matchedStaffs[0];
+        authenticatedStaff = {
+          id: matchedStaff.id,
+          name: matchedStaff.name,
+          role: matchedStaff.role || 'PACKER',
+          stationId: matchedStaff.stationId || 'Packing-01',
+          email: matchedStaff.email
+        };
       }
-    } catch {}
-  } else {
-    await syncStaffsFromFirestore();
+    } catch (supaErr) {
+      console.warn('Supabase Auth Query error:', supaErr);
+    }
   }
 
-  // 2. Check matched staff by exact password or ID (Strict security: rejecting random text)
-  const matchedStaff = Object.values(staffsStore).find(s => {
-    const p = String(s.password || '').trim().toLowerCase();
-    const id = String(s.id || '').trim().toLowerCase();
-    if (!cleanCode || cleanCode.length < 2) return false;
-    return (p && p === cleanCode) || (id && id === cleanCode);
-  });
+  // 2. Fallback to in-memory/Firestore (if Supabase query didn't find anyone or failed)
+  if (!authenticatedStaff) {
+    // Refresh memory store if needed
+    if (Object.keys(staffsStore).length <= INITIAL_STAFFS.length) {
+      await syncStaffsFromFirestore();
+    }
 
-  if (matchedStaff) {
-    authenticatedStaff = {
-      id: matchedStaff.id,
-      name: matchedStaff.name,
-      role: matchedStaff.role || 'PACKER',
-      stationId: matchedStaff.stationId || 'Packing-01',
-      email: matchedStaff.email
-    };
-  } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || 'zuboc2026').trim().toLowerCase()) {
-    authenticatedStaff = {
-      id: 'Zuboc',
-      name: 'Zuboc (ADMIN)',
-      role: 'ADMIN',
-      stationId: 'Packing-01',
-      email: 'admin@zuboc.com'
-    };
+    const matchedStaff = Object.values(staffsStore).find(s => {
+      const p = String(s.password || '').trim().toLowerCase();
+      const id = String(s.id || '').trim().toLowerCase();
+      return (p && p === cleanCode) || (id && id === cleanCode);
+    });
+
+    if (matchedStaff) {
+      authenticatedStaff = {
+        id: matchedStaff.id,
+        name: matchedStaff.name,
+        role: matchedStaff.role || 'PACKER',
+        stationId: matchedStaff.stationId || 'Packing-01',
+        email: matchedStaff.email
+      };
+    } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || 'zuboc2026').trim().toLowerCase()) {
+      authenticatedStaff = {
+        id: 'Zuboc',
+        name: 'Zuboc (ADMIN)',
+        role: 'ADMIN',
+        stationId: 'Packing-01',
+        email: 'admin@zuboc.com'
+      };
+    }
   }
 
   if (authenticatedStaff) {

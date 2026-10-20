@@ -16,7 +16,11 @@ import {
   Eye,
   EyeOff,
   User,
-  Activity
+  Activity,
+  Download,
+  Upload,
+  Database,
+  Save
 } from 'lucide-react';
 import { AppSettings, StaffMember } from '../types';
 import { safeFetchJson } from '../utils/api';
@@ -45,7 +49,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onStaffUpdated,
   onStaffChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs'>('telegram');
+  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'backup'>('telegram');
 
   // Telegram Config
   const [botToken, setBotToken] = useState(settings.telegramBotToken || '');
