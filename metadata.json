@@ -1,6 +1,6 @@
 {
   "name": "Zuboc Flow",
-  "description": "Zuboc E-Commerce Logistics Flow Engine and Telegram Evidence Portal",
+  "description": "Zuboc Flow Engine",
   "requestFramePermissions": [
     "camera",
     "microphone"

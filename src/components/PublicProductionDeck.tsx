@@ -263,28 +263,34 @@ export const PublicProductionDeck: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased selection:bg-slate-900 selection:text-white">
       
-      {/* Header Bar - Glassmorphism Restyle */}
+      {/* Header Bar - Center Aligned Logo & Glassmorphism */}
       <header className="px-6 py-5 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between shadow-sm sticky top-0 z-30">
-        <div className="flex items-center gap-5">
-          <div className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-            <img 
-              src="/zuboc-com-svg-1-1.png" 
-              alt="Zuboc Flow Logo" 
-              className="h-10 w-auto object-contain"
-            />
-          </div>
-          <div className="hidden sm:block h-8 w-px bg-slate-200/80 mx-1" />
-          <div className="hidden sm:block">
-            <h1 className="text-[13px] font-black uppercase tracking-[0.2em] text-slate-900 leading-tight">
-              Live Production Schedule
+        {/* Left Section: Context */}
+        <div className="hidden sm:flex items-center gap-4 w-1/3">
+          <div className="h-8 w-px bg-slate-200/80 mx-1" />
+          <div>
+            <h1 className="text-[13px] font-black uppercase tracking-[0.25em] text-slate-900 leading-tight">
+              Live Production
             </h1>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-              Real-time Workshop Intelligence
+              Workshop Intelligence
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Center Section: Primary Brand */}
+        <div className="flex-1 flex justify-center">
+          <div className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+            <img 
+              src="/zuboc-com-svg-1-1.png" 
+              alt="Zuboc Flow Logo" 
+              className="h-11 w-auto object-contain max-w-[200px]"
+            />
+          </div>
+        </div>
+
+        {/* Right Section: Real-time Indicators */}
+        <div className="flex items-center justify-end gap-3 w-1/3">
           <div className="hidden md:flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white/50 backdrop-blur-md border border-slate-200/60 text-[11px] font-black text-slate-600 tracking-tight shadow-sm">
             <Clock className="w-4 h-4 text-purple-600" />
             <span>{currentTime || 'IST'}</span>

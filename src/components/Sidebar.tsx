@@ -69,22 +69,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Sidebar Panel - Premium Modern Aesthetic */}
       <aside className={`
-        fixed top-0 bottom-0 left-0 z-50 w-64 bg-white text-slate-900 border-r border-slate-200/60
-        flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-xl shadow-slate-200/20
+        fixed top-0 bottom-0 left-0 z-50 w-64 bg-white/80 backdrop-blur-xl text-slate-900 border-r border-slate-200/60
+        flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-2xl shadow-slate-200/40
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* Brand Header */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="px-6 py-8 flex items-center justify-center relative">
+          <div className="px-6 py-10 flex items-center justify-center relative">
             <div 
-              className="flex items-center gap-3 cursor-pointer select-none transition-transform hover:scale-[1.02] active:scale-95" 
+              className="flex items-center gap-3 cursor-pointer select-none transition-transform hover:scale-105 active:scale-95" 
               onClick={() => { setActiveTab('search'); setIsMobileOpen(false); }}
             >
               <img 
                 src="/zuboc-com-svg-1-1.png" 
                 alt="Zuboc Flow Logo" 
-                className="h-10 w-auto object-contain max-w-[190px]"
+                className="h-11 w-auto object-contain max-w-[200px]"
               />
             </div>
 
@@ -97,9 +97,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Premium Navigation Items */}
-          <nav className="px-3 pb-6 space-y-1.5">
-            <div className="px-4 py-2 mb-1">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Core Engine</span>
+          <nav className="px-4 pb-8 space-y-2">
+            <div className="px-4 py-2 mb-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Core Engine</span>
             </div>
             
             {navItems.map((item) => {
@@ -114,31 +114,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     setIsMobileOpen(false);
                   }}
                   className={`
-                    w-full text-left px-4 py-3 rounded-2xl font-semibold text-[13px] transition-all duration-200
+                    w-full text-left px-5 py-3.5 rounded-2xl font-bold text-[13px] transition-all duration-300
                     flex items-center justify-between cursor-pointer group relative
                     ${isActive 
-                      ? 'bg-slate-950 text-white shadow-lg shadow-slate-950/20' 
-                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-slate-950 text-white shadow-xl shadow-slate-950/30 scale-[1.02]' 
+                      : 'text-slate-500 hover:text-slate-950 hover:bg-slate-100/50'
                     }
                   `}
                 >
-                  <div className="flex items-center gap-3.5">
-                    <Icon className={`w-[18px] h-[18px] shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-900'}`} />
+                  <div className="flex items-center gap-4">
+                    <Icon className={`w-[19px] h-[19px] shrink-0 transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-900'}`} />
                     <span className="tracking-tight">{item.label}</span>
                   </div>
 
                   {item.badge && (
-                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border transition-colors ${
                       isActive 
                         ? 'bg-white/10 border-white/20 text-white' 
-                        : 'bg-[#832f5e]/5 border-[#832f5e]/10 text-[#832f5e]'
+                        : 'bg-slate-950/5 border-slate-950/10 text-slate-600'
                     }`}>
                       {item.badge}
                     </span>
                   )}
 
                   {isActive && (
-                    <div className="absolute left-1.5 w-1 h-4 bg-purple-400 rounded-full" />
+                    <div className="absolute left-0 w-1 h-5 bg-purple-500 rounded-r-full" />
                   )}
                 </button>
               );
@@ -169,21 +169,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </button>
 
-          {/* Diagnostics Portal Link */}
-          <a
-            href="/diagnose"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-between p-3 rounded-2xl text-slate-500 hover:text-slate-950 hover:bg-white/60 transition-all text-[12px] font-bold border border-transparent hover:border-slate-200 group/diag cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-emerald-50">
-                <Activity className="w-4 h-4 text-emerald-600 group-hover/diag:animate-pulse" />
-              </div>
-              <span>Diagnostics</span>
-            </div>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-300 group-hover/diag:text-slate-500" />
-          </a>
 
           {/* Operator Account */}
           <div className="p-3 rounded-2xl bg-white border border-slate-200/80 space-y-3 shadow-sm">

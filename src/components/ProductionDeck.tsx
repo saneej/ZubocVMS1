@@ -564,19 +564,32 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
         <header className="sticky top-0 z-40 px-6 py-4 bg-[#F9F8F6]/95 backdrop-blur-md border-b border-stone-200/60 text-slate-900 shadow-3xs">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             
-            {/* Left Section: Info & Main Stats */}
-            <div className="flex items-center gap-6">
+            {/* Left Section: Stats & Info */}
+            <div className="flex items-center gap-6 lg:w-1/3">
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-[#832f5e] text-white flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-2xl bg-slate-950 text-white flex items-center justify-center shadow-md">
                   <Tv className="w-5 h-5" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-black tracking-tight font-sans leading-none">Production TV Deck</h1>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wide">Live Workshop Monitor</span>
+                  <h1 className="text-sm font-black tracking-tight font-sans leading-none uppercase">Production Deck</h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[9px] text-stone-400 font-bold uppercase tracking-widest">Live Monitor</span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Center Section: Brand */}
+            <div className="flex-1 flex justify-center">
+              <img 
+                src="/zuboc-com-svg-1-1.png" 
+                alt="Zuboc Flow Logo" 
+                className="h-10 w-auto object-contain max-w-[180px]"
+              />
+            </div>
+
+            {/* Right Section: Controls & Global Stats */}
+            <div className="flex items-center justify-end gap-4 lg:w-1/3">
 
               {/* Minimal Unified Stats Bar */}
               <div className="hidden xl:flex items-center gap-1 bg-white border border-stone-200/80 rounded-2xl p-1 shadow-2xs">
