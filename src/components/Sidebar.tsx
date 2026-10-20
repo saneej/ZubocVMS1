@@ -177,20 +177,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">Active Staff</span>
-                  <select
-                    value={currentStaff.id}
-                    onChange={(e) => {
-                      const found = effectiveStaffList.find(s => s.id === e.target.value);
-                      if (found) setCurrentStaff(found);
-                    }}
-                    className="bg-transparent text-[12px] text-slate-900 font-black focus:outline-none cursor-pointer pr-1 max-w-[110px] truncate"
-                  >
-                    {effectiveStaffList.map(st => (
-                      <option key={st.id} value={st.id} className="bg-white text-slate-900">
-                        {st.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="text-[12px] text-slate-900 font-black truncate max-w-[110px]">
+                    {currentStaff.name}
+                  </span>
                 </div>
               </div>
 
