@@ -687,7 +687,7 @@ const apiRouter = express.Router();
 apiRouter.get('/', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'Zuboc VMS API',
+    service: 'Zuboc Flow API',
     firebaseConnected: Boolean(firestoreDb),
     timestamp: new Date().toISOString()
   });
@@ -2182,7 +2182,7 @@ apiRouter.post('/telegram/test-connection', async (req, res) => {
     }
     const botUsername = meData.result?.username ? `@${meData.result.username}` : 'Bot';
 
-    const text = `🟢 <b>Zuboc VMS (${escapeHtml(botUsername)}) Connected!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour Zuboc VMS packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`;
+    const text = `🟢 <b>Zuboc Flow (${escapeHtml(botUsername)}) Connected!</b>\n\n<b>Station:</b> ${escapeHtml(settings.stationId)}\n<b>Timestamp:</b> ${escapeHtml(new Date().toLocaleString('en-GB'))}\n\nYour Zuboc Flow packing station is online and verified. Recorded order packing evidence will be delivered here automatically.`;
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -2383,7 +2383,7 @@ async function startServer() {
 
   if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Zuboc VMS Server (v1.2.1-diag) running on http://localhost:${PORT}`);
+      console.log(`Zuboc Flow Server (v1.2.1-diag) running on http://localhost:${PORT}`);
       // Initial sync in background to avoid blocking startup
       syncFromSupabase().catch(e => console.error('Background sync error:', e));
     });

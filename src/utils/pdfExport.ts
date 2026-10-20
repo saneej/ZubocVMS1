@@ -43,7 +43,7 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
 
   doc.setTextColor(SECONDARY_DARK[0], SECONDARY_DARK[1], SECONDARY_DARK[2]);
   doc.setFontSize(16);
-  doc.text('ZUBOC LOGISTICS VMS', 26, 15);
+  doc.text('ZUBOC LOGISTICS FLOW', 26, 15);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -197,7 +197,7 @@ export function exportOrdersToPDF(orders: OrderRecord[], title = 'Fulfillment & 
       doc.setLineWidth(0.3);
       doc.line(12, pageHeight - 12, pageWidth - 12, pageHeight - 12);
 
-      doc.text('ZUBOC VMS — Official Logistics Dispatch & Proof Manifest • Confidential Internal Record', 12, pageHeight - 7);
+      doc.text('ZUBOC FLOW — Official Logistics Dispatch & Proof Manifest • Confidential Internal Record', 12, pageHeight - 7);
       doc.text(`Page ${currentPg}`, pageWidth - 12, pageHeight - 7, { align: 'right' });
     }
   });
@@ -234,7 +234,7 @@ export function exportSingleOrderPDF(order: OrderRecord): void {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(PRIMARY_MAROON[0], PRIMARY_MAROON[1], PRIMARY_MAROON[2]);
-  doc.text('ZUBOC LOGISTICS VMS', 18, 22);
+  doc.text('ZUBOC LOGISTICS FLOW', 18, 22);
 
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
@@ -368,7 +368,7 @@ export function exportSingleOrderPDF(order: OrderRecord): void {
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
   doc.text('This document certifies that the aforementioned parcel was packed and recorded under high-definition video monitoring.', 12, curY + 9);
-  doc.text('All rights reserved © Zuboc Logistics VMS Engine.', 12, curY + 12.5);
+  doc.text('All rights reserved © Zuboc Logistics Flow Engine.', 12, curY + 12.5);
 
   doc.save(`dispatch_slip_${order.orderId || 'order'}_${Date.now()}.pdf`);
 }

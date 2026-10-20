@@ -14,8 +14,8 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'Zuboc VMS — Enterprise Physical Logistics & Video Evidence Station',
-          short_name: 'ZubocVMS',
+          name: 'Zuboc Flow — Enterprise Physical Logistics & Video Evidence Station',
+          short_name: 'Zuboc Flow',
           description: 'Zuboc E-Commerce Packing Video Management System and Telegram Evidence Portal.',
           theme_color: '#2563eb',
           background_color: '#f8fafc',

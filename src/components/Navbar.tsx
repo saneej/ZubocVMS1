@@ -62,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             SYSTEM OPERATIONAL
           </span>
           <span className="text-slate-600">|</span>
-          <span className="hidden sm:inline-block">NODE: <strong className="text-slate-300">ZUBOC-ECOM-VMS-01</strong></span>
+          <span className="hidden sm:inline-block">NODE: <strong className="text-slate-300">ZUBOC-ECOM-FLOW-01</strong></span>
           <span className="text-slate-600 hidden sm:inline-block">|</span>
           <span className="flex items-center gap-1 text-slate-300">
             <Clock className="w-3 h-3 text-cyan-400" />
@@ -98,9 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div>
               <div className="font-extrabold text-base tracking-wider text-white flex items-center gap-2 font-mono">
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-emerald-400 font-black">ZUBOC</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold tracking-widest">
-                  VMS v2.4
-                </span>
+                  Flow v2.4
               </div>
               <p className="text-[10px] font-mono text-emerald-400/80 uppercase tracking-widest font-semibold">
                 LOGISTICS VIDEO EVIDENCE VAULT
@@ -163,7 +161,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onOpenSettings}
               className="p-2.5 rounded-xl bg-[#121620] hover:bg-[#1a202e] text-slate-300 hover:text-white border border-[#202738] transition-all cursor-pointer shadow-sm group"
-              title="Open VMS Configuration"
+              title="Open Flow Configuration"
             >
               <SettingsIcon className="w-4 h-4 group-hover:rotate-45 transition-transform text-slate-400 group-hover:text-cyan-400" />
             </button>
