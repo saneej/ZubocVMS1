@@ -509,7 +509,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
                 />
                 <div className="flex flex-col">
                   <span className="font-black text-indigo-950 uppercase tracking-wide">Display on Production TV Deck Schedule</span>
-                  <span className="text-[10px] font-bold text-indigo-700/70">Enable this to track workshop sub-assembly and 55&quot; TV live monitoring</span>
+                  <span className="text-[10px] font-bold text-indigo-700/70">Enable this to track workshop sub-assembly and live dashboard monitoring</span>
                 </div>
               </label>
             </div>

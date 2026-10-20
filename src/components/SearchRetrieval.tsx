@@ -1021,7 +1021,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       />
                       <div className="flex flex-col">
                         <span className="font-bold text-[#832f5e]">Display on Production TV Deck Schedule</span>
-                        <span className="text-[10px] font-normal text-stone-500">Enable if this order requires workshop sub-assembly and 55&quot; TV monitoring</span>
+                        <span className="text-[10px] font-normal text-stone-500">Enable if this order requires workshop sub-assembly and live monitoring</span>
                       </div>
                     </label>
                   </div>

@@ -49,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems = [
     { id: 'search', label: 'Orders', icon: Search },
-    { id: 'deck', label: 'Production TV Deck', icon: Tv, badge: '55" TV' },
+    { id: 'deck', label: 'Production TV Deck', icon: Tv },
     { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
     { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
     { id: 'history', label: 'Recording History', icon: History },

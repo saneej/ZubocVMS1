@@ -261,59 +261,63 @@ export const PublicProductionDeck: React.FC = () => {
   }, [orders]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased">
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased selection:bg-slate-900 selection:text-white">
       
-      {/* Header Bar */}
-      <header className="px-6 py-4 bg-white border-b border-stone-200 flex items-center justify-between shadow-xs sticky top-0 z-30">
-        <div className="flex items-center gap-4">
-          <img 
-            src="/zuboc-com-svg-1-1.png" 
-            alt="Zuboc Logo" 
-            className="h-9 w-auto object-contain"
-          />
-          <div className="hidden sm:block h-8 w-px bg-stone-200 mx-1" />
+      {/* Header Bar - Glassmorphism Restyle */}
+      <header className="px-6 py-5 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between shadow-sm sticky top-0 z-30">
+        <div className="flex items-center gap-5">
+          <div className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+            <img 
+              src="/zuboc-com-svg-1-1.png" 
+              alt="Zuboc Logo" 
+              className="h-10 w-auto object-contain"
+            />
+          </div>
+          <div className="hidden sm:block h-8 w-px bg-slate-200/80 mx-1" />
           <div className="hidden sm:block">
-            <h1 className="text-xs font-black uppercase tracking-widest text-stone-700">
+            <h1 className="text-[13px] font-black uppercase tracking-[0.2em] text-slate-900 leading-tight">
               Live Production Schedule
             </h1>
-            <p className="text-[10px] text-stone-400 font-medium">
-              Real-time workshop sub-assembly & tracking
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+              Real-time Workshop Intelligence
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-50 border border-stone-200 text-xs font-mono">
-            <Clock className="w-3.5 h-3.5 text-stone-500" />
-            <span className="font-bold text-stone-800">{currentTime || 'IST'}</span>
+          <div className="hidden md:flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white/50 backdrop-blur-md border border-slate-200/60 text-[11px] font-black text-slate-600 tracking-tight shadow-sm">
+            <Clock className="w-4 h-4 text-purple-600" />
+            <span>{currentTime || 'IST'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Active Jobs: {orders.length}</span>
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50/80 backdrop-blur-md border border-emerald-200/60 text-emerald-800 text-[11px] font-black tracking-tight shadow-sm">
+            <div className="relative">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block" />
+              <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-30" />
+            </div>
+            <span>{orders.length} ACTIVE JOBS</span>
           </div>
 
           <button
             onClick={fetchPublicOrders}
             disabled={isSyncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#832f5e] hover:bg-[#6c234b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
-            title="Click to sync latest updates"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest transition-all shadow-lg shadow-slate-950/20 cursor-pointer disabled:opacity-50 active:scale-95"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isSyncing ? 'SYNCING...' : 'REFRESH'}</span>
           </button>
         </div>
       </header>
 
       {/* Main Kanban Grid */}
-      <main className="flex-1 p-6 overflow-x-auto">
+      <main className="flex-1 p-8 overflow-x-auto">
         {isLoading ? (
-          <div className="h-96 flex flex-col items-center justify-center text-stone-400">
-            <div className="w-8 h-8 border-3 border-[#832f5e] border-t-transparent rounded-full animate-spin mb-3"></div>
-            <p className="text-xs font-mono font-bold uppercase tracking-widest text-stone-500">Loading Live Schedule...</p>
+          <div className="h-[60vh] flex flex-col items-center justify-center">
+            <div className="w-10 h-10 border-4 border-slate-950 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Synchronizing Flow State...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 w-full max-w-[2000px] mx-auto">
             {STAGES.map((stage) => {
               const columnItems = stageColumns[stage.id] || [];
               const Icon = stage.icon;
@@ -321,24 +325,24 @@ export const PublicProductionDeck: React.FC = () => {
               return (
                 <div 
                   key={stage.id}
-                  className="flex flex-col rounded-2xl bg-white border border-stone-200/90 shadow-sm overflow-hidden"
+                  className="flex flex-col rounded-[2rem] bg-white/40 backdrop-blur-sm border border-slate-200/50 shadow-sm overflow-hidden min-w-[280px]"
                 >
-                  {/* Stage Header */}
-                  <div className="p-4 border-b border-stone-100 bg-stone-50/60 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-xl border ${stage.badgeBg}`}>
-                        <Icon className="w-4 h-4" />
+                  {/* Stage Header - Glassmorphism Column */}
+                  <div className="p-5 border-b border-slate-200/40 bg-white/60 backdrop-blur-md flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl shadow-sm border ${stage.badgeBg}`}>
+                        <Icon className="w-4.5 h-4.5" />
                       </div>
                       <div>
-                        <h2 className="font-bold text-xs uppercase tracking-wider text-stone-800">
+                        <h2 className="font-black text-[11px] uppercase tracking-[0.15em] text-slate-900 leading-none">
                           {stage.title.split('. ')[1]}
                         </h2>
-                        <p className="text-[10px] text-stone-400 font-medium">
+                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider mt-1.5">
                           {stage.subtitle}
                         </p>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-black bg-stone-100 text-stone-700">
+                    <span className="w-7 h-7 flex items-center justify-center rounded-xl text-[11px] font-black bg-slate-950 text-white shadow-md shadow-slate-950/20">
                       {columnItems.length}
                     </span>
                   </div>
