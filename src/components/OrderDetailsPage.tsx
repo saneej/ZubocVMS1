@@ -853,6 +853,49 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                   )}
                 </div>
 
+                {/* Shipping Address Details Card */}
+                <div className="bg-slate-50/50 border border-slate-100 p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-indigo-500" />
+                      Shipping Address
+                    </h3>
+                  </div>
+                  <div className="space-y-2 text-xs font-sans text-slate-700">
+                    {order.email && (
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Email</span>
+                        <span className="font-medium text-slate-900">{order.email}</span>
+                      </div>
+                    )}
+                    {order.shippingName && (
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Recipient Name</span>
+                        <span className="font-bold text-slate-900">{order.shippingName}</span>
+                      </div>
+                    )}
+                    <div className="py-1 border-b border-slate-100 space-y-0.5">
+                      <span className="text-slate-500 block">Full Address</span>
+                      <p className="font-medium text-slate-900 leading-relaxed">
+                        {[
+                          order.shippingStreet || order.shippingAddress1,
+                          order.shippingAddress2,
+                          order.shippingCity,
+                          order.shippingProvince,
+                          order.shippingZip,
+                          order.shippingCountry
+                        ].filter(Boolean).join(', ') || order.notes || '—'}
+                      </p>
+                    </div>
+                    {order.shippingPhone && (
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-slate-500">Phone</span>
+                        <span className="font-mono font-bold text-slate-900">{order.shippingPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* 4. Timeline & Dates */}
                 <div className="bg-slate-50/50 border border-slate-100 p-4 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
