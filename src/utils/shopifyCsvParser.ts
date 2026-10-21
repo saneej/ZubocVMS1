@@ -108,14 +108,30 @@ export function parseOrderNumberNum(orderName: string): number | undefined {
  * Formats CSV date to ISO string or clean date
  */
 export function parseCsvDate(dateStr?: any): string | undefined {
-  if (!dateStr) return undefined;
+  if (dateStr === undefined || dateStr === null || dateStr === '') return undefined;
+
+  const str = String(dateStr).trim();
+  if (!str) return undefined;
+
+  // Convert Excel serial date numbers (e.g., 46315.782488) to ISO strings
+  const num = typeof dateStr === 'number' ? dateStr : parseFloat(str);
+  if (!isNaN(num) && /^\d+(\.\d+)?$/.test(str) && num > 10000 && num < 100000) {
+    try {
+      const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toISOString();
+      }
+    } catch {}
+  }
+
   try {
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
       return d.toISOString();
     }
   } catch {}
-  return String(dateStr).trim();
+
+  return undefined;
 }
 
 /**

@@ -596,7 +596,12 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         <ImportShopifyCsvModal
           isOpen={isShopifyCsvModalOpen}
           onClose={() => setIsShopifyCsvModalOpen(false)}
-          onSuccess={() => onRefreshOrders()}
+          onSuccess={(count, importedOrders) => {
+            if (importedOrders && importedOrders.length > 0 && onUpdateOrder) {
+              importedOrders.forEach(ord => onUpdateOrder(ord));
+            }
+            onRefreshOrders();
+          }}
           existingOrderIds={orders.map(o => o.orderId)}
         />
 

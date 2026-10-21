@@ -78,27 +78,38 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
-    // 1. Prioritize direct Supabase client-side fetch (bypassing Vercel serverless cold starts instantly)
+    const allOrdersMap: Record<string, OrderRecord> = {};
+
+    // 1. Fetch Express backend server orders (in-memory & local backup)
+    try {
+      const serverResponse = await safeFetchJson('/api/orders');
+      if (Array.isArray(serverResponse)) {
+        for (const o of serverResponse) {
+          if (o && o.orderId) allOrdersMap[o.orderId] = o;
+        }
+      }
+    } catch {}
+
+    // 2. Fetch direct Supabase client-side orders
     try {
       const { data: supaOrders, error: supaErr } = await supabase
         .from('orders')
         .select('*')
         .order('createdAt', { ascending: false });
-      if (!supaErr && Array.isArray(supaOrders) && supaOrders.length > 0) {
-        setOrders(supaOrders);
-        try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(supaOrders)); } catch {}
-        return;
+      if (!supaErr && Array.isArray(supaOrders)) {
+        for (const o of supaOrders) {
+          if (o && o.orderId) {
+            allOrdersMap[o.orderId] = { ...(allOrdersMap[o.orderId] || {}), ...o };
+          }
+        }
       }
     } catch {}
 
-    // 2. Fallback to Express backend API
-    try {
-      const serverResponse = await safeFetchJson('/api/orders');
-      if (Array.isArray(serverResponse) && serverResponse.length > 0) {
-        setOrders(serverResponse);
-        try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(serverResponse)); } catch {}
-      }
-    } catch {}
+    const mergedList = Object.values(allOrdersMap);
+    if (mergedList.length > 0) {
+      setOrders(mergedList);
+      try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(mergedList)); } catch {}
+    }
   };
 
   const fetchStaffsAPI = async () => {

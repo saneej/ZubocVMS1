@@ -437,7 +437,20 @@ try {
   if (fs.existsSync(activeDataPath)) {
     const raw = fs.readFileSync(activeDataPath, 'utf-8');
     const parsed = JSON.parse(raw);
-    if (parsed.orders) ordersStore = { ...ordersStore, ...parsed.orders };
+    if (parsed.orders) {
+      for (const [id, ord] of Object.entries(parsed.orders as Record<string, any>)) {
+        if (ord) {
+          const cleaned = { ...ord };
+          for (const dateKey of ['createdAt', 'updatedAt', 'recordingStartedAt', 'recordingCompletedAt', 'orderReceivedDate', 'dispatchDate', 'deliveredDate', 'formFillingDate', 'promisedDeliveryDate']) {
+            if (cleaned[dateKey]) {
+              const norm = normalizeIsoDate(cleaned[dateKey]);
+              if (norm) cleaned[dateKey] = norm;
+            }
+          }
+          ordersStore[id] = cleaned as OrderRecord;
+        }
+      }
+    }
     if (parsed.staffs) staffsStore = { ...staffsStore, ...parsed.staffs };
     if (parsed.settings) {
       settings = {
@@ -475,12 +488,88 @@ function cleanForFirestore(obj: any): any {
   }));
 }
 
+const SUPABASE_ALLOWED_COLUMNS = new Set([
+  'orderId', 'staffId', 'stationId', 'recordingStartedAt', 'recordingCompletedAt',
+  'durationSeconds', 'recordingStatus', 'uploadStatus', 'evidenceType', 'videoUrl',
+  'photoUrls', 'photoDataUrl', 'telegramChatId', 'telegramMessageId', 'telegramFileId',
+  'telegramMessageLink', 'awbNumber', 'courier', 'deliveryMethod', 'weight',
+  'productSku', 'customerName', 'contactPerson', 'contactPhone', 'fulfillFrom',
+  'orderReceivedDate', 'dispatchDate', 'deliveredDate', 'orderAmount', 'shippingAmount',
+  'orderTotal', 'itemCount', 'fulfillmentStatus', 'notes', 'remarks', 'chatNotes',
+  'auditLogs', 'clientName', 'product', 'formFillingDate', 'preparedBy', 'checkedBy',
+  'customisations', 'subAssemblyProgress', 'timeline', 'promisedDeliveryDate',
+  'paymentGate', 'productionStage', 'stageDueDates', 'productionNotes',
+  'isProductionDeckOrder', 'createdAt', 'updatedAt', 'order_source', 'orderSource',
+  'order_number_num', 'email', 'financialStatus', 'subtotal', 'shipping', 'taxes',
+  'total', 'discountCode', 'discountAmount', 'shippingMethod', 'shippingName',
+  'shippingStreet', 'shippingAddress1', 'shippingAddress2', 'shippingCompany',
+  'shippingCity', 'shippingZip', 'shippingProvince', 'shippingCountry',
+  'shippingPhone', 'lineItems'
+]);
+
+const SUPABASE_DATE_FIELDS = new Set([
+  'createdAt',
+  'updatedAt',
+  'recordingStartedAt',
+  'recordingCompletedAt',
+  'orderReceivedDate',
+  'dispatchDate',
+  'deliveredDate',
+  'formFillingDate',
+  'promisedDeliveryDate'
+]);
+
+function normalizeIsoDate(dateVal?: any): string | undefined {
+  if (dateVal === undefined || dateVal === null || dateVal === '') return undefined;
+  const str = String(dateVal).trim();
+  if (!str) return undefined;
+
+  const num = typeof dateVal === 'number' ? dateVal : parseFloat(str);
+  if (!isNaN(num) && /^\d+(\.\d+)?$/.test(str) && num > 10000 && num < 100000) {
+    try {
+      const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toISOString();
+      }
+    } catch {}
+  }
+
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
+      return d.toISOString();
+    }
+  } catch {}
+
+  return undefined;
+}
+
 function cleanForSupabase(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
-  return JSON.parse(JSON.stringify(obj, (key, value) => {
-    if (value === undefined) return null;
-    return value;
-  }));
+  const cleaned: Record<string, any> = {};
+  const nowIso = new Date().toISOString();
+
+  for (const [key, val] of Object.entries(obj)) {
+    if (SUPABASE_ALLOWED_COLUMNS.has(key) && val !== undefined) {
+      if (SUPABASE_DATE_FIELDS.has(key)) {
+        const norm = normalizeIsoDate(val);
+        if (norm) {
+          cleaned[key] = norm;
+        } else if (key === 'createdAt' || key === 'updatedAt' || key === 'recordingStartedAt') {
+          cleaned[key] = nowIso;
+        } else {
+          cleaned[key] = null;
+        }
+      } else {
+        cleaned[key] = val;
+      }
+    }
+  }
+
+  if (!cleaned.createdAt) cleaned.createdAt = nowIso;
+  if (!cleaned.updatedAt) cleaned.updatedAt = nowIso;
+
+  return cleaned;
 }
 
 async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
@@ -1379,6 +1468,30 @@ apiRouter.post('/auth/login', async (req, res) => {
   });
 });
 
+async function saveBatchToSupabase(records: OrderRecord[]): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client || records.length === 0) return false;
+  try {
+    const payload = records.map(cleanForSupabase);
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+      const chunk = payload.slice(i, i + BATCH_SIZE);
+      const result = (await withTimeout(
+        client.from('orders').upsert(chunk, { onConflict: 'orderId' }),
+        15000
+      )) as { error: any };
+      if (result && result.error) {
+        console.error('Batch Supabase save error:', result.error.message, result.error.code);
+      }
+    }
+    isSupabaseReady = true;
+    return true;
+  } catch (err: any) {
+    console.error('Batch Supabase save exception:', err?.message);
+    return false;
+  }
+}
+
 // Orders GET - Syncs latest orders from Supabase and serves them
 apiRouter.get('/orders', async (req, res) => {
   const client = getSupabaseClient();
@@ -1399,7 +1512,8 @@ apiRouter.get('/orders', async (req, res) => {
         for (const o of supaOrders) {
           if (o.orderId) freshOrdersMap[o.orderId] = o;
         }
-        ordersStore = freshOrdersMap;
+        // Safely merge Supabase orders with in-memory ordersStore (never delete local/imported orders)
+        ordersStore = { ...freshOrdersMap, ...ordersStore };
         saveLocalBackup();
       }
     } catch (e: any) {
@@ -1624,8 +1738,11 @@ apiRouter.post('/orders/bulk', async (req, res) => {
       }
     }
 
-    // Save to Supabase
-    saveOrderToSupabase(recordToSave);
+  }
+
+  // Synchronously batch save processed records to Supabase before returning
+  if (processedRecords.length > 0) {
+    await saveBatchToSupabase(processedRecords);
   }
 
   saveLocalBackup();
@@ -1777,7 +1894,6 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
           await setDoc(doc(firestoreDb, 'orders', orderName), cleanForFirestore(record), { merge: true });
         } catch {}
       }
-      saveOrderToSupabase(record).catch(() => {});
     }
 
     // Process draft orders (open/uncompleted draft orders created manually in Shopify)
@@ -1863,7 +1979,10 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
           await setDoc(doc(firestoreDb, 'orders', orderName), cleanForFirestore(record), { merge: true });
         } catch {}
       }
-      saveOrderToSupabase(record).catch(() => {});
+    }
+
+    if (importedRecords.length > 0) {
+      await saveBatchToSupabase(importedRecords);
     }
 
     saveLocalBackup();

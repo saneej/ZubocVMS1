@@ -27,7 +27,7 @@ import { OrderRecord } from '../types';
 interface ImportShopifyCsvModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (importedCount: number) => void;
+  onSuccess?: (importedCount: number, importedOrders?: OrderRecord[]) => void;
   existingOrderIds?: string[];
 }
 
@@ -90,7 +90,7 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
 
       if (res && res.success) {
         setDirectSuccessCount(res.count || 0);
-        if (onSuccess) onSuccess(res.count || 0);
+        if (onSuccess) onSuccess(res.count || 0, res.orders || []);
       } else {
         setDirectError(res?.error || 'Failed to fetch orders from Shopify API.');
       }
@@ -291,7 +291,7 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
       });
 
       if (onSuccess) {
-        onSuccess(created + updated);
+        onSuccess(created + updated, res?.records || (formattedPayload as OrderRecord[]));
       }
     } catch (err: any) {
       console.error('Bulk import error:', err);

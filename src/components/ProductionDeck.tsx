@@ -236,8 +236,10 @@ function normalizeOrder(order: OrderRecord): {
     qcPackedCompleted: stage === 'DISPATCH'
   };
 
-  const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '18500').replace(/[^0-9.]/g, '')) || 0;
-  const advance = parseFloat(String(order.paymentGate?.advanceReceived || (totalAmount > 0 ? totalAmount * 0.5 : '10000')).replace(/[^0-9.]/g, '')) || 0;
+  const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '0').replace(/[^0-9.]/g, '')) || 0;
+  const advance = (order.paymentGate?.advanceReceived !== undefined && order.paymentGate?.advanceReceived !== null)
+    ? (parseFloat(String(order.paymentGate.advanceReceived).replace(/[^0-9.]/g, '')) || 0)
+    : 0;
   const calculatedBalance = Math.max(0, totalAmount - advance);
   const balance = order.paymentGate?.balanceAmount !== undefined 
     ? parseFloat(String(order.paymentGate.balanceAmount).replace(/[^0-9.]/g, '')) || 0

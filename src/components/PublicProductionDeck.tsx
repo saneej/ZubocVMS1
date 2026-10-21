@@ -180,8 +180,10 @@ function normalizeOrder(order: OrderRecord) {
   const totalTasks = Object.keys(subAssembly).length;
   const progressPercent = Math.min(100, Math.round((completedTasks / Math.max(1, totalTasks)) * 100));
 
-  const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '18500').replace(/[^0-9.]/g, '')) || 0;
-  const advance = parseFloat(String(order.paymentGate?.advanceReceived || (totalAmount > 0 ? totalAmount * 0.5 : '10000')).replace(/[^0-9.]/g, '')) || 0;
+  const totalAmount = parseFloat(String(order.paymentGate?.totalBillingAmount || order.orderTotal || order.orderAmount || '0').replace(/[^0-9.]/g, '')) || 0;
+  const advance = (order.paymentGate?.advanceReceived !== undefined && order.paymentGate?.advanceReceived !== null)
+    ? (parseFloat(String(order.paymentGate.advanceReceived).replace(/[^0-9.]/g, '')) || 0)
+    : 0;
   const balance = Math.max(0, totalAmount - advance);
   const balanceStatus = order.paymentGate?.balanceStatus || (balance <= 0 ? 'COMPLETED' : 'PENDING');
   const isBalancePaid = balanceStatus === 'COMPLETED' || balance <= 0;
