@@ -104,6 +104,7 @@ export interface OrderRecord {
   fulfillFrom?: string;
   orderReceivedDate?: string;
   dispatchDate?: string;
+  riderNumber?: string;
   orderAmount?: string;
   shippingAmount?: string;
   orderTotal?: string;

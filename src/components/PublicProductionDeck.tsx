@@ -217,6 +217,7 @@ function normalizeOrder(order: OrderRecord) {
 
 export const PublicProductionDeck: React.FC = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<'production' | 'despatch'>('production');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -230,14 +231,14 @@ export const PublicProductionDeck: React.FC = () => {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setOrders(parsed.filter((o: OrderRecord) => o.isProductionDeckOrder));
+            setOrders(parsed);
           }
         } catch {}
       }
 
       const res = await safeFetchJson('/api/orders');
       if (res && Array.isArray(res) && res.length > 0) {
-        setOrders(res.filter((o: OrderRecord) => o.isProductionDeckOrder));
+        setOrders(res);
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(res));
       }
     } catch (e) {
@@ -285,7 +286,7 @@ export const PublicProductionDeck: React.FC = () => {
       DISPATCHED: []
     };
 
-    orders.forEach(ord => {
+    orders.filter(o => o.isProductionDeckOrder).forEach(ord => {
       const norm = normalizeOrder(ord);
       if (map[norm.stage]) {
         map[norm.stage].push({ raw: ord, norm });
@@ -296,6 +297,50 @@ export const PublicProductionDeck: React.FC = () => {
 
     return map;
   }, [orders]);
+
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+
+  const despatchProcessedOrders = useMemo(() => {
+    return orders.map(ord => {
+      const clientName = ord.clientName || ord.customerName || ord.contactPerson || `Order #${ord.orderId}`;
+      const product = ord.product || ord.productSku || 'Bespoke Stationery';
+      const dispatchDate = ord.dispatchDate || ord.promisedDeliveryDate || '';
+      const riderNumber = ord.riderNumber || ord.awbNumber || 'Not assigned';
+      const isDespatched = ord.fulfillmentStatus === 'Shipped' || ord.fulfillmentStatus === 'Delivered' || ord.fulfillmentStatus === 'Fulfilled' || ord.productionStage === 'DISPATCH';
+
+      let status: 'OVERDUE' | 'DUE_TODAY' | 'UPCOMING' | 'COMPLETED' | 'NO_DATE' = 'NO_DATE';
+      if (!dispatchDate) {
+        status = 'NO_DATE';
+      } else if (isDespatched) {
+        status = 'COMPLETED';
+      } else if (dispatchDate < todayDateStr) {
+        status = 'OVERDUE';
+      } else if (dispatchDate === todayDateStr) {
+        status = 'DUE_TODAY';
+      } else {
+        status = 'UPCOMING';
+      }
+
+      return {
+        raw: ord,
+        clientName,
+        product,
+        dispatchDate,
+        riderNumber,
+        isDespatched,
+        status
+      };
+    }).sort((a, b) => {
+      const rank = (s: string) => {
+        if (s === 'OVERDUE') return 1;
+        if (s === 'DUE_TODAY') return 2;
+        if (s === 'UPCOMING') return 3;
+        if (s === 'NO_DATE') return 4;
+        return 5;
+      };
+      return rank(a.status) - rank(b.status);
+    });
+  }, [orders, todayDateStr]);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC] text-slate-900 font-sans antialiased selection:bg-slate-900 selection:text-white">
@@ -350,18 +395,46 @@ export const PublicProductionDeck: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Kanban Grid */}
-      <main className="flex-1 p-8 overflow-x-auto">
-        {isLoading ? (
-          <div className="h-[60vh] flex flex-col items-center justify-center">
-            <div className="w-10 h-10 border-4 border-slate-950 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Synchronizing Flow State...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6 min-w-[1900px] mx-auto">
-            {STAGES.map((stage) => {
-              const columnItems = stageColumns[stage.id] || [];
-              const Icon = stage.icon;
+      {/* Sub-nav Tab Switcher */}
+      <div className="bg-white border-b border-slate-200/80 px-8 py-3 flex items-center justify-center gap-3 sticky top-[73px] z-20 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setActiveTab('production')}
+          className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
+            activeTab === 'production'
+              ? 'bg-slate-950 text-white shadow-md'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          🏭 Production Wall ({orders.filter(o => o.isProductionDeckOrder).length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('despatch')}
+          className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-2 ${
+            activeTab === 'despatch'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+          }`}
+        >
+          <Truck className="w-4 h-4" />
+          <span>🚚 Despatch Reminders &amp; Schedule ({despatchProcessedOrders.length})</span>
+        </button>
+      </div>
+
+      {/* Main Content Area */}
+      {activeTab === 'production' ? (
+        <main className="flex-1 p-8 overflow-x-auto">
+          {isLoading ? (
+            <div className="h-[60vh] flex flex-col items-center justify-center">
+              <div className="w-10 h-10 border-4 border-slate-950 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Synchronizing Flow State...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6 min-w-[1900px] mx-auto">
+              {STAGES.map((stage) => {
+                const columnItems = stageColumns[stage.id] || [];
+                const Icon = stage.icon;
 
               return (
                 <div 
@@ -557,6 +630,103 @@ export const PublicProductionDeck: React.FC = () => {
           </div>
         )}
       </main>
+    ) : (
+      /* Despatch Reminders & Schedule Window */
+      <main className="flex-1 p-8 max-w-7xl mx-auto w-full space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+          <div>
+            <h2 className="text-lg font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+              <Truck className="w-5 h-5 text-amber-600" />
+              Despatch Reminders &amp; Schedule
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Tracking planned despatch dates. Overdue orders are highlighted first, and today&apos;s scheduled despatches highlight the rider number prominently.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
+              Total Tracked: {despatchProcessedOrders.length}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {despatchProcessedOrders.length === 0 ? (
+            <div className="bg-white p-12 rounded-3xl text-center border border-slate-200 text-slate-400 font-medium">
+              No orders found for despatch tracking.
+            </div>
+          ) : (
+            despatchProcessedOrders.map(({ raw, clientName, product, dispatchDate, riderNumber, isDespatched, status }) => {
+              return (
+                <div
+                  key={raw.orderId}
+                  className={`p-5 rounded-3xl border transition-all shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                    status === 'OVERDUE'
+                      ? 'bg-rose-50/70 border-rose-300 shadow-rose-100'
+                      : status === 'DUE_TODAY'
+                      ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400 shadow-amber-100'
+                      : isDespatched
+                      ? 'bg-emerald-50/50 border-emerald-200 opacity-80'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-sm font-black text-slate-900">
+                        #{raw.orderId}
+                      </span>
+                      <span className="text-xs font-bold text-slate-700">
+                        {clientName}
+                      </span>
+                      {status === 'OVERDUE' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse">
+                          🚨 OVERDUE DESPATCH (MISSED PLANNED DATE)
+                        </span>
+                      )}
+                      {status === 'DUE_TODAY' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-600 text-white animate-pulse">
+                          🔔 TODAY IS PLANNED DESPATCH DATE!
+                        </span>
+                      )}
+                      {status === 'COMPLETED' && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                          ✅ DESPATCHED
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium">{product}</p>
+                    <p className="text-[11px] text-stone-500 font-mono">
+                      Planned Despatch Date: <strong className="text-slate-800">{dispatchDate || 'Not set'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-200">
+                    {/* Rider Number Display (Prominent as requested) */}
+                    <div className="px-4 py-2 rounded-2xl bg-slate-900 text-white shadow-md flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-emerald-400" />
+                      <div className="text-right">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-none">Rider Number</p>
+                        <p className="text-sm font-mono font-black text-emerald-300 tracking-wider mt-0.5">
+                          {riderNumber || 'Not assigned'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(raw)}
+                      className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer"
+                    >
+                      View Order
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </main>
+    )}
 
       {/* Detail Modal */}
       {selectedOrder && (

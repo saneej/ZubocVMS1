@@ -494,7 +494,7 @@ const SUPABASE_ALLOWED_COLUMNS = new Set([
   'photoUrls', 'photoDataUrl', 'telegramChatId', 'telegramMessageId', 'telegramFileId',
   'telegramMessageLink', 'awbNumber', 'courier', 'deliveryMethod', 'weight',
   'productSku', 'customerName', 'contactPerson', 'contactPhone', 'fulfillFrom',
-  'orderReceivedDate', 'dispatchDate', 'deliveredDate', 'orderAmount', 'shippingAmount',
+  'orderReceivedDate', 'dispatchDate', 'riderNumber', 'deliveredDate', 'orderAmount', 'shippingAmount',
   'orderTotal', 'itemCount', 'fulfillmentStatus', 'notes', 'remarks', 'chatNotes',
   'auditLogs', 'clientName', 'product', 'formFillingDate', 'preparedBy', 'checkedBy',
   'customisations', 'subAssemblyProgress', 'timeline', 'promisedDeliveryDate',
