@@ -2779,8 +2779,8 @@ apiRouter.use((req, res) => {
   res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl || req.url}` });
 });
 
-// Attach API Router under /api and /
-app.use(['/api', '/'], async (req, res, next) => {
+// Attach API Router strictly under /api
+app.use('/api', async (req, res, next) => {
   try {
     await ensureInitialSync();
   } catch (e) {

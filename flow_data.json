@@ -183,8 +183,8 @@
       "contactPhone": "7561000000",
       "fulfillFrom": "",
       "orderReceivedDate": "2026-10-20T15:26:35.000Z",
-      "dispatchDate": "",
-      "deliveredDate": "",
+      "dispatchDate": null,
+      "deliveredDate": null,
       "orderAmount": "3000",
       "shippingAmount": "0",
       "orderTotal": "3000",
@@ -195,11 +195,11 @@
       "chatNotes": [],
       "auditLogs": [
         {
-          "timestamp": "2026-10-21T05:41:01.368Z",
-          "staffId": "saneej",
+          "type": "EDIT_LOG",
           "action": "EDIT_ORDER_DETAILS",
           "details": "Enabled Production Deck listing",
-          "type": "EDIT_LOG"
+          "staffId": "saneej",
+          "timestamp": "2026-10-21T05:41:01.368Z"
         }
       ],
       "clientName": null,
@@ -217,7 +217,7 @@
       "productionNotes": null,
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-21T05:30:52.344+00:00",
-      "updatedAt": "2026-10-21T05:41:01.018Z",
+      "updatedAt": "2026-10-21T05:41:01.368+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2484,
@@ -442,8 +442,8 @@
       "contactPhone": "+919582244688/9311113002",
       "fulfillFrom": "",
       "orderReceivedDate": "2026-10-20T18:46:47.000Z",
-      "dispatchDate": "",
-      "deliveredDate": "",
+      "dispatchDate": null,
+      "deliveredDate": null,
       "orderAmount": "2547",
       "shippingAmount": "350",
       "orderTotal": "2897",
@@ -476,7 +476,7 @@
       "productionNotes": null,
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-20T17:09:15.764+00:00",
-      "updatedAt": "2026-10-21T05:41:12.608Z",
+      "updatedAt": "2026-10-21T05:41:12.992+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2485,
@@ -7547,6 +7547,38 @@
       "password": "saneej",
       "email": null,
       "createdAt": "2026-10-16T11:06:21.534+00:00"
+    },
+    "Admin-01": {
+      "id": "Admin-01",
+      "name": "David Admin",
+      "role": "ADMIN",
+      "stationId": "Packing-HQ",
+      "password": "password123",
+      "createdAt": "2026-10-15T10:09:26.652Z"
+    },
+    "Staff-01": {
+      "id": "Staff-01",
+      "name": "Alex Packer",
+      "role": "PACKER",
+      "stationId": "Packing-01",
+      "password": "password123",
+      "createdAt": "2026-10-15T10:09:26.652Z"
+    },
+    "Staff-02": {
+      "id": "Staff-02",
+      "name": "Sarah Supervisor",
+      "role": "SUPERVISOR",
+      "stationId": "Packing-01",
+      "password": "password123",
+      "createdAt": "2026-10-15T10:09:26.652Z"
+    },
+    "Zuboc": {
+      "id": "Zuboc",
+      "name": "Zuboc",
+      "role": "ADMIN",
+      "stationId": "Packing-01",
+      "password": "password123",
+      "createdAt": "2026-10-16T10:00:00.000Z"
     },
     "a": {
       "id": "a",
