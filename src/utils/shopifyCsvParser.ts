@@ -306,18 +306,8 @@ export function parseOrdersCsv(fileBuffer: ArrayBuffer | Uint8Array): CsvParseRe
         const shippingName = (firstRow['Shipping Name'] || '').trim();
         const contactPhone = sanitizePhone(firstRow['Shipping Phone']);
 
-        // Build composite notes if address parts exist
-        const addressLines = [
-          firstRow['Shipping Street'] || firstRow['Shipping Address1'],
-          firstRow['Shipping Address2'],
-          firstRow['Shipping City'],
-          firstRow['Shipping Province'],
-          firstRow['Shipping Zip'],
-          firstRow['Shipping Country']
-        ].filter(Boolean).map(s => String(s).trim());
-
-        const addressPreview = addressLines.length > 0 ? `Ship To: ${addressLines.join(', ')}` : '';
-        const orderNotes = [addressPreview, firstRow.Notes].filter(Boolean).join(' | ');
+        // Address parts and notes
+        const orderNotes = (firstRow['Notes'] || '').trim();
 
         parsedOrders.push({
           orderId: orderName,
