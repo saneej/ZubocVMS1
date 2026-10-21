@@ -1,0 +1,136 @@
+JULY SALES REPORT,,,,,,,,
+SL NO,Order id,Weight,Pincode,Shipping type,LOGISTICS PARTNER,SHIPPING CHARGE PAID,Shipping Rate Calculator,DESTINATION
+1,2043, 96 gm,110003,,Bluedart,157.28,187,Delhi
+2,2044, 33 gm,562110,,Bluedart,82.31,187,Karnataka
+3,2045,70 gm,641023,,Bluedart,,,Tamilnadu
+4,2046, 96 gm,400072,,Bluedart,97.28,187,Maharashtra
+5,2047,1.140 gm,560085,,Bluedart,120.79,187,Karnataka
+6,2048, 445 gm,110026,,Bluedart,97.28,187,Delhi
+7,2049, 309 gm,400071,AIR,Bluedart,58.32,187,Maharashtra
+8,2050,173.28 gm,411015,,Bluedart,97.28,187,Maharashtra
+9,2051,,,,,,,West Bengal
+10,2052, 1.739 kg,400028,,Bluedart,189.22,232,Maharashtra
+11,2053, 179 gm,122002,AIR,Bluedart,58.32,510,Haryana
+12,2054,98 gm,413709,AIR,Bluedart,116.64,510,Maharashtra
+13,2055,652 gm,530026,AIR,Trackon,219,362,Andhra Pradesh
+14,2056,,,,Self,,,Kerala
+15,2057, 510 gm,641023,,Bluedart,82.31,150,Tamilnadu
+16,2058,,,,SKS,200,,Karnataka
+17,2059, 308 gm,600021,,Bluedart,97.28,187,Tamilnadu
+18,2060, 164 gm,673509,,Speed & Safe,,,Kerala
+19,2061,60 gm,577217,AIR,Delhivery,259.47,145,Karnataka
+20,2062, 96 gm,140603,,Bluedart,157.28,187,Punjab
+21,2063,,,,Self,,,Kerala
+22,2064,,,,Self,,,Kerala
+23,2065,,,,Self,,,Kerala
+24,2066,,,,Self,,,Kerala
+25,2067, 169 gm,110020,,Bluedart,97.28,187,Delhi
+26,2068, 285 gm,410210,,Bluedart,97.28,187,Maharashtra
+27,2069,,,,,,,Karnataka
+28,2070,596 gm,570016,,Bluedart,197.75,150,Karnataka
+29,2071,189 gm,673574,,Speed & Safe,,,Kerala
+30,2072,142 gm,400606,,Bluedart,97.28,,Maharashtra
+31,2073,159 gm,560043,,Bluedart,82.31,187,Karnataka
+32,2076,,,,Self,,,Kerala
+33,2077,,,,Self,,,Kerala
+34,2078, 470 gm,560076,AIR,Bluedart,82.31,408,Karnataka
+35,2079, 413 gm,400010,AIR,Bluedart,58.32,408,Maharashtra
+36,2080,0.64 gm,700156,,Bluedart,157.28,187,West Bengal
+37,2081, 0.67 gm,534211,,Bluedart,157.28,150,Andhra Pradesh
+38,2082,169 gm,560037,,Bluedart,82.31,187,Karnataka
+39,2083, 0.90 gm,614601,,Bluedart,82.31,150,Tamilnadu
+40,2085, 2.21 kg,600041,,Bluedart,235.19,277,Tamilnadu
+41,2086, 96 gm,620012,,Bluedart,82.31,150,Tamilnadu
+42,2087,3.002 gm,560093,,Bluedart,236.23,187,Karnataka
+43,2088, 329 gm,110025,,Bluedart,97.28,187,Delhi
+44,2089, 1.13 kg,500050,,Bluedart,143.25,187,Telangana
+45,2090, 1. 608 kg,110058,,Bluedart,,,Delhi
+46,2091,461 gm,608702,AIR,Trackon,100,362,Tamilnadu
+47,2092,0.344 gm,160071,AIR,Bluedart,58.32,510,Punjab
+48,2093,278 gm,380054,AIR,Bluedart,116.64,408,Gujarat
+49,2094, 4.104 kg,600119,AIR,Bluedart,816.48,1108,Tamilnadu
+50,2095,255 gm,673014,,Delhivery,78.37,70,Kerala
+51,2096, 226 gm,560100,,Bluedart,82.31,187,Madhya Pradesh
+52,2097,275 gm,247667,AIR,Bluedart,58.32,510,Uttar Pradesh
+53,2098, 1.608 kg,110058,,Bluedart,189.22,232,Delhi
+54,2099, 279 gm,600028,,Bluedart,97.28,187,Tamilnadu
+55,2100,141 gm,560048,,Bluedart,82.31,187,Karnataka
+56,2101,668 gm,110052,AIR,Bluedart,116.64,408,Delhi
+57,2102,1.784 kg,396195,,Bluedart,249.22,232,Gujarat
+58,2103,275 gm,400101,,Bluedart,281.16,187,Maharashtra
+59,2104,443 gm,500033,,Bluedart,97.28,187,Telangana
+60,2105, 79 gm,679563,,Delhivery,113.28,70,Kerala
+61,2106,380 gm,466001,,Bluedart,97.28,187,Madhya Pradesh
+62,2107, 33 gm,600037,,Bluedart,97.28,187,Tamilnadu
+63,2108,275 gm,110068,,Bluedart,97.28,187,Delhi
+64,2109, 546 gm,400001,,Bluedart,97.28,187,Maharashtra
+65,2110,275 gm,122001,,Bluedart,97.28,187,Haryana
+66,2111,198 gm,700019,AIR,Trackon,200,485,West Bengal
+67,2112,,,,,,,Tamilnadu
+68,2113,,,,BUS,,,Kerala
+69,2114, 75 gm,411038,,Bluedart,97.28,187,Maharashtra
+70,2115,275 gm,560043,AIR,Bluedart,58.32,187,Karnataka
+71,,,,,,,,Maharashtra
+72,2116,358 gm,395006,,Bluedart,97.28,187,Gujarat
+73,2117,,,,Trackon,,,Andhra Pradesh
+74,2118, 43 gm,530026,AIR,Bluedart,116.64,233,Andhra Pradesh
+75,2119, 64 gm,500033,AIR,Bluedart,174.96,408,Telangana
+76,2120,112 gm,244713,,Bluedart,97.28,187,Uttarakhand
+77,2121, 487 gm,400057,,Bluedart,97.28,187,Maharashtra
+78,2122,402 gm,144623,,Delhivery,133.17,241,Panjab
+79,2123, 914 gm,754021,,Bluedart,97.28,187,Odisha
+80,2124, 165 gm,342005,,Bluedart,97.28,187,Rajasthan
+81,2125, 350 gm,400054,,Bluedart,97.28,187,Maharashtra
+82,2126,1.213 kg,421302,AIR,Trackon,525,549,Maharashtra
+83,2127,,,,SKS,150,,Karnataka
+84,2128,1.622 kg,410210,,Bluedart,189.22,232,Maharashtra
+85,2129,742 gm,629002,,Bluedart,82.31,150,Tamilnadu
+86,2130,284 gm,695030,,Bluedart,82.31,150,Kerala
+87,2131,39 kg,533101,AIR,Trackon,3900,5601,Andhra Pradesh
+88,2132, 97 gm,400028,,Bluedart,97.28,187,Maharashtra
+89,2134, 411 gm,400604,,Bluedart,97.28,187,Maharashtra
+90,2135,991 gm,700135,,Bluedart,189.22,187,West Bengal
+91,2136, 165 gm,500004,,Bluedart,157.28,187,Telangana
+92,2137,931 gm,560094,,Bluedart,120.79,187,Karnataka
+93,2138,492 gm,380015,,Bluedart,97.28,187,Gujarat
+94,2139, 456 gm,411057,,Bluedart,97.28,187,Maharashtra
+95,2140,,,,Bluedart,82.31,,Tamilnadu
+96,2141,472 gm,700019,AIR,Bluedart,58.32,408,West Bengal
+97,2142,,,,SKS,150,,Karnataka
+98,2143,43 gm,132103,,Bluedart,97.28,187,Haryana
+99,2144,,,,Self,,,Kerala
+100,2145,821gm ,673008,AIR,Bluedart,174.96,175,Kerala
+101,2146,97 gm,797112,,Bluedart,116.52,262,Nagaland
+102,2147,347 gm,683574,,,50,,Kerala
+103,2148,27 gm,700097,,Bluedart,97.28,187,West Bengal
+104,2149,85 gm,560079,AIR,Bluedart,116.64,408,Karnataka
+105,2150,322 gm,380007,,Trackon,220,187,Gujarat
+106,2151, 376 gm,500075,AIR,Bluedart,58.32,408,Telangana
+107,2152,243 gm,700029,AIR,Bluedart,58.32,408,West Bengal
+108,2153, 602 gm,560001,,Bluedart,82.31,187,Karnataka
+109,2154,52 gm,440014,,Bluedart,97.28,187,Maharashtra
+110,2155,,,,Trackon,,,Kerala
+111,2156,196 gm,570009,,Bluedart,82.31,150,Karnataka
+112,2157,89 gm,143505,,Bluedart,97.28,187,Panjab
+113,2158,421 gm,401105,AIR,Trackon,220,408,Maharashtra
+114,2159,,,,SKS,150,,Karnataka
+115,2160,,,,,,,Maharashtra
+116,2161,,,,,,,Kerala
+117,2162, 2.88 kg,572103,,Bluedart,621.03,252,Karnataka
+118,2163,,,,,,,Kerala
+119,2164,,,,,,,Kerala
+120,2165,,,,,,,Kerala
+121,2166,,,,Bluedart,274.71,,Kerala
+122,2167,97 gm,221401,AIR,Bluedart,58.32,510,Uttar Pradesh
+123,2168,,,,,,,Kerala
+124,2169,339 gm,700019,,Bluedart,97.28,187,West Bengal
+125,2170,,,,,,,
+126,2171,2.02 gm,560032,AIR,Bluedart,291.6,187,Karnataka
+127,2172,1 kg,400050,AIR,Trackon,425,408,Maharashtra
+128,2173,319 gm,680121,,Bluedart,82.31,150,Kerala
+129,2174,,,,,,,Karnataka
+130,2175,54 gm,560092,,Bluedart,82.31,187,Karnataka
+131,2176,355 gm,122011,,Bluedart,58.32,187,Haryana
+TOTAL,,,,,,18248.57,,
+,,,,,,,,
+,,,,BLUEDART AIR EXTRA CHARGES : 3804.57,,,,

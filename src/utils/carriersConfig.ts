@@ -13,7 +13,7 @@ export interface CarrierConfig {
   fuelSurchargePct: number; // e.g. 0.10 (10%)
   gstPct: number; // e.g. 0.18 (18%)
   volumetricBufferPct?: number; // e.g. 0.15 (15% for Air)
-  minimumFloorQuote?: Record<string, number>; // Zone floor constraints (e.g. { zone1: 174.96, zone4: 408.00 })
+  minimumFloorQuote?: Record<string, number>;
   badge?: string;
   notes?: string;
   transitDays: {
@@ -30,17 +30,6 @@ export interface CarrierConfig {
     zone4: CarrierRateZone;
     zone5: CarrierRateZone;
   };
-}
-
-export interface CarrierCalculationParams {
-  carrier: CarrierConfig;
-  zoneId: number;
-  deadWeightKg: number;
-  lengthCm: number;
-  widthCm: number;
-  heightCm: number;
-  shippingType?: 'SURFACE' | 'AIR' | 'AUTO';
-  isSpecialPincode?: boolean;
 }
 
 export interface CarrierCalculationResult {
@@ -76,7 +65,7 @@ export interface CarrierCalculationResult {
 
 /**
  * Calibrated carrier rates based on empirical May - August reconciliation (500+ real orders)
- * (Base Origin: South India / Kerala hub - 676505)
+ * Base Origin: South India / Kerala hub (676505)
  */
 export const CARRIERS_CONFIG: Record<string, CarrierConfig> = {
   bluedart_surface: {
@@ -86,17 +75,17 @@ export const CARRIERS_CONFIG: Record<string, CarrierConfig> = {
     minWeightSlab: 0.5,
     incrementalSlab: 0.5,
     docketFee: 35.0,
-    fuelSurchargePct: 0.10, // 10% FSC
+    fuelSurchargePct: 0.10,
     gstPct: 0.18,
     badge: "Contracted Primary",
     notes: "Contracted Tariff Matrix calibrated against 500+ May–August sales invoices.",
     transitDays: { zone1: "1-2 Days", zone2: "2-3 Days", zone3: "3-4 Days", zone4: "4-5 Days", zone5: "6-8 Days" },
     rates: {
-      zone1: { base: 30.00, addl: 15.00 }, // First 500g Total incl GST = ₹82.31
-      zone2: { base: 42.00, addl: 22.00 }, // First 500g Total incl GST = ₹97.28
-      zone3: { base: 48.00, addl: 26.00 }, // Metro First 500g = ₹105.00
-      zone4: { base: 50.00, addl: 26.00 }, // North/East Hubs First 500g = ₹108.00 (1kg = ₹168.00)
-      zone5: { base: 150.00, addl: 84.75 } // Special / NE Base = ₹240.86
+      zone1: { base: 28.41, addl: 29.61 }, // 500g = ₹82.31, 1kg = ₹120.79
+      zone2: { base: 28.41, addl: 29.61 }, // 500g = ₹82.31, 1kg = ₹120.79
+      zone3: { base: 39.91, addl: 35.37 }, // 500g = ₹97.28, 1kg = ₹143.25, 1.5kg = ₹189.22, 2.0kg = ₹235.19
+      zone4: { base: 39.91, addl: 35.37 }, // 500g = ₹97.28 (WB/Far East = ₹157.28)
+      zone5: { base: 54.71, addl: 46.16 }  // Special / NE Base = ₹116.52 - ₹176.52
     }
   },
   bluedart_air: {
@@ -105,46 +94,46 @@ export const CARRIERS_CONFIG: Record<string, CarrierConfig> = {
     type: "Air / Express",
     minWeightSlab: 0.5,
     incrementalSlab: 0.5,
-    docketFee: 35.0,
-    fuelSurchargePct: 0.12, // 12% FSC
+    docketFee: 0.0,
+    fuelSurchargePct: 0.0,
     gstPct: 0.18,
     volumetricBufferPct: 0.15, // 15% Air Volumetric Protection Buffer
     minimumFloorQuote: {
-      zone1: 174.96,
-      zone2: 205.10,
-      zone3: 408.00,
-      zone4: 408.00,
-      zone5: 510.00
+      zone1: 58.32,
+      zone2: 58.32,
+      zone3: 58.32,
+      zone4: 58.32,
+      zone5: 116.64
     },
     badge: "Air Express (15% Protected)",
-    notes: "Priority Air Express with automatic 15% Volumetric Buffer & Docket Floor Protection.",
+    notes: "Priority Air Express with automatic 15% Volumetric Buffer.",
     transitDays: { zone1: "Next Day", zone2: "1-2 Days", zone3: "2 Days", zone4: "2-3 Days", zone5: "3-5 Days" },
     rates: {
-      zone1: { base: 85.00, addl: 45.00 },
-      zone2: { base: 120.00, addl: 65.00 },
-      zone3: { base: 260.00, addl: 110.00 },
-      zone4: { base: 260.00, addl: 110.00 },
-      zone5: { base: 340.00, addl: 160.00 }
+      zone1: { base: 49.42, addl: 49.42 }, // Incl 18% GST = ₹58.32 per 500g slab
+      zone2: { base: 49.42, addl: 49.42 },
+      zone3: { base: 49.42, addl: 49.42 },
+      zone4: { base: 49.42, addl: 49.42 },
+      zone5: { base: 98.85, addl: 49.42 }
     }
   },
   trackon_cargo: {
     id: "trackon_cargo",
     name: "Trackon / SKS Heavy Cargo",
     type: "Heavy Cargo",
-    minWeightSlab: 3.0, // 3kg minimum base slab
+    minWeightSlab: 3.0,
     incrementalSlab: 1.0,
-    docketFee: 35.0,
-    fuelSurchargePct: 0.10,
+    docketFee: 25.0,
+    fuelSurchargePct: 0.08,
     gstPct: 0.18,
     badge: "Heavy Freight Partner (>5kg)",
     notes: "Optimized for heavy packages (>5.0 kg). Flat base ₹150 for first 3 kg + ₹30/kg thereafter.",
     transitDays: { zone1: "2-3 Days", zone2: "3-4 Days", zone3: "4-5 Days", zone4: "5-6 Days", zone5: "7-10 Days" },
     rates: {
-      zone1: { base: 150.00, addl: 30.00 },
-      zone2: { base: 170.00, addl: 35.00 },
-      zone3: { base: 210.00, addl: 45.00 },
-      zone4: { base: 240.00, addl: 55.00 },
-      zone5: { base: 350.00, addl: 85.00 }
+      zone1: { base: 127.12, addl: 25.42 }, // Base 3kg = ₹150 incl GST
+      zone2: { base: 144.07, addl: 29.66 },
+      zone3: { base: 177.97, addl: 38.14 },
+      zone4: { base: 203.39, addl: 46.61 },
+      zone5: { base: 296.61, addl: 72.03 }
     }
   },
   delhivery_surface: {
@@ -153,18 +142,18 @@ export const CARRIERS_CONFIG: Record<string, CarrierConfig> = {
     type: "Surface",
     minWeightSlab: 0.5,
     incrementalSlab: 0.5,
-    docketFee: 25.0,
-    fuelSurchargePct: 0.08, // 8% FSC
+    docketFee: 0.0,
+    fuelSurchargePct: 0.0,
     gstPct: 0.18,
     badge: "Special / Remote Partner",
     notes: "Recommended for North-East (79X) and Remote J&K (19X) pincodes.",
     transitDays: { zone1: "1-2 Days", zone2: "2-3 Days", zone3: "3-5 Days", zone4: "5-7 Days", zone5: "6-8 Days" },
     rates: {
-      zone1: { base: 25.00, addl: 14.00 },
-      zone2: { base: 40.00, addl: 22.00 },
-      zone3: { base: 75.00, addl: 32.00 },
-      zone4: { base: 88.00, addl: 38.00 },
-      zone5: { base: 135.00, addl: 58.00 } // Highly competitive for remote/NE
+      zone1: { base: 38.88, addl: 27.54 }, // Local Kerala = ₹45.88
+      zone2: { base: 69.29, addl: 35.00 }, // Regional = ₹81.77
+      zone3: { base: 107.99, addl: 36.00 }, // West = ₹127.44
+      zone4: { base: 120.51, addl: 40.00 }, // ROI = ₹142.20
+      zone5: { base: 204.12, addl: 93.22 } // Manipur/NE = ₹240.86
     }
   },
   dtdc_ground: {
@@ -173,17 +162,17 @@ export const CARRIERS_CONFIG: Record<string, CarrierConfig> = {
     type: "Surface",
     minWeightSlab: 1.0,
     incrementalSlab: 1.0,
-    docketFee: 30.0,
-    fuelSurchargePct: 0.10,
+    docketFee: 0.0,
+    fuelSurchargePct: 0.0,
     gstPct: 0.18,
-    notes: "Local South & Kerala 1.0 kg flat rate slab.",
+    notes: "Local South & Kerala flat ₹70 per kg rate.",
     transitDays: { zone1: "1-2 Days", zone2: "2-4 Days", zone3: "4-6 Days", zone4: "6-8 Days", zone5: "8-11 Days" },
     rates: {
-      zone1: { base: 55.00, addl: 30.00 },
-      zone2: { base: 80.00, addl: 40.00 },
-      zone3: { base: 120.00, addl: 55.00 },
-      zone4: { base: 150.00, addl: 70.00 },
-      zone5: { base: 220.00, addl: 110.00 }
+      zone1: { base: 59.32, addl: 25.42 }, // ₹70.00 for 1kg
+      zone2: { base: 80.00, addl: 35.00 },
+      zone3: { base: 110.00, addl: 45.00 },
+      zone4: { base: 130.00, addl: 55.00 },
+      zone5: { base: 180.00, addl: 85.00 }
     }
   },
   india_post: {
@@ -199,11 +188,11 @@ export const CARRIERS_CONFIG: Record<string, CarrierConfig> = {
     notes: "Universal coverage for remote pincodes without private courier access.",
     transitDays: { zone1: "2-3 Days", zone2: "3-5 Days", zone3: "4-6 Days", zone4: "5-8 Days", zone5: "6-10 Days" },
     rates: {
-      zone1: { base: 67.80, addl: 25.42 }, // Incl GST = ₹80.00
-      zone2: { base: 93.22, addl: 38.14 },
-      zone3: { base: 120.00, addl: 50.00 },
-      zone4: { base: 140.00, addl: 60.00 },
-      zone5: { base: 180.00, addl: 85.00 }
+      zone1: { base: 31.50, addl: 15.00 },
+      zone2: { base: 55.00, addl: 25.00 },
+      zone3: { base: 80.00, addl: 35.00 },
+      zone4: { base: 95.00, addl: 45.00 },
+      zone5: { base: 130.00, addl: 60.00 }
     }
   }
 };
@@ -219,24 +208,24 @@ export function calculateCarrierRate(
   widthCm: number,
   heightCm: number,
   shippingType: 'SURFACE' | 'AIR' | 'AUTO' = 'AUTO',
-  targetMarginPct: number = 0.20 // 20% default margin
+  targetMarginPct: number = 0.20
 ): CarrierCalculationResult {
   const zoneKey = (`zone${zoneId}` as 'zone1' | 'zone2' | 'zone3' | 'zone4' | 'zone5') || 'zone3';
   const zoneRates = carrier.rates[zoneKey] || carrier.rates.zone3;
   const transitTime = carrier.transitDays[zoneKey] || carrier.transitDays.zone3;
 
-  // 1. Dual Weight Comparison (Volumetric vs Dead Weight)
+  // 1. Dual Weight Comparison
   const actualDeadWeightKg = Math.max(0, deadWeightKg);
   const rawVolumetricWeightKg = Math.max(0, (lengthCm * widthCm * heightCm) / 5000);
 
-  // 2. Air Volumetric Protection Buffer (15% for Air Express)
+  // 2. Air Volumetric Buffer
   const isAirService = carrier.type.toLowerCase().includes('air') || shippingType === 'AIR';
   const bufferPct = isAirService ? (carrier.volumetricBufferPct || 0.15) : 0;
   const bufferedVolumetricWeightKg = rawVolumetricWeightKg * (1 + bufferPct);
 
-  // 3. Billable Weight = Math.max(actual_weight, volumetric_weight) with 0.5 kg floor
+  // 3. Billable Weight
   let billableWeightKg = Math.max(actualDeadWeightKg, bufferedVolumetricWeightKg);
-  billableWeightKg = Math.max(0.5, billableWeightKg); // 0.5 kg floor
+  billableWeightKg = Math.max(0.5, billableWeightKg);
 
   // 4. Calculate Charged Slabs
   const minSlab = carrier.minWeightSlab || 0.5;
@@ -259,26 +248,26 @@ export function calculateCarrierRate(
   const operationalFreightSubtotal = baseFreightRate + additionalFreightFee;
 
   const docketFee = carrier.docketFee;
-  const fuelSurchargeAmount = operationalFreightSubtotal * carrier.fuelSurchargePct;
+  const fuelSurchargeAmount = (operationalFreightSubtotal + docketFee) * carrier.fuelSurchargePct;
   const subtotalBeforeTax = operationalFreightSubtotal + docketFee + fuelSurchargeAmount;
   const gstAmount = subtotalBeforeTax * carrier.gstPct;
   
-  let contractedCarrierCost = Math.round(subtotalBeforeTax + gstAmount);
+  let contractedCarrierCost = Number((subtotalBeforeTax + gstAmount).toFixed(2));
   let isFloorAdjusted = false;
   let floorAdjustmentAmount = 0;
 
-  // 6. Check Air Minimum Floor Protection
+  // 6. Air Minimum Floor Protection
   if (isAirService && carrier.minimumFloorQuote) {
-    const floorValue = carrier.minimumFloorQuote[zoneKey] || 174.96;
+    const floorValue = carrier.minimumFloorQuote[zoneKey] || 58.32;
     if (contractedCarrierCost < floorValue) {
       isFloorAdjusted = true;
-      floorAdjustmentAmount = Math.round(floorValue - contractedCarrierCost);
-      contractedCarrierCost = Math.round(floorValue);
+      floorAdjustmentAmount = Number((floorValue - contractedCarrierCost).toFixed(2));
+      contractedCarrierCost = Number(floorValue.toFixed(2));
     }
   }
 
-  // 7. Calculate Customer Quoted Price with Guaranteed Net Margin
-  const totalPayable = contractedCarrierCost; // Contracted Cost
+  // 7. Customer Quoted Price & Net Margin
+  const totalPayable = contractedCarrierCost;
   const recommendedCustomerQuote = Math.round(contractedCarrierCost * (1 + targetMarginPct));
   const marginAmount = recommendedCustomerQuote - contractedCarrierCost;
 
@@ -314,7 +303,7 @@ export function calculateCarrierRate(
 }
 
 /**
- * Automated Carrier Evaluation & Smart Recommendation Logic
+ * Automated Carrier Evaluation
  */
 export function evaluateAllCarriers(
   zoneId: number,
@@ -333,7 +322,6 @@ export function evaluateAllCarriers(
 
   if (results.length === 0) return [];
 
-  // Identify Cheapest & Fastest
   let cheapestIndex = 0;
   let minCost = results[0].contractedCarrierCost;
 
@@ -356,7 +344,6 @@ export function evaluateAllCarriers(
   results[cheapestIndex].isCheapest = true;
   results[fastestIndex].isFastest = true;
 
-  // Automated Carrier Recommendation Rules
   const maxWeight = Math.max(deadWeightKg, (lengthCm * widthCm * heightCm) / 5000);
 
   let recommendedCarrierId = 'bluedart_surface';
@@ -364,10 +351,10 @@ export function evaluateAllCarriers(
 
   if (isSpecialZone) {
     recommendedCarrierId = 'delhivery_surface';
-    reason = 'Delhivery / Speed Post recommended for North-East & Far Zones (Avoids Blue Dart remote surcharge)';
+    reason = 'Delhivery / Speed Post recommended for North-East & Far Zones';
   } else if (maxWeight > 5.0) {
     recommendedCarrierId = 'trackon_cargo';
-    reason = 'Heavy Freight (>5kg): Trackon / SKS Cargo Partner selected to prevent high per-kg air expenses';
+    reason = 'Heavy Freight (>5kg): Trackon / SKS Cargo Partner selected';
   } else if (maxWeight <= 2.0 && (zoneId === 1 || zoneId === 2 || zoneId === 3)) {
     recommendedCarrierId = 'bluedart_surface';
     reason = 'Blue Dart Surface recommended (Lowest contracted tariff ₹82–₹97 for South & Metros)';
