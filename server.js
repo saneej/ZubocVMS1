@@ -335,7 +335,20 @@ try {
   if (fs.existsSync(activeDataPath)) {
     const raw = fs.readFileSync(activeDataPath, "utf-8");
     const parsed = JSON.parse(raw);
-    if (parsed.orders) ordersStore = { ...ordersStore, ...parsed.orders };
+    if (parsed.orders) {
+      for (const [id, ord] of Object.entries(parsed.orders)) {
+        if (ord) {
+          const cleaned = { ...ord };
+          for (const dateKey of ["createdAt", "updatedAt", "recordingStartedAt", "recordingCompletedAt", "orderReceivedDate", "dispatchDate", "deliveredDate", "formFillingDate", "promisedDeliveryDate"]) {
+            if (cleaned[dateKey]) {
+              const norm = normalizeIsoDate(cleaned[dateKey]);
+              if (norm) cleaned[dateKey] = norm;
+            }
+          }
+          ordersStore[id] = cleaned;
+        }
+      }
+    }
     if (parsed.staffs) staffsStore = { ...staffsStore, ...parsed.staffs };
     if (parsed.settings) {
       settings = {
@@ -369,12 +382,141 @@ function cleanForFirestore(obj) {
     return value;
   }));
 }
+var SUPABASE_ALLOWED_COLUMNS = /* @__PURE__ */ new Set([
+  "orderId",
+  "staffId",
+  "stationId",
+  "recordingStartedAt",
+  "recordingCompletedAt",
+  "durationSeconds",
+  "recordingStatus",
+  "uploadStatus",
+  "evidenceType",
+  "videoUrl",
+  "photoUrls",
+  "photoDataUrl",
+  "telegramChatId",
+  "telegramMessageId",
+  "telegramFileId",
+  "telegramMessageLink",
+  "awbNumber",
+  "courier",
+  "deliveryMethod",
+  "weight",
+  "productSku",
+  "customerName",
+  "contactPerson",
+  "contactPhone",
+  "fulfillFrom",
+  "orderReceivedDate",
+  "dispatchDate",
+  "deliveredDate",
+  "orderAmount",
+  "shippingAmount",
+  "orderTotal",
+  "itemCount",
+  "fulfillmentStatus",
+  "notes",
+  "remarks",
+  "chatNotes",
+  "auditLogs",
+  "clientName",
+  "product",
+  "formFillingDate",
+  "preparedBy",
+  "checkedBy",
+  "customisations",
+  "subAssemblyProgress",
+  "timeline",
+  "promisedDeliveryDate",
+  "paymentGate",
+  "productionStage",
+  "stageDueDates",
+  "productionNotes",
+  "isProductionDeckOrder",
+  "createdAt",
+  "updatedAt",
+  "order_source",
+  "orderSource",
+  "order_number_num",
+  "email",
+  "financialStatus",
+  "subtotal",
+  "shipping",
+  "taxes",
+  "total",
+  "discountCode",
+  "discountAmount",
+  "shippingMethod",
+  "shippingName",
+  "shippingStreet",
+  "shippingAddress1",
+  "shippingAddress2",
+  "shippingCompany",
+  "shippingCity",
+  "shippingZip",
+  "shippingProvince",
+  "shippingCountry",
+  "shippingPhone",
+  "lineItems"
+]);
+var SUPABASE_DATE_FIELDS = /* @__PURE__ */ new Set([
+  "createdAt",
+  "updatedAt",
+  "recordingStartedAt",
+  "recordingCompletedAt",
+  "orderReceivedDate",
+  "dispatchDate",
+  "deliveredDate",
+  "formFillingDate",
+  "promisedDeliveryDate"
+]);
+function normalizeIsoDate(dateVal) {
+  if (dateVal === void 0 || dateVal === null || dateVal === "") return void 0;
+  const str = String(dateVal).trim();
+  if (!str) return void 0;
+  const num = typeof dateVal === "number" ? dateVal : parseFloat(str);
+  if (!isNaN(num) && /^\d+(\.\d+)?$/.test(str) && num > 1e4 && num < 1e5) {
+    try {
+      const dateObj = new Date(Math.round((num - 25569) * 86400 * 1e3));
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toISOString();
+      }
+    } catch {
+    }
+  }
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
+      return d.toISOString();
+    }
+  } catch {
+  }
+  return void 0;
+}
 function cleanForSupabase(obj) {
   if (!obj || typeof obj !== "object") return obj;
-  return JSON.parse(JSON.stringify(obj, (key, value) => {
-    if (value === void 0) return null;
-    return value;
-  }));
+  const cleaned = {};
+  const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+  for (const [key, val] of Object.entries(obj)) {
+    if (SUPABASE_ALLOWED_COLUMNS.has(key) && val !== void 0) {
+      if (SUPABASE_DATE_FIELDS.has(key)) {
+        const norm = normalizeIsoDate(val);
+        if (norm) {
+          cleaned[key] = norm;
+        } else if (key === "createdAt" || key === "updatedAt" || key === "recordingStartedAt") {
+          cleaned[key] = nowIso;
+        } else {
+          cleaned[key] = null;
+        }
+      } else {
+        cleaned[key] = val;
+      }
+    }
+  }
+  if (!cleaned.createdAt) cleaned.createdAt = nowIso;
+  if (!cleaned.updatedAt) cleaned.updatedAt = nowIso;
+  return cleaned;
 }
 async function saveOrderToSupabase(record) {
   const client = getSupabaseClient();
@@ -406,10 +548,19 @@ async function saveOrderToSupabase(record) {
   }
 }
 async function deleteOrderFromSupabase(orderId) {
-  if (!getSupabaseClient()) return;
+  const client = getSupabaseClient();
+  if (!client) return false;
   try {
-    await getSupabaseClient().from("orders").delete().eq("orderId", orderId);
-  } catch {
+    const { error } = await client.from("orders").delete().eq("orderId", orderId);
+    if (error) {
+      console.error(`Supabase order delete error for #${orderId}:`, error.message, error.code);
+      return false;
+    }
+    console.log(`Deleted order #${orderId} from Supabase successfully.`);
+    return true;
+  } catch (err) {
+    console.error(`Supabase order delete exception for #${orderId}:`, err?.message);
+    return false;
   }
 }
 async function saveStaffToSupabase(staff) {
@@ -448,11 +599,17 @@ async function syncFromSupabase() {
     ]);
     if (ordersRes.status === "fulfilled") {
       const { data: ords, error: ordErr } = ordersRes.value;
-      if (ordErr) console.error("Sync error (orders):", ordErr.message);
-      else if (Array.isArray(ords)) {
+      if (ordErr) {
+        console.error("Sync error (orders):", ordErr.message);
+      } else if (Array.isArray(ords)) {
         isSupabaseReady = true;
-        for (const o of ords) if (o.orderId) ordersStore[o.orderId] = o;
-        console.log(`Synced ${ords.length} orders.`);
+        const freshOrdersMap = {};
+        for (const o of ords) {
+          if (o.orderId) freshOrdersMap[o.orderId] = o;
+        }
+        ordersStore = freshOrdersMap;
+        saveLocalBackup();
+        console.log(`Synced ${ords.length} orders from Supabase.`);
       }
     }
     if (staffsRes.status === "fulfilled") {
@@ -1060,6 +1217,29 @@ apiRouter.post("/auth/login", async (req, res) => {
     }
   });
 });
+async function saveBatchToSupabase(records) {
+  const client = getSupabaseClient();
+  if (!client || records.length === 0) return false;
+  try {
+    const payload = records.map(cleanForSupabase);
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+      const chunk = payload.slice(i, i + BATCH_SIZE);
+      const result = await withTimeout(
+        client.from("orders").upsert(chunk, { onConflict: "orderId" }),
+        15e3
+      );
+      if (result && result.error) {
+        console.error("Batch Supabase save error:", result.error.message, result.error.code);
+      }
+    }
+    isSupabaseReady = true;
+    return true;
+  } catch (err) {
+    console.error("Batch Supabase save exception:", err?.message);
+    return false;
+  }
+}
 apiRouter.get("/orders", async (req, res) => {
   const client = getSupabaseClient();
   if (client) {
@@ -1072,14 +1252,12 @@ apiRouter.get("/orders", async (req, res) => {
         8e3
       );
       if (!error && Array.isArray(supaOrders)) {
-        if (supaOrders.length > 0) {
-          const freshOrdersMap = {};
-          for (const o of supaOrders) {
-            if (o.orderId) freshOrdersMap[o.orderId] = o;
-          }
-          ordersStore = freshOrdersMap;
-          saveLocalBackup();
+        const freshOrdersMap = {};
+        for (const o of supaOrders) {
+          if (o.orderId) freshOrdersMap[o.orderId] = o;
         }
+        ordersStore = { ...freshOrdersMap, ...ordersStore };
+        saveLocalBackup();
       }
     } catch (e) {
       console.warn("Supabase sync warning on GET /orders:", e?.message);
@@ -1146,30 +1324,54 @@ apiRouter.get("/orders/:orderId", async (req, res) => {
   }
   return res.status(404).json({ error: "Order recording not found" });
 });
-apiRouter.post("/orders", async (req, res) => {
-  const orderId = sanitizeString(req.body.orderId);
+var handleSaveOrderRequest = async (req, res) => {
+  let paramId = req.params?.orderId;
+  if (paramId) {
+    try {
+      paramId = decodeURIComponent(paramId);
+    } catch {
+    }
+  }
+  const rawId = req.body.orderId || paramId || "";
+  const orderId = sanitizeString(rawId);
   if (!orderId) {
     return res.status(400).json({ error: "orderId is required" });
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
-  const existing = ordersStore[orderId];
+  const existing = ordersStore[orderId] || Object.values(ordersStore).find((o) => {
+    if (!o.orderId) return false;
+    const cleanO = o.orderId.trim().toLowerCase().replace(/^#/, "");
+    const cleanR = orderId.trim().toLowerCase().replace(/^#/, "");
+    return cleanO === cleanR;
+  });
+  const digits = orderId.replace(/\D/g, "");
+  const parsedNum = digits ? parseInt(digits, 10) : void 0;
+  const order_source = req.body.order_source || req.body.orderSource || existing?.order_source || existing?.orderSource || "website";
+  const order_number_num = req.body.order_number_num !== void 0 ? req.body.order_number_num : existing?.order_number_num !== void 0 ? existing.order_number_num : parsedNum;
   const record = {
     ...existing || {},
     ...req.body,
-    orderId,
+    orderId: existing?.orderId || orderId,
     // Ensure ID is preserved
+    order_source,
+    orderSource: order_source,
+    order_number_num,
     updatedAt: now,
-    createdAt: existing?.createdAt || now
+    createdAt: existing?.createdAt || req.body.createdAt || now
   };
+  const finalId = record.orderId;
   const fulfillmentChanged = existing && existing.fulfillmentStatus !== record.fulfillmentStatus;
-  ordersStore[orderId] = record;
+  ordersStore[finalId] = record;
+  if (orderId !== finalId) {
+    ordersStore[orderId] = record;
+  }
   saveLocalBackup();
   if (fulfillmentChanged) {
     await sendTelegramUpdate(record);
   }
   if (firestoreDb && !firestoreQuotaExceeded) {
     try {
-      await setDoc(doc(firestoreDb, "orders", orderId), cleanForFirestore(record), { merge: true });
+      await setDoc(doc(firestoreDb, "orders", finalId), cleanForFirestore(record), { merge: true });
     } catch (e) {
       if (e?.code === "resource-exhausted" || e?.message?.includes("Quota") || e?.message?.includes("quota")) {
         firestoreQuotaExceeded = true;
@@ -1179,9 +1381,12 @@ apiRouter.post("/orders", async (req, res) => {
       }
     }
   }
-  saveOrderToSupabase(record).catch((err) => console.error("Supabase Background Sync Error:", err));
-  res.json({ success: true, record, supaSynced: "PENDING" });
-});
+  const supaSaved = await saveOrderToSupabase(record);
+  res.json({ success: true, record, supaSynced: supaSaved });
+};
+apiRouter.post("/orders", handleSaveOrderRequest);
+apiRouter.post("/orders/:orderId", handleSaveOrderRequest);
+apiRouter.put("/orders/:orderId", handleSaveOrderRequest);
 apiRouter.post("/orders/bulk", async (req, res) => {
   const { orders, conflictStrategy = "skip" } = req.body;
   if (!Array.isArray(orders) || orders.length === 0) {
@@ -1195,6 +1400,10 @@ apiRouter.post("/orders/bulk", async (req, res) => {
   for (const rawRecord of orders) {
     const cleanId = sanitizeString(rawRecord.orderId);
     if (!cleanId) continue;
+    const digits = cleanId.replace(/\D/g, "");
+    const parsedNum = digits ? parseInt(digits, 10) : void 0;
+    const defaultSource = rawRecord.order_source || rawRecord.orderSource || "website";
+    const numVal = rawRecord.order_number_num !== void 0 ? rawRecord.order_number_num : parsedNum;
     const existing = ordersStore[cleanId];
     if (existing && conflictStrategy === "skip") {
       skippedCount++;
@@ -1206,6 +1415,9 @@ apiRouter.post("/orders/bulk", async (req, res) => {
         ...existing,
         ...rawRecord,
         orderId: cleanId,
+        order_source: rawRecord.order_source || rawRecord.orderSource || existing.order_source || "website",
+        orderSource: rawRecord.order_source || rawRecord.orderSource || existing.order_source || "website",
+        order_number_num: numVal !== void 0 ? numVal : existing.order_number_num,
         updatedAt: now,
         createdAt: existing.createdAt || rawRecord.createdAt || now
       };
@@ -1214,6 +1426,9 @@ apiRouter.post("/orders/bulk", async (req, res) => {
       recordToSave = {
         ...rawRecord,
         orderId: cleanId,
+        order_source: defaultSource,
+        orderSource: defaultSource,
+        order_number_num: numVal,
         updatedAt: now,
         createdAt: rawRecord.createdAt || now
       };
@@ -1222,6 +1437,9 @@ apiRouter.post("/orders/bulk", async (req, res) => {
       recordToSave = {
         ...rawRecord,
         orderId: cleanId,
+        order_source: defaultSource,
+        orderSource: defaultSource,
+        order_number_num: numVal,
         fulfillmentStatus: rawRecord.fulfillmentStatus || "Pending",
         recordingStatus: rawRecord.recordingStatus || "PENDING",
         uploadStatus: rawRecord.uploadStatus || "PENDING",
@@ -1244,7 +1462,9 @@ apiRouter.post("/orders/bulk", async (req, res) => {
         }
       }
     }
-    saveOrderToSupabase(recordToSave);
+  }
+  if (processedRecords.length > 0) {
+    await saveBatchToSupabase(processedRecords);
   }
   saveLocalBackup();
   res.json({
@@ -1259,6 +1479,209 @@ apiRouter.post("/orders/bulk", async (req, res) => {
     },
     records: processedRecords
   });
+});
+apiRouter.post("/shopify/fetch-direct", async (req, res) => {
+  const { shopDomain, accessToken } = req.body;
+  if (!shopDomain || !accessToken) {
+    return res.status(400).json({ success: false, error: "shopDomain and accessToken are required" });
+  }
+  const cleanShop = shopDomain.replace(/https?:\/\//, "").replace(/\/$/, "").trim();
+  const cleanToken = accessToken.trim();
+  try {
+    const shopifyRes = await fetch(`https://${cleanShop}/admin/api/2023-10/orders.json?status=any&limit=250`, {
+      method: "GET",
+      headers: {
+        "X-Shopify-Access-Token": cleanToken,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!shopifyRes.ok) {
+      const errText = await shopifyRes.text();
+      return res.status(400).json({ success: false, error: `Shopify API Error (${shopifyRes.status}): ${errText}` });
+    }
+    const shopifyData = await shopifyRes.json();
+    const rawOrders = shopifyData.orders || [];
+    let rawDraftOrders = [];
+    try {
+      const draftRes = await fetch(`https://${cleanShop}/admin/api/2023-10/draft_orders.json?status=any&limit=250`, {
+        method: "GET",
+        headers: {
+          "X-Shopify-Access-Token": cleanToken,
+          "Content-Type": "application/json"
+        }
+      });
+      if (draftRes.ok) {
+        const draftData = await draftRes.json();
+        rawDraftOrders = draftData.draft_orders || [];
+      }
+    } catch (draftErr) {
+      console.warn("Could not fetch draft orders from Shopify API:", draftErr);
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const importedRecords = [];
+    const processedOrderNames = /* @__PURE__ */ new Set();
+    for (const ord of rawOrders) {
+      const orderName = String(ord.name || ord.order_number || ord.id).trim();
+      if (!orderName) continue;
+      processedOrderNames.add(orderName);
+      const digits = orderName.replace(/\D/g, "");
+      const order_number_num = digits ? parseInt(digits, 10) : void 0;
+      const createdAt = ord.created_at || now;
+      const lineItems = (ord.line_items || []).map((li) => ({
+        name: li.name || li.title || "Product Item",
+        sku: li.sku || void 0,
+        price: li.price || void 0,
+        quantity: li.quantity || 1
+      }));
+      const skus = lineItems.map((li) => li.sku || li.name).filter(Boolean);
+      const shippingAddr = ord.shipping_address || ord.billing_address || {};
+      const customerObj = ord.customer || {};
+      const rawFulfillment = ord.fulfillment_status;
+      const fulfillmentStatus = rawFulfillment ? rawFulfillment.charAt(0).toUpperCase() + rawFulfillment.slice(1).toLowerCase() : "Unfulfilled";
+      const record = {
+        orderId: orderName,
+        order_source: "website",
+        orderSource: "website",
+        order_number_num,
+        staffId: "Shopify Direct API",
+        stationId: "Web-Fulfillment",
+        recordingStartedAt: createdAt,
+        durationSeconds: 0,
+        recordingStatus: "PENDING",
+        uploadStatus: "PENDING",
+        email: ord.email || customerObj.email,
+        financialStatus: ord.financial_status || "pending",
+        fulfillmentStatus,
+        subtotal: ord.subtotal_price,
+        shipping: ord.total_shipping_price_set?.shop_money?.amount || ord.shipping_lines?.[0]?.price || "0",
+        taxes: ord.total_tax,
+        total: ord.total_price,
+        orderTotal: ord.total_price,
+        orderAmount: ord.subtotal_price,
+        shippingAmount: ord.total_shipping_price_set?.shop_money?.amount || "0",
+        discountCode: ord.discount_codes?.[0]?.code,
+        discountAmount: ord.total_discounts,
+        shippingMethod: ord.shipping_lines?.[0]?.title || "Shopify Express",
+        courier: ord.shipping_lines?.[0]?.title || "Shopify Express",
+        orderReceivedDate: createdAt,
+        lineItems,
+        productSku: skus.length > 0 ? skus.join(", ") : "Shopify Item",
+        itemCount: lineItems.reduce((acc, li) => acc + (li.quantity || 1), 0),
+        customerName: `${shippingAddr.first_name || customerObj.first_name || ""} ${shippingAddr.last_name || customerObj.last_name || ""}`.trim() || ord.email || "Shopify Customer",
+        shippingName: `${shippingAddr.first_name || ""} ${shippingAddr.last_name || ""}`.trim() || void 0,
+        contactPerson: `${shippingAddr.first_name || ""} ${shippingAddr.last_name || ""}`.trim() || void 0,
+        contactPhone: shippingAddr.phone || customerObj.phone || void 0,
+        shippingStreet: shippingAddr.address1,
+        shippingAddress1: shippingAddr.address1,
+        shippingAddress2: shippingAddr.address2,
+        shippingCompany: shippingAddr.company,
+        shippingCity: shippingAddr.city,
+        shippingZip: shippingAddr.zip,
+        shippingProvince: shippingAddr.province,
+        shippingCountry: shippingAddr.country,
+        shippingPhone: shippingAddr.phone,
+        notes: ord.note || void 0,
+        isProductionDeckOrder: false,
+        createdAt,
+        updatedAt: now
+      };
+      ordersStore[orderName] = record;
+      importedRecords.push(record);
+      if (firestoreDb && !firestoreQuotaExceeded) {
+        try {
+          await setDoc(doc(firestoreDb, "orders", orderName), cleanForFirestore(record), { merge: true });
+        } catch {
+        }
+      }
+    }
+    for (const draft of rawDraftOrders) {
+      if (draft.order_id || draft.name && processedOrderNames.has(draft.name)) {
+        continue;
+      }
+      const orderName = String(draft.name || `DRAFT-${draft.id}`).trim();
+      if (!orderName || processedOrderNames.has(orderName)) continue;
+      processedOrderNames.add(orderName);
+      const digits = orderName.replace(/\D/g, "");
+      const order_number_num = digits ? parseInt(digits, 10) : void 0;
+      const createdAt = draft.created_at || now;
+      const lineItems = (draft.line_items || []).map((li) => ({
+        name: li.name || li.title || "Draft Product Item",
+        sku: li.sku || void 0,
+        price: li.price || void 0,
+        quantity: li.quantity || 1
+      }));
+      const skus = lineItems.map((li) => li.sku || li.name).filter(Boolean);
+      const shippingAddr = draft.shipping_address || draft.billing_address || {};
+      const customerObj = draft.customer || {};
+      const record = {
+        orderId: orderName,
+        order_source: "website",
+        orderSource: "website",
+        order_number_num,
+        staffId: "Shopify Direct API (Draft)",
+        stationId: "Web-Fulfillment",
+        recordingStartedAt: createdAt,
+        durationSeconds: 0,
+        recordingStatus: "PENDING",
+        uploadStatus: "PENDING",
+        email: draft.email || customerObj.email,
+        financialStatus: draft.status || "draft",
+        fulfillmentStatus: "Draft",
+        subtotal: draft.subtotal_price,
+        shipping: draft.shipping_line?.price || "0",
+        taxes: draft.total_tax,
+        total: draft.total_price,
+        orderTotal: draft.total_price,
+        orderAmount: draft.subtotal_price,
+        shippingAmount: draft.shipping_line?.price || "0",
+        discountCode: void 0,
+        discountAmount: "0",
+        shippingMethod: draft.shipping_line?.title || "Shopify Draft",
+        courier: draft.shipping_line?.title || "Shopify Draft",
+        orderReceivedDate: createdAt,
+        lineItems,
+        productSku: skus.length > 0 ? skus.join(", ") : "Shopify Draft Item",
+        itemCount: lineItems.reduce((acc, li) => acc + (li.quantity || 1), 0),
+        customerName: `${shippingAddr.first_name || customerObj.first_name || ""} ${shippingAddr.last_name || customerObj.last_name || ""}`.trim() || draft.email || "Shopify Draft Customer",
+        shippingName: `${shippingAddr.first_name || ""} ${shippingAddr.last_name || ""}`.trim() || void 0,
+        contactPerson: `${shippingAddr.first_name || ""} ${shippingAddr.last_name || ""}`.trim() || void 0,
+        contactPhone: shippingAddr.phone || customerObj.phone || void 0,
+        shippingStreet: shippingAddr.address1,
+        shippingAddress1: shippingAddr.address1,
+        shippingAddress2: shippingAddr.address2,
+        shippingCompany: shippingAddr.company,
+        shippingCity: shippingAddr.city,
+        shippingZip: shippingAddr.zip,
+        shippingProvince: shippingAddr.province,
+        shippingCountry: shippingAddr.country,
+        shippingPhone: shippingAddr.phone,
+        notes: draft.note || void 0,
+        isProductionDeckOrder: false,
+        createdAt,
+        updatedAt: now
+      };
+      ordersStore[orderName] = record;
+      importedRecords.push(record);
+      if (firestoreDb && !firestoreQuotaExceeded) {
+        try {
+          await setDoc(doc(firestoreDb, "orders", orderName), cleanForFirestore(record), { merge: true });
+        } catch {
+        }
+      }
+    }
+    if (importedRecords.length > 0) {
+      await saveBatchToSupabase(importedRecords);
+    }
+    saveLocalBackup();
+    return res.json({
+      success: true,
+      count: importedRecords.length,
+      orders: importedRecords
+    });
+  } catch (err) {
+    console.error("Shopify Direct API Error:", err);
+    return res.status(500).json({ success: false, error: err.message || "Failed to connect to Shopify API" });
+  }
 });
 apiRouter.post("/orders/:orderId", async (req, res) => {
   const { orderId } = req.params;
@@ -1299,6 +1722,8 @@ apiRouter.delete("/orders/:orderId", async (req, res) => {
     return res.status(400).json({ error: "orderId is required" });
   }
   delete ordersStore[orderId];
+  delete ordersStore[orderId.replace(/^#/, "")];
+  delete ordersStore[`#${orderId.replace(/^#/, "")}`];
   saveLocalBackup();
   if (firestoreDb && !firestoreQuotaExceeded) {
     try {

@@ -146,7 +146,7 @@ const AppContent: React.FC = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const record = payload.new as OrderRecord;
             if (record && record.orderId) {
@@ -182,7 +182,7 @@ const AppContent: React.FC = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'staffs' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const stf = payload.new as StaffMember;
             if (stf && stf.id) {

@@ -4,10 +4,22 @@ import { createClient } from '@supabase/supabase-js';
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U';
 
-// Client-side instance using the public anon key
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
-});
+let _supabaseClientInstance: any = null;
+
+export function getClientSupabase() {
+  if (_supabaseClientInstance) return _supabaseClientInstance;
+  _supabaseClientInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
+  return _supabaseClientInstance;
+}
+
+// Client-side singleton instance using the public anon key
+export const supabase = getClientSupabase();
 
 export const SUPABASE_ALLOWED_COLUMNS = new Set([
   'orderId', 'staffId', 'stationId', 'recordingStartedAt', 'recordingCompletedAt',

@@ -2774,9 +2774,13 @@ apiRouter.post('/ifm/chat', async (req, res) => {
   }
 });
 
-// Attach API Router under /api
-// Add warmup middleware for serverless/cold-starts
-app.use('/api', async (req, res, next) => {
+// Catch-all 404 for unmatched API endpoints (returns JSON 404 instead of falling through to SPA HTML)
+apiRouter.use((req, res) => {
+  res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl || req.url}` });
+});
+
+// Attach API Router under /api and /
+app.use(['/api', '/'], async (req, res, next) => {
   try {
     await ensureInitialSync();
   } catch (e) {
