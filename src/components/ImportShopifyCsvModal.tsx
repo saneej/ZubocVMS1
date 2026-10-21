@@ -38,6 +38,7 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
   existingOrderIds = []
 }) => {
   const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [detectedFormat, setDetectedFormat] = useState<'Shopify CSV' | 'Custom CSV' | null>(null);
@@ -60,7 +61,45 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
     total: number;
   } | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeModalTab, setActiveModalTab] = useState<'csv' | 'direct'>('csv');
+  const [shopDomain, setShopDomain] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [isFetchingDirect, setIsFetchingDirect] = useState(false);
+  const [directError, setDirectError] = useState<string | null>(null);
+  const [directSuccessCount, setDirectSuccessCount] = useState<number | null>(null);
+
+  const handleFetchDirectShopify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shopDomain.trim() || !accessToken.trim()) {
+      setDirectError('Please enter both Shopify Store Domain and Admin Access Token.');
+      return;
+    }
+    setIsFetchingDirect(true);
+    setDirectError(null);
+    setDirectSuccessCount(null);
+
+    try {
+      const res = await safeFetchJson('/api/shopify/fetch-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopDomain: shopDomain.trim(),
+          accessToken: accessToken.trim()
+        })
+      });
+
+      if (res && res.success) {
+        setDirectSuccessCount(res.count || 0);
+        if (onSuccess) onSuccess(res.count || 0);
+      } else {
+        setDirectError(res?.error || 'Failed to fetch orders from Shopify API.');
+      }
+    } catch (err: any) {
+      setDirectError(err.message || 'Network error connecting to Shopify API.');
+    } finally {
+      setIsFetchingDirect(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -303,356 +342,478 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
 
-          {/* SUCCESS RESULTS VIEW */}
-          {importResults ? (
-            <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-6 text-center animate-in fade-in zoom-in-95">
-              <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20">
-                <CheckCircle2 className="w-9 h-9" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900">Import Successful!</h3>
-              <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
-                Successfully processed {importResults.total} orders into the packing & fulfillment pipeline.
-              </p>
+          {/* Import Method Tabs */}
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <button
+              type="button"
+              onClick={() => setActiveModalTab('csv')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeModalTab === 'csv'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Shopify CSV File Import</span>
+            </button>
 
-              <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mt-6">
-                <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
-                  <span className="text-2xl font-black text-emerald-600">{importResults.created}</span>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">New Orders Added</p>
-                </div>
-                <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
-                  <span className="text-2xl font-black text-blue-600">{importResults.updated}</span>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">Orders Updated</p>
-                </div>
-                <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
-                  <span className="text-2xl font-black text-slate-400">{importResults.skipped}</span>
-                  <p className="text-xs font-medium text-slate-500 mt-0.5">Duplicates Skipped</p>
-                </div>
-              </div>
+            <button
+              type="button"
+              onClick={() => setActiveModalTab('direct')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeModalTab === 'direct'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Connect Shopify API Directly</span>
+            </button>
+          </div>
 
-              <div className="mt-8 flex items-center justify-center gap-3">
-                <button
-                  onClick={handleReset}
-                  className="px-5 py-2.5 rounded-xl border border-stone-300 font-semibold text-slate-700 hover:bg-slate-100 text-sm transition-all"
-                >
-                  Import Another CSV
-                </button>
-                <button
-                  onClick={onClose}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
-                >
-                  Done & View Orders <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ) : parsedOrders.length === 0 ? (
-            /* UPLOAD FILE & DROPZONE STEP */
-            <div className="space-y-4">
-              
-              {/* Dropzone */}
-              <div
-                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-stone-300 hover:border-emerald-500 bg-stone-50/70 hover:bg-emerald-50/30 rounded-2xl p-8 text-center cursor-pointer transition-all group relative overflow-hidden"
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,.txt,.xlsx,.xls"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                
-                <div className="w-16 h-16 rounded-2xl bg-white border border-stone-200 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                  <Upload className="w-8 h-8" />
-                </div>
-                
-                <h3 className="text-base font-bold text-slate-800">
-                  {isParsing ? 'Parsing CSV File...' : 'Drop your Shopify orders CSV here'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Supports <span className="font-semibold text-emerald-700">orders_export_1.csv</span> exported directly from Shopify Admin or custom CSVs
-                </p>
-
-                <div className="mt-4 inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-600 text-white shadow-sm group-hover:bg-emerald-700 transition-colors">
-                  <FileSpreadsheet className="w-4 h-4" /> Select CSV File
-                </div>
-              </div>
-
-              {parseError && (
-                <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
-                  <div>
-                    <strong className="font-semibold block">Parse Error</strong>
-                    {parseError}
-                  </div>
-                </div>
-              )}
-
-              {/* Sample Download & Instructions */}
-              <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div>
-                  <span className="font-bold text-slate-800 block">Need a test template or format preview?</span>
-                  <p className="text-slate-500">Download our sample Shopify CSV containing sample multi-item order entries.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadSample}
-                  className="px-4 py-2 rounded-xl bg-white border border-stone-300 text-slate-700 hover:bg-stone-100 font-semibold flex items-center gap-2 shadow-xs transition-colors flex-shrink-0"
-                >
-                  <Download className="w-4 h-4 text-emerald-600" /> Download Sample CSV
-                </button>
-              </div>
-
-              {/* How it handles Shopify CSV */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-                <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-xs">
-                  <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
-                    <Layers className="w-4 h-4 text-emerald-600" /> Item Aggregation
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Automatically combines multiple line items sharing the same order number into a single item list.
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-xs">
-                  <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" /> Smart De-duplication
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Detects existing orders in your packing database to avoid duplicate recordings or overwrites.
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-xs">
-                  <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
-                    <Box className="w-4 h-4 text-amber-600" /> Carrier & Phone Resolution
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Extracts shipping telephone, customer address, delivery method (Delhivery/BlueDart), and total amounts.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          ) : (
-            /* PREVIEW & CONFLICT SETTINGS STEP */
-            <div className="space-y-4">
-              
-              {/* File Info & Change File */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-stone-50 p-3.5 rounded-2xl border border-stone-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                    <FileSpreadsheet className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-sm">{file?.name || 'CSV File'}</span>
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
-                        {detectedFormat}
-                      </span>
-                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold text-[10px] rounded-full">
-                        Channel: Website
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono text-[10px] rounded-full">
-                        26 Whitelist Fields
-                      </span>
+          {/* DIRECT SHOPIFY API TAB VIEW */}
+                    {/* TAB CONTENT */}
+          {(() => {
+            if (activeModalTab === 'direct') {
+              if (directSuccessCount !== null) {
+                return (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-3">
+                    <div className="w-14 h-14 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-md">
+                      <CheckCircle2 className="w-8 h-8" />
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
-                      <span>Found <strong className="text-slate-800">{parsedOrders.length} unique orders</strong> ready for import</span>
-                      {filteredOutUnfulfilled > 0 && (
-                        <span className="text-amber-600 font-medium">({filteredOutUnfulfilled} unfulfilled ignored)</span>
-                      )}
-                      {duplicateRowsCount > 0 && (
-                        <span className="text-blue-600 font-medium">({duplicateRowsCount} duplicate item rows merged)</span>
-                      )}
+                    <h3 className="text-lg font-bold text-slate-900">Direct Shopify Connection Successful!</h3>
+                    <p className="text-xs text-slate-600">
+                      Successfully fetched and synchronized <strong className="text-emerald-700">{directSuccessCount} orders</strong> directly from your Shopify store.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setDirectSuccessCount(null);
+                        setAccessToken('');
+                      }}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors cursor-pointer"
+                    >
+                      Fetch Again / Connect Another Store
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-4 py-2">
+                  <form onSubmit={handleFetchDirectShopify} className="space-y-4">
+                    <div className="bg-indigo-50/60 border border-indigo-200/80 rounded-2xl p-4 space-y-2">
+                      <h3 className="text-xs font-extrabold text-indigo-900 uppercase tracking-wider flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-indigo-600" />
+                        Shopify Admin API Direct Sync
+                      </h3>
+                      <p className="text-xs text-indigo-700 leading-relaxed">
+                        Enter your Shopify store URL and Admin API access token to fetch fulfilled orders in real-time, automatically mapping the 26 whitelisted fields, customer addresses, and line items.
+                      </p>
                     </div>
-                  </div>
-                </div>
 
-                <button
-                  onClick={handleReset}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-stone-300 text-slate-600 hover:bg-white transition-colors flex items-center gap-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Change CSV
-                </button>
-              </div>
-
-              {/* Conflict Handling Options */}
-              {conflictCount > 0 && (
-                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-xs">
-                  <div className="flex items-center gap-2 text-amber-900 font-bold mb-2">
-                    <AlertCircle className="w-4 h-4 text-amber-600" />
-                    <span>{conflictCount} orders already exist in your packing records</span>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-4 text-slate-700">
-                    <label className="flex items-center gap-1.5 cursor-pointer font-medium">
-                      <input
-                        type="radio"
-                        name="conflict"
-                        value="skip"
-                        checked={conflictStrategy === 'skip'}
-                        onChange={() => setConflictStrategy('skip')}
-                        className="text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span>Skip existing orders (Keep current)</span>
-                    </label>
-
-                    <label className="flex items-center gap-1.5 cursor-pointer font-medium">
-                      <input
-                        type="radio"
-                        name="conflict"
-                        value="merge"
-                        checked={conflictStrategy === 'merge'}
-                        onChange={() => setConflictStrategy('merge')}
-                        className="text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span>Merge missing details</span>
-                    </label>
-
-                    <label className="flex items-center gap-1.5 cursor-pointer font-medium">
-                      <input
-                        type="radio"
-                        name="conflict"
-                        value="overwrite"
-                        checked={conflictStrategy === 'overwrite'}
-                        onChange={() => setConflictStrategy('overwrite')}
-                        className="text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span>Overwrite existing records</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Search & Selection Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by Order ID, Customer, Phone, SKU..."
-                    className="w-full pl-9 pr-3 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={toggleSelectAll}
-                    className="px-3 py-1.5 rounded-lg border border-stone-200 bg-white hover:bg-stone-50 text-slate-700 font-semibold transition-colors"
-                  >
-                    {selectedOrderIds.size === filteredOrders.length ? 'Deselect All' : 'Select All'}
-                  </button>
-                  <span className="text-slate-500 font-medium">
-                    Selected: <strong className="text-emerald-700">{selectedOrderIds.size}</strong> / {parsedOrders.length}
-                  </span>
-                </div>
-              </div>
-
-              {/* Orders Table */}
-              <div className="border border-stone-200 rounded-2xl overflow-hidden shadow-xs max-h-[300px] overflow-y-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-stone-100/80 text-slate-600 uppercase font-bold text-[10px] sticky top-0 z-10 border-b border-stone-200">
-                    <tr>
-                      <th className="p-3 w-10 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedOrderIds.size === filteredOrders.length && filteredOrders.length > 0}
-                          onChange={toggleSelectAll}
-                          className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                      </th>
-                      <th className="p-3">Order ID</th>
-                      <th className="p-3">Customer & Contact</th>
-                      <th className="p-3">Products & SKU(s)</th>
-                      <th className="p-3">Courier / Delivery</th>
-                      <th className="p-3 text-right">Total (₹)</th>
-                      <th className="p-3 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100 bg-white">
-                    {filteredOrders.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="p-6 text-center text-slate-400">
-                          No matching orders found.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredOrders.map(order => {
-                        const isSelected = selectedOrderIds.has(order.orderId);
-                        const exists = existingSet.has(order.orderId.toLowerCase());
-
-                        return (
-                          <tr 
-                            key={order.orderId}
-                            onClick={() => toggleSelectOrder(order.orderId)}
-                            className={`cursor-pointer transition-colors ${
-                              isSelected ? 'bg-emerald-50/40 hover:bg-emerald-50/70' : 'hover:bg-stone-50'
-                            }`}
-                          >
-                            <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleSelectOrder(order.orderId)}
-                                className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
-                              />
-                            </td>
-                            <td className="p-3 font-bold text-slate-900">
-                              <div className="flex items-center gap-1.5">
-                                <span>{order.orderId}</span>
-                                {exists && (
-                                  <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
-                                    Exists
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] text-slate-400 block font-normal">
-                                {order.lineItemCount > 1 ? `${order.lineItemCount} items aggregated` : '1 line item'}
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              <span className="font-semibold text-slate-800 block">{order.customerName || 'N/A'}</span>
-                              <span className="text-[11px] text-slate-500">{order.contactPhone || 'No Phone'}</span>
-                            </td>
-                            <td className="p-3 max-w-[220px]">
-                              <p className="truncate font-medium text-slate-700" title={order.productSku}>
-                                {order.productSku || 'Item'}
-                              </p>
-                              <span className="text-[10px] text-slate-400">Qty: {order.itemCount}</span>
-                            </td>
-                            <td className="p-3">
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
-                                {order.courier || 'Standard'}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right font-bold text-slate-900">
-                              {order.orderTotal ? `₹${order.orderTotal}` : '—'}
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                order.fulfillmentStatus === 'Fulfilled' ? 'bg-emerald-100 text-emerald-800' :
-                                order.fulfillmentStatus === 'Packed' ? 'bg-blue-100 text-blue-800' :
-                                order.fulfillmentStatus === 'Shipped' ? 'bg-indigo-100 text-indigo-800' :
-                                'bg-amber-100 text-amber-800'
-                              }`}>
-                                {order.fulfillmentStatus}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
+                    {directError && (
+                      <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                        <span>{directError}</span>
+                      </div>
                     )}
-                  </tbody>
-                </table>
-              </div>
 
-            </div>
-          )}
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase mb-1">
+                          Shopify Store Domain <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="mystore.myshopify.com"
+                          value={shopDomain}
+                          onChange={(e) => setShopDomain(e.target.value)}
+                          className="w-full bg-white border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 uppercase mb-1">
+                          Admin API Access Token <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                          value={accessToken}
+                          onChange={(e) => setAccessToken(e.target.value)}
+                          className="w-full bg-white border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                        />
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Generate a Custom App Access Token from your Shopify Admin (Settings &gt; Apps and sales channels &gt; Develop apps). Requires <code className="text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded">read_orders</code> permission.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={isFetchingDirect}
+                        className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isFetchingDirect ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Connecting & Fetching Orders...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            <span>Fetch Orders Directly from Shopify</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              );
+            }
+
+            if (importResults) {
+              return (
+                <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-6 text-center animate-in fade-in zoom-in-95">
+                  <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20">
+                    <CheckCircle2 className="w-9 h-9" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Import Successful!</h3>
+                  <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
+                    Successfully processed {importResults.total} orders into the packing & fulfillment pipeline.
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mt-6">
+                    <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
+                      <span className="text-2xl font-black text-emerald-600">{importResults.created}</span>
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">New Orders Added</p>
+                    </div>
+                    <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
+                      <span className="text-2xl font-black text-blue-600">{importResults.updated}</span>
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">Orders Updated</p>
+                    </div>
+                    <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-sm">
+                      <span className="text-2xl font-black text-slate-400">{importResults.skipped}</span>
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">Duplicates Skipped</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex items-center justify-center gap-3">
+                    <button
+                      onClick={handleReset}
+                      className="px-5 py-2.5 rounded-xl border border-stone-300 font-semibold text-slate-700 hover:bg-slate-100 text-sm transition-all"
+                    >
+                      Import Another CSV
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                    >
+                      Done & View Orders <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            if (parsedOrders.length === 0) {
+              return (
+                <div className="space-y-4">
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-stone-300 hover:border-emerald-500 bg-stone-50/70 hover:bg-emerald-50/30 rounded-2xl p-8 text-center cursor-pointer transition-all group relative overflow-hidden"
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.txt,.xlsx,.xls"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <div className="w-16 h-16 rounded-2xl bg-white border border-stone-200 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition-transform">
+                      <Upload className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-800">
+                      {isParsing ? 'Parsing CSV File...' : 'Drop your Shopify orders CSV here'}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Supports <span className="font-semibold text-emerald-700">orders_export_1.csv</span> exported directly from Shopify Admin or custom CSVs
+                    </p>
+                    <div className="mt-4 inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-xl bg-emerald-600 text-white shadow-sm group-hover:bg-emerald-700 transition-colors">
+                      <FileSpreadsheet className="w-4 h-4" /> Select CSV File
+                    </div>
+                  </div>
+
+                  {parseError && (
+                    <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
+                      <div>
+                        <strong className="font-semibold block">Parse Error</strong>
+                        {parseError}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <div>
+                      <span className="font-bold text-slate-800 block">Need a test template or format preview?</span>
+                      <p className="text-slate-500">Download our sample Shopify CSV containing sample multi-item order entries.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadSample}
+                      className="px-4 py-2 rounded-xl bg-white border border-stone-300 text-slate-700 hover:bg-stone-100 font-semibold flex items-center gap-2 shadow-xs transition-colors flex-shrink-0"
+                    >
+                      <Download className="w-4 h-4 text-emerald-600" /> Download Sample CSV
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                    <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
+                        <Layers className="w-4 h-4 text-emerald-600" /> Item Aggregation
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Automatically combines multiple line items sharing the same order number into a single item list.
+                      </p>
+                    </div>
+                    <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
+                        <ShieldCheck className="w-4 h-4 text-blue-600" /> Smart De-duplication
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Detects existing orders in your packing database to avoid duplicate recordings or overwrites.
+                      </p>
+                    </div>
+                    <div className="p-3.5 bg-white rounded-xl border border-stone-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
+                        <Box className="w-4 h-4 text-amber-600" /> Carrier & Phone Resolution
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Extracts shipping telephone, customer address, delivery method (Delhivery/BlueDart), and total amounts.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-stone-50 p-3.5 rounded-2xl border border-stone-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{file?.name || 'CSV File'}</span>
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
+                          {detectedFormat}
+                        </span>
+                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold text-[10px] rounded-full">
+                          Channel: Website
+                        </span>
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono text-[10px] rounded-full">
+                          26 Whitelist Fields
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                        <span>Found <strong className="text-slate-800">{parsedOrders.length} unique orders</strong> ready for import</span>
+                        {filteredOutUnfulfilled > 0 && (
+                          <span className="text-amber-600 font-medium">({filteredOutUnfulfilled} unfulfilled ignored)</span>
+                        )}
+                        {duplicateRowsCount > 0 && (
+                          <span className="text-blue-600 font-medium">({duplicateRowsCount} duplicate item rows merged)</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleReset}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-stone-300 text-slate-600 hover:bg-white transition-colors flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Change CSV
+                  </button>
+                </div>
+
+                {conflictCount > 0 && (
+                  <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-xs">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold mb-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <span>{conflictCount} orders already exist in your packing records</span>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-4 text-slate-700">
+                      <label className="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input
+                          type="radio"
+                          name="conflict"
+                          value="skip"
+                          checked={conflictStrategy === 'skip'}
+                          onChange={() => setConflictStrategy('skip')}
+                          className="text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span>Skip existing orders (Keep current)</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input
+                          type="radio"
+                          name="conflict"
+                          value="merge"
+                          checked={conflictStrategy === 'merge'}
+                          onChange={() => setConflictStrategy('merge')}
+                          className="text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span>Merge missing details</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input
+                          type="radio"
+                          name="conflict"
+                          value="overwrite"
+                          checked={conflictStrategy === 'overwrite'}
+                          onChange={() => setConflictStrategy('overwrite')}
+                          className="text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span>Overwrite existing records</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by Order ID, Customer, Phone, SKU..."
+                      className="w-full pl-9 pr-3 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="px-3 py-1.5 rounded-lg border border-stone-200 bg-white hover:bg-stone-50 text-slate-700 font-semibold transition-colors"
+                    >
+                      {selectedOrderIds.size === filteredOrders.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    <span className="text-slate-500 font-medium">
+                      Selected: <strong className="text-emerald-700">{selectedOrderIds.size}</strong> / {parsedOrders.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="border border-stone-200 rounded-2xl overflow-hidden shadow-xs max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-stone-100/80 text-slate-600 uppercase font-bold text-[10px] sticky top-0 z-10 border-b border-stone-200">
+                      <tr>
+                        <th className="p-3 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrderIds.size === filteredOrders.length && filteredOrders.length > 0}
+                            onChange={toggleSelectAll}
+                            className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                        </th>
+                        <th className="p-3">Order ID</th>
+                        <th className="p-3">Customer & Contact</th>
+                        <th className="p-3">Products & SKU(s)</th>
+                        <th className="p-3">Courier / Delivery</th>
+                        <th className="p-3 text-right">Total (₹)</th>
+                        <th className="p-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 bg-white">
+                      {filteredOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-6 text-center text-slate-400">
+                            No matching orders found.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredOrders.map(order => {
+                          const isSelected = selectedOrderIds.has(order.orderId);
+                          const exists = existingSet.has(order.orderId.toLowerCase());
+
+                          return (
+                            <tr 
+                              key={order.orderId}
+                              onClick={() => toggleSelectOrder(order.orderId)}
+                              className={`cursor-pointer transition-colors ${
+                                isSelected ? 'bg-emerald-50/40 hover:bg-emerald-50/70' : 'hover:bg-stone-50'
+                              }`}
+                            >
+                              <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectOrder(order.orderId)}
+                                  className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                              </td>
+                              <td className="p-3 font-bold text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{order.orderId}</span>
+                                  {exists && (
+                                    <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
+                                      Exists
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 block font-normal">
+                                  {order.lineItemCount > 1 ? `${order.lineItemCount} items aggregated` : '1 line item'}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <span className="font-semibold text-slate-800 block">{order.customerName || 'N/A'}</span>
+                                <span className="text-[11px] text-slate-500">{order.contactPhone || 'No Phone'}</span>
+                              </td>
+                              <td className="p-3 max-w-[220px]">
+                                <p className="truncate font-medium text-slate-700" title={order.productSku}>
+                                  {order.productSku || 'Item'}
+                                </p>
+                                <span className="text-[10px] text-slate-400">Qty: {order.itemCount}</span>
+                              </td>
+                              <td className="p-3">
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
+                                  {order.courier || 'Standard'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right font-bold text-slate-900">
+                                {order.orderTotal ? `₹${order.orderTotal}` : '—'}
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  order.fulfillmentStatus === 'Fulfilled' ? 'bg-emerald-100 text-emerald-800' :
+                                  order.fulfillmentStatus === 'Packed' ? 'bg-blue-100 text-blue-800' :
+                                  order.fulfillmentStatus === 'Shipped' ? 'bg-indigo-100 text-indigo-800' :
+                                  'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {order.fulfillmentStatus}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
 

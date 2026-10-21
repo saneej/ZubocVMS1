@@ -1644,6 +1644,129 @@ apiRouter.post('/orders/bulk', async (req, res) => {
   });
 });
 
+// Connect directly with Shopify Admin API
+apiRouter.post('/shopify/fetch-direct', async (req, res) => {
+  const { shopDomain, accessToken } = req.body;
+  if (!shopDomain || !accessToken) {
+    return res.status(400).json({ success: false, error: 'shopDomain and accessToken are required' });
+  }
+
+  const cleanShop = shopDomain.replace(/https?:\/\//, '').replace(/\/$/, '').trim();
+  const cleanToken = accessToken.trim();
+
+  try {
+    const shopifyRes = await fetch(`https://${cleanShop}/admin/api/2023-10/orders.json?status=any&fulfillment_status=fulfilled&limit=100`, {
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': cleanToken,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!shopifyRes.ok) {
+      const errText = await shopifyRes.text();
+      return res.status(400).json({ success: false, error: `Shopify API Error (${shopifyRes.status}): ${errText}` });
+    }
+
+    const shopifyData = await shopifyRes.json() as { orders?: any[] };
+    const rawOrders = shopifyData.orders || [];
+
+    const now = new Date().toISOString();
+    const importedRecords: OrderRecord[] = [];
+
+    for (const ord of rawOrders) {
+      const orderName = String(ord.name || ord.order_number || ord.id).trim();
+      if (!orderName) continue;
+
+      const digits = orderName.replace(/\D/g, '');
+      const order_number_num = digits ? parseInt(digits, 10) : undefined;
+      const createdAt = ord.created_at || now;
+
+      const lineItems = (ord.line_items || []).map((li: any) => ({
+        name: li.name || li.title || 'Product Item',
+        sku: li.sku || undefined,
+        price: li.price || undefined,
+        quantity: li.quantity || 1
+      }));
+
+      const skus = lineItems.map((li: any) => li.sku || li.name).filter(Boolean);
+      const shippingAddr = ord.shipping_address || ord.billing_address || {};
+      const customerObj = ord.customer || {};
+
+      const record: OrderRecord = {
+        orderId: orderName,
+        order_source: 'website',
+        orderSource: 'website',
+        order_number_num,
+        staffId: 'Shopify Direct API',
+        stationId: 'Web-Fulfillment',
+        recordingStartedAt: createdAt,
+        durationSeconds: 0,
+        recordingStatus: 'PENDING',
+        uploadStatus: 'PENDING',
+
+        email: ord.email || customerObj.email,
+        financialStatus: ord.financial_status || 'paid',
+        fulfillmentStatus: 'Fulfilled',
+        subtotal: ord.subtotal_price,
+        shipping: ord.total_shipping_price_set?.shop_money?.amount || ord.shipping_lines?.[0]?.price || '0',
+        taxes: ord.total_tax,
+        total: ord.total_price,
+        orderTotal: ord.total_price,
+        orderAmount: ord.subtotal_price,
+        shippingAmount: ord.total_shipping_price_set?.shop_money?.amount || '0',
+        discountCode: ord.discount_codes?.[0]?.code,
+        discountAmount: ord.total_discounts,
+        shippingMethod: ord.shipping_lines?.[0]?.title || 'Shopify Express',
+        courier: ord.shipping_lines?.[0]?.title || 'Shopify Express',
+        orderReceivedDate: createdAt,
+        lineItems,
+        productSku: skus.length > 0 ? skus.join(', ') : 'Shopify Item',
+        itemCount: lineItems.reduce((acc: number, li: any) => acc + (li.quantity || 1), 0),
+        customerName: `${shippingAddr.first_name || customerObj.first_name || ''} ${shippingAddr.last_name || customerObj.last_name || ''}`.trim() || ord.email || 'Shopify Customer',
+        shippingName: `${shippingAddr.first_name || ''} ${shippingAddr.last_name || ''}`.trim() || undefined,
+        contactPerson: `${shippingAddr.first_name || ''} ${shippingAddr.last_name || ''}`.trim() || undefined,
+        contactPhone: shippingAddr.phone || customerObj.phone || undefined,
+        shippingStreet: shippingAddr.address1,
+        shippingAddress1: shippingAddr.address1,
+        shippingAddress2: shippingAddr.address2,
+        shippingCompany: shippingAddr.company,
+        shippingCity: shippingAddr.city,
+        shippingZip: shippingAddr.zip,
+        shippingProvince: shippingAddr.province,
+        shippingCountry: shippingAddr.country,
+        shippingPhone: shippingAddr.phone,
+        notes: ord.note || undefined,
+        isProductionDeckOrder: true,
+        createdAt,
+        updatedAt: now
+      };
+
+      ordersStore[orderName] = record;
+      importedRecords.push(record);
+
+      if (firestoreDb && !firestoreQuotaExceeded) {
+        try {
+          await setDoc(doc(firestoreDb, 'orders', orderName), cleanForFirestore(record), { merge: true });
+        } catch {}
+      }
+      saveOrderToSupabase(record).catch(() => {});
+    }
+
+    saveLocalBackup();
+
+    return res.json({
+      success: true,
+      count: importedRecords.length,
+      orders: importedRecords
+    });
+
+  } catch (err: any) {
+    console.error('Shopify Direct API Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to connect to Shopify API' });
+  }
+});
+
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
   const { orderId } = req.params;

@@ -1325,281 +1325,50 @@ export const PackingStation: React.FC<PackingStationProps> = ({
                   </div>
 
 
-                  {/* Package & Shipment Details Panel */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => setShowPackageDetails(!showPackageDetails)}
-                        className="flex items-center gap-2 text-xs font-mono font-bold text-slate-800 hover:text-blue-600 cursor-pointer"
-                      >
-                        <Box className="w-4 h-4 text-blue-600" />
-                        <span>PACKAGE & SHIPMENT DETAILS</span>
-                        {showPackageDetails ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                      </button>
-                      <span className="text-[10px] font-mono text-slate-500 font-medium">Shared in Telegram caption & stored in Dashboard</span>
-                    </div>
+                  {/* Matched Order Info Card (Auto-filled from Orders Page) */}
+                  {(() => {
+                    const q = orderIdInput.trim().toLowerCase();
+                    const matchedOrder = q.length >= 2 
+                      ? existingOrders.find(o => o.orderId.toLowerCase() === q || (o.awbNumber && o.awbNumber.toLowerCase() === q))
+                      : null;
 
-                    {showPackageDetails && (
-                      <div className="space-y-2.5 pt-1">
-                        {/* Delivery Method Selector */}
-                        <div>
-                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
-                            Delivery Method:
-                          </label>
-                          <select
-                            value={deliveryMethodInput}
-                            onChange={(e) => setDeliveryMethodInput(e.target.value)}
-                            className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none font-mono"
-                          >
-                            <option value="Normal">Normal</option>
-                            <option value="Express">Express</option>
-                            <option value="Next day delivery (porter/SKS)">Next day delivery (porter/SKS)</option>
-                          </select>
+                    if (!matchedOrder) return null;
+
+                    return (
+                      <div className="bg-emerald-50 border border-emerald-200/90 rounded-xl p-3.5 space-y-2 text-xs font-mono">
+                        <div className="flex items-center justify-between border-b border-emerald-200/70 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                            <span className="font-extrabold text-emerald-950 text-sm">Order #{matchedOrder.orderId} Pre-filled Details</span>
+                          </div>
+                          {matchedOrder.courier && (
+                            <span className="bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded text-[11px]">
+                              {matchedOrder.courier} {matchedOrder.awbNumber ? `• ${matchedOrder.awbNumber}` : ''}
+                            </span>
+                          )}
                         </div>
 
-                        {/* Courier Partner Quick Selector */}
-                        <div>
-                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">
-                            Courier Partner:
-                          </label>
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {['Delhivery', 'Blue Dart', 'DTDC', 'Shiprocket', 'Ekart', 'Xpressbees', 'India Post'].map((c) => (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => setCourierInput(courierInput === c ? '' : c)}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold cursor-pointer transition-colors border ${
-                                  courierInput === c
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                                }`}
-                              >
-                                {c}
-                              </button>
-                            ))}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-emerald-800 text-[11px] pt-0.5">
+                          <div>
+                            <span className="text-emerald-600 block text-[10px] uppercase font-bold">Customer</span>
+                            <span className="font-bold text-emerald-950 truncate block">{matchedOrder.customerName || 'N/A'}</span>
                           </div>
                           <div>
-                            <input
-                              type="text"
-                              value={courierInput}
-                              onChange={(e) => setCourierInput(e.target.value)}
-                              placeholder="Or type custom courier name..."
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
+                            <span className="text-emerald-600 block text-[10px] uppercase font-bold">SKU / Item</span>
+                            <span className="font-bold text-emerald-950 truncate block">{matchedOrder.productSku || 'N/A'}</span>
                           </div>
-                        </div>
-
-                        {/* Grid of Inputs: AWB, Weight, SKU, Qty, Customer, Notes */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 font-mono text-xs">
-                          {/* AWB / Tracking No */}
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              AWB / Tracking Barcode
-                            </label>
-                            <div className="relative">
-                              <Truck className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={awbInput}
-                                onChange={(e) => setAwbInput(e.target.value)}
-                                placeholder="Scan or enter AWB..."
-                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                              />
-                            </div>
+                            <span className="text-emerald-600 block text-[10px] uppercase font-bold">Contact</span>
+                            <span className="font-bold text-emerald-950 truncate block">{matchedOrder.contactPhone || matchedOrder.contactPerson || 'N/A'}</span>
                           </div>
-
-                          {/* Weight */}
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Package Weight
-                            </label>
-                            <div className="relative">
-                              <Scale className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={weightInput}
-                                onChange={(e) => setWeightInput(e.target.value)}
-                                placeholder="e.g. 0.45 kg / 450g"
-                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Item / SKU */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Item / SKU Name
-                            </label>
-                            <div className="relative">
-                              <Tag className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={skuInput}
-                                onChange={(e) => setSkuInput(e.target.value)}
-                                placeholder="e.g. ZB-TEE-L"
-                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Qty */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Items Quantity
-                            </label>
-                            <input
-                              type="text"
-                              value={itemCountInput}
-                              onChange={(e) => setItemCountInput(e.target.value)}
-                              placeholder="1"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Customer / City */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Customer / City
-                            </label>
-                            <input
-                              type="text"
-                              value={customerInput}
-                              onChange={(e) => setCustomerInput(e.target.value)}
-                              placeholder="e.g. Rajesh • Mumbai"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Contact Person Name */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Contact Person Name
-                            </label>
-                            <input
-                              type="text"
-                              value={contactPersonInput}
-                              onChange={(e) => setContactPersonInput(e.target.value)}
-                              placeholder="e.g. Amit Sharma"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Contact Person Phone Number */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Contact Phone Number
-                            </label>
-                            <input
-                              type="text"
-                              value={contactPhoneInput}
-                              onChange={(e) => setContactPhoneInput(e.target.value)}
-                              placeholder="e.g. +91 9876543210"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Order Received Date */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Order Received Date
-                            </label>
-                            <input
-                              type="date"
-                              value={orderReceivedDateInput}
-                              onChange={(e) => setOrderReceivedDateInput(e.target.value)}
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Despatch Date */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Despatch Date
-                            </label>
-                            <input
-                              type="date"
-                              value={dispatchDateInput}
-                              onChange={(e) => setDispatchDateInput(e.target.value)}
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Order Amount */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Order Amount (₹)
-                            </label>
-                            <input
-                              type="text"
-                              value={orderAmountInput}
-                              onChange={(e) => setOrderAmountInput(e.target.value)}
-                              placeholder="e.g. 1499.00"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Shipping Amount */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Shipping Amount (₹)
-                            </label>
-                            <input
-                              type="text"
-                              value={shippingAmountInput}
-                              onChange={(e) => setShippingAmountInput(e.target.value)}
-                              placeholder="e.g. 99.00"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Total Amount */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Total Amount (₹)
-                            </label>
-                            <input
-                              type="text"
-                              value={orderTotalInput}
-                              onChange={(e) => setOrderTotalInput(e.target.value)}
-                              placeholder="Auto or manual total"
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Delivered Date */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Delivered Date (Editable)
-                            </label>
-                            <input
-                              type="date"
-                              value={deliveredDateInput}
-                              onChange={(e) => setDeliveredDateInput(e.target.value)}
-                              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                            />
-                          </div>
-
-                          {/* Notes / QC Remarks */}
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
-                              Notes / QC Remarks
-                            </label>
-                            <div className="relative">
-                              <FileText className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={notesInput}
-                                onChange={(e) => setNotesInput(e.target.value)}
-                                placeholder="e.g. Packed OK, Bubble wrap"
-                                className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-lg pl-8 pr-2 py-1.5 text-slate-900 text-xs font-bold focus:outline-none"
-                              />
-                            </div>
+                            <span className="text-emerald-600 block text-[10px] uppercase font-bold">Total Amount</span>
+                            <span className="font-bold text-emerald-950">₹{matchedOrder.orderTotal || matchedOrder.orderAmount || '0'}</span>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Primary Trigger Buttons depending on Selected Mode */}
                   <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
