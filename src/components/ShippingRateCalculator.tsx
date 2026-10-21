@@ -349,8 +349,11 @@ export const ShippingRateCalculator: React.FC<ShippingRateCalculatorProps> = ({
 
   // Multi-Carrier Evaluations
   const carrierResults = useMemo(() => {
-    return evaluateAllCarriers(selectedZoneId, rawBillableWeightKg);
-  }, [selectedZoneId, rawBillableWeightKg]);
+    const l = parseFloat(lengthCm) || 0;
+    const w = parseFloat(widthCm) || 0;
+    const h = parseFloat(heightCm) || 0;
+    return evaluateAllCarriers(selectedZoneId, deadWeightKg, l, w, h, pincode.substring(0, 2));
+  }, [selectedZoneId, deadWeightKg, lengthCm, widthCm, heightCm, pincode]);
 
   // Selected Carrier Result
   const selectedResult = useMemo(() => {
