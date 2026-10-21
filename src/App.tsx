@@ -20,7 +20,7 @@ import { OrderRecord, StaffMember, AppSettings } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
-import { supabase } from './supabase';
+import { supabase, cleanForSupabase } from './supabase';
 import { cleanForFirestore } from './utils/firestoreHelper';
 import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
 import { INITIAL_STAFFS } from './utils/initialStaffs';
@@ -304,24 +304,51 @@ const AppContent: React.FC = () => {
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {
-    // 1. Update React state and browser cache immediately
+    if (!updatedOrder || !updatedOrder.orderId) return;
+
+    // 1. Update React state and browser cache immediately (Instant UI update)
     setOrders(prev => {
-      const next = prev.map(o => o.orderId === updatedOrder.orderId ? updatedOrder : o);
+      const idx = prev.findIndex(o => 
+        o.orderId === updatedOrder.orderId || 
+        o.orderId?.toLowerCase() === updatedOrder.orderId?.toLowerCase() ||
+        o.orderId?.replace(/^#/, '') === updatedOrder.orderId?.replace(/^#/, '')
+      );
+      let next: OrderRecord[];
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = { ...next[idx], ...updatedOrder };
+      } else {
+        next = [updatedOrder, ...prev];
+      }
       try {
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
       } catch {}
       return next;
     });
 
-    // 2. Single-source persistence via server
+    // 2. Persist to Express backend
     try {
-      await safeFetchJson(`/api/orders/${updatedOrder.orderId}`, {
+      const safeId = encodeURIComponent(updatedOrder.orderId);
+      await safeFetchJson(`/api/orders/${safeId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedOrder)
       });
-      broadcastSync();
-    } catch (apiErr) {}
+    } catch (apiErr) {
+      console.warn('Backend order update notice:', apiErr);
+    }
+
+    // 3. Persist directly to Supabase client-side for dual-guarantee database write
+    try {
+      const supaPayload = cleanForSupabase(updatedOrder);
+      if (supaPayload && supaPayload.orderId) {
+        await supabase.from('orders').upsert(supaPayload, { onConflict: 'orderId' });
+      }
+    } catch (supaErr) {
+      console.warn('Supabase client-side order update notice:', supaErr);
+    }
+
+    broadcastSync();
   };
 
   const handleDeleteOrder = async (orderId: string) => {

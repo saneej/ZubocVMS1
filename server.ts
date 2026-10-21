@@ -1599,14 +1599,24 @@ apiRouter.get('/orders/:orderId', async (req, res) => {
 });
 
 // Create or update order record metadata
-apiRouter.post('/orders', async (req, res) => {
-  const orderId = sanitizeString(req.body.orderId);
+const handleSaveOrderRequest = async (req: express.Request, res: express.Response) => {
+  let paramId = req.params?.orderId;
+  if (paramId) {
+    try { paramId = decodeURIComponent(paramId); } catch {}
+  }
+  const rawId = req.body.orderId || paramId || '';
+  const orderId = sanitizeString(rawId);
   if (!orderId) {
     return res.status(400).json({ error: 'orderId is required' });
   }
 
   const now = new Date().toISOString();
-  const existing = ordersStore[orderId];
+  const existing = ordersStore[orderId] || Object.values(ordersStore).find(o => {
+    if (!o.orderId) return false;
+    const cleanO = o.orderId.trim().toLowerCase().replace(/^#/, '');
+    const cleanR = orderId.trim().toLowerCase().replace(/^#/, '');
+    return cleanO === cleanR;
+  });
 
   // Auto-calculate order_source and numeric sort key
   const digits = orderId.replace(/\D/g, '');
@@ -1618,26 +1628,30 @@ apiRouter.post('/orders', async (req, res) => {
   const record: OrderRecord = {
     ...(existing || {}),
     ...req.body,
-    orderId, // Ensure ID is preserved
+    orderId: existing?.orderId || orderId, // Ensure ID is preserved
     order_source,
     orderSource: order_source,
     order_number_num,
     updatedAt: now,
-    createdAt: existing?.createdAt || now
+    createdAt: existing?.createdAt || req.body.createdAt || now
   };
 
+  const finalId = record.orderId;
   const fulfillmentChanged = existing && existing.fulfillmentStatus !== record.fulfillmentStatus;
 
-  ordersStore[orderId] = record;
+  ordersStore[finalId] = record;
+  if (orderId !== finalId) {
+    ordersStore[orderId] = record;
+  }
   saveLocalBackup();
 
   if (fulfillmentChanged) {
-      await sendTelegramUpdate(record);
+    await sendTelegramUpdate(record);
   }
 
   if (firestoreDb && !firestoreQuotaExceeded) {
     try {
-      await setDoc(doc(firestoreDb, 'orders', orderId), cleanForFirestore(record), { merge: true });
+      await setDoc(doc(firestoreDb, 'orders', finalId), cleanForFirestore(record), { merge: true });
     } catch (e: any) {
       if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota') || e?.message?.includes('quota')) {
         firestoreQuotaExceeded = true;
@@ -1648,11 +1662,15 @@ apiRouter.post('/orders', async (req, res) => {
     }
   }
 
-  // Async background save to Supabase to avoid blocking response
-  saveOrderToSupabase(record).catch(err => console.error('Supabase Background Sync Error:', err));
-  
-  res.json({ success: true, record, supaSynced: 'PENDING' });
-});
+  // Synchronously save to Supabase
+  const supaSaved = await saveOrderToSupabase(record);
+
+  res.json({ success: true, record, supaSynced: supaSaved });
+};
+
+apiRouter.post('/orders', handleSaveOrderRequest);
+apiRouter.post('/orders/:orderId', handleSaveOrderRequest);
+apiRouter.put('/orders/:orderId', handleSaveOrderRequest);
 
 // Bulk import orders (e.g. from Shopify CSV)
 apiRouter.post('/orders/bulk', async (req, res) => {
