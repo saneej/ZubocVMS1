@@ -2017,6 +2017,134 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
   }
 });
 
+// Parse incoming Shopify Webhook payload into OrderRecord
+function parseShopifyWebhookPayload(ord: any): OrderRecord | null {
+  if (!ord) return null;
+  const now = new Date().toISOString();
+  
+  // Format Order ID (#2891, WEB-1042, or DRAFT-1002)
+  let orderName = ord.name ? String(ord.name).trim() : '';
+  if (!orderName && ord.order_number) {
+    orderName = `#${ord.order_number}`;
+  }
+  if (!orderName && ord.id) {
+    orderName = `SHOPIFY-${ord.id}`;
+  }
+  if (!orderName) return null;
+
+  const digits = orderName.replace(/\D/g, '');
+  const order_number_num = digits ? parseInt(digits, 10) : undefined;
+  const createdAt = normalizeIsoDate(ord.created_at || ord.processed_at) || now;
+
+  const lineItems = (ord.line_items || []).map((li: any) => ({
+    name: li.name || li.title || 'Shopify Line Item',
+    sku: li.sku || undefined,
+    price: li.price || undefined,
+    quantity: li.quantity || 1
+  }));
+
+  const skus = lineItems.map((li: any) => li.sku || li.name).filter(Boolean);
+  const shippingAddr = ord.shipping_address || ord.billing_address || {};
+  const customerObj = ord.customer || {};
+
+  const rawFulfillment = ord.fulfillment_status;
+  const fulfillmentStatus = rawFulfillment
+    ? (rawFulfillment.charAt(0).toUpperCase() + rawFulfillment.slice(1).toLowerCase())
+    : 'Unfulfilled';
+
+  const record: OrderRecord = {
+    orderId: orderName,
+    order_source: 'website',
+    orderSource: 'website',
+    order_number_num,
+    staffId: 'Shopify Webhook Auto-Sync',
+    stationId: 'Web-Fulfillment',
+    recordingStartedAt: createdAt,
+    durationSeconds: 0,
+    recordingStatus: 'PENDING',
+    uploadStatus: 'PENDING',
+
+    email: ord.email || customerObj.email,
+    financialStatus: ord.financial_status || 'pending',
+    fulfillmentStatus,
+    subtotal: ord.subtotal_price,
+    shipping: ord.total_shipping_price_set?.shop_money?.amount || ord.shipping_lines?.[0]?.price || '0',
+    taxes: ord.total_tax,
+    total: ord.total_price || ord.total_price_set?.shop_money?.amount,
+    orderTotal: ord.total_price || ord.subtotal_price,
+    orderAmount: ord.subtotal_price || ord.total_price,
+    shippingAmount: ord.total_shipping_price_set?.shop_money?.amount || '0',
+    discountCode: ord.discount_codes?.[0]?.code,
+    discountAmount: ord.total_discounts,
+    shippingMethod: ord.shipping_lines?.[0]?.title || 'Shopify Express',
+    courier: ord.shipping_lines?.[0]?.title || 'Shopify Express',
+    orderReceivedDate: createdAt,
+    lineItems,
+    productSku: skus.length > 0 ? skus.join(', ') : 'Shopify Line Item',
+    itemCount: lineItems.reduce((acc: number, li: any) => acc + (li.quantity || 1), 0) || 1,
+    customerName: `${shippingAddr.first_name || customerObj.first_name || ''} ${shippingAddr.last_name || customerObj.last_name || ''}`.trim() || ord.email || 'Shopify Customer',
+    shippingName: `${shippingAddr.first_name || ''} ${shippingAddr.last_name || ''}`.trim() || undefined,
+    contactPerson: `${shippingAddr.first_name || ''} ${shippingAddr.last_name || ''}`.trim() || undefined,
+    contactPhone: shippingAddr.phone || customerObj.phone || undefined,
+    shippingStreet: shippingAddr.address1,
+    shippingAddress1: shippingAddr.address1,
+    shippingAddress2: shippingAddr.address2,
+    shippingCompany: shippingAddr.company,
+    shippingCity: shippingAddr.city,
+    shippingZip: shippingAddr.zip,
+    shippingProvince: shippingAddr.province,
+    shippingCountry: shippingAddr.country,
+    shippingPhone: shippingAddr.phone,
+    notes: ord.note || undefined,
+    isProductionDeckOrder: false,
+    createdAt,
+    updatedAt: now
+  };
+
+  return record;
+}
+
+// Real-time Shopify Webhook Ingestion Routes
+const handleShopifyWebhook = async (req: express.Request, res: express.Response) => {
+  try {
+    const topic = req.headers['x-shopify-topic'] || 'orders/create';
+    console.log(`[Shopify Webhook] Ingesting ${topic} event...`);
+
+    const record = parseShopifyWebhookPayload(req.body);
+    if (!record) {
+      return res.status(200).json({ success: true, message: 'Webhook received but payload contained no valid order Name or ID.' });
+    }
+
+    ordersStore[record.orderId] = record;
+    saveLocalBackup();
+
+    if (firestoreDb && !firestoreQuotaExceeded) {
+      try {
+        await setDoc(doc(firestoreDb, 'orders', record.orderId), cleanForFirestore(record), { merge: true });
+      } catch {}
+    }
+
+    const supaSaved = await saveOrderToSupabase(record);
+    console.log(`[Shopify Webhook] Automatically created order #${record.orderId} (Supabase synced: ${supaSaved})`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Order #${record.orderId} automatically ingested from Shopify`,
+      orderId: record.orderId,
+      order: record,
+      supaSynced: supaSaved
+    });
+  } catch (err: any) {
+    console.error('[Shopify Webhook Error]:', err);
+    return res.status(200).json({ success: false, error: err?.message || 'Webhook processing exception' });
+  }
+};
+
+apiRouter.post('/webhooks/shopify/orders-create', handleShopifyWebhook);
+apiRouter.post('/webhooks/shopify/orders-updated', handleShopifyWebhook);
+apiRouter.post('/webhooks/shopify/draft-orders', handleShopifyWebhook);
+apiRouter.post('/webhooks/shopify', handleShopifyWebhook);
+
 // Update specific order
 apiRouter.post('/orders/:orderId', async (req, res) => {
   const { orderId } = req.params;

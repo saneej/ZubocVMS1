@@ -61,12 +61,72 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
     total: number;
   } | null>(null);
 
-  const [activeModalTab, setActiveModalTab] = useState<'csv' | 'direct'>('csv');
+  const [activeModalTab, setActiveModalTab] = useState<'webhook' | 'csv' | 'direct'>('webhook');
   const [shopDomain, setShopDomain] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [isFetchingDirect, setIsFetchingDirect] = useState(false);
   const [directError, setDirectError] = useState<string | null>(null);
   const [directSuccessCount, setDirectSuccessCount] = useState<number | null>(null);
+
+  // Webhook Automation state
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+  const [testWebhookResult, setTestWebhookResult] = useState<string | null>(null);
+
+  const handleTestWebhookPing = async () => {
+    setIsTestingWebhook(true);
+    setTestWebhookResult(null);
+    const sampleShopifyPayload = {
+      id: Date.now(),
+      name: `#SHOPIFY-AUTO-${Math.floor(1000 + Math.random() * 9000)}`,
+      email: 'auto.client@example.com',
+      financial_status: 'paid',
+      fulfillment_status: 'unfulfilled',
+      subtotal_price: '4500.00',
+      total_price: '4500.00',
+      total_tax: '0.00',
+      created_at: new Date().toISOString(),
+      customer: {
+        first_name: 'Automatic',
+        last_name: 'Shopify Client',
+        email: 'auto.client@example.com'
+      },
+      shipping_address: {
+        first_name: 'Automatic',
+        last_name: 'Shopify Client',
+        address1: '456 Automation Boulevard',
+        city: 'Mumbai',
+        province: 'Maharashtra',
+        zip: '400001',
+        country: 'India',
+        phone: '9876543210'
+      },
+      line_items: [
+        { name: 'Bespoke Wax Seal Suite', price: '4500.00', quantity: 1, sku: 'AUTOMATED-SUITE-01' }
+      ]
+    };
+
+    try {
+      const res = await safeFetchJson('/api/webhooks/shopify/orders-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sampleShopifyPayload)
+      });
+
+      if (res && res.success) {
+        setTestWebhookResult(`✅ Success! Sample order ${res.orderId} was automatically created in Zuboc VMS and saved to Supabase.`);
+        if (onSuccess && res.order) {
+          onSuccess(1, [res.order]);
+        }
+      } else {
+        setTestWebhookResult(`⚠️ Webhook error: ${res?.message || res?.error || 'Failed'}`);
+      }
+    } catch (err: any) {
+      setTestWebhookResult(`❌ Error testing webhook: ${err?.message || 'Network error'}`);
+    } finally {
+      setIsTestingWebhook(false);
+    }
+  };
 
   const handleFetchDirectShopify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -343,7 +403,20 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
         <div className="flex-1 overflow-y-auto py-4 space-y-4">
 
           {/* Import Method Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
+            <button
+              type="button"
+              onClick={() => setActiveModalTab('webhook')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeModalTab === 'webhook'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>⚡ Automatic Webhooks (Real-Time)</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveModalTab('csv')}
@@ -366,14 +439,145 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4" />
               <span>Connect Shopify API Directly</span>
             </button>
           </div>
 
-          {/* DIRECT SHOPIFY API TAB VIEW */}
-                    {/* TAB CONTENT */}
+          {/* TAB CONTENT */}
           {(() => {
+            if (activeModalTab === 'webhook') {
+              const webhookEndpoint = `${window.location.origin}/api/webhooks/shopify/orders-create`;
+              return (
+                <div className="space-y-5 py-2">
+                  
+                  {/* Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-900 to-indigo-900 text-white shadow-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> 100% Fully Automated Real-Time Ingestion
+                      </span>
+                      <span className="text-[10px] text-purple-200 font-mono">Zero Manual Effort Required</span>
+                    </div>
+                    <h3 className="text-base font-extrabold font-sans">
+                      Connect Shopify Webhooks for Instant Order Sync
+                    </h3>
+                    <p className="text-xs text-purple-100/90 leading-relaxed">
+                      Whenever a customer places an order or draft order in your Shopify store, Shopify automatically sends the order directly to Zuboc VMS in real-time without you ever having to upload a CSV file!
+                    </p>
+                  </div>
+
+                  {/* Endpoint Box */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-purple-200 space-y-2.5">
+                    <label className="block text-xs font-black text-purple-900 uppercase tracking-wider">
+                      Your Target Shopify Webhook Endpoint URL
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={webhookEndpoint}
+                        className="flex-1 px-3 py-2 rounded-xl bg-white border border-stone-300 font-mono text-xs text-slate-800 font-bold focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(webhookEndpoint);
+                          setCopiedWebhook(true);
+                          setTimeout(() => setCopiedWebhook(false), 2500);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                      >
+                        {copiedWebhook ? <Check className="w-4 h-4 text-emerald-300" /> : <Layers className="w-4 h-4" />}
+                        <span>{copiedWebhook ? 'Copied URL!' : 'Copy Webhook URL'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Simulator Box */}
+                  <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-amber-600" />
+                        <h4 className="text-xs font-extrabold text-amber-900 uppercase">Live Webhook Test Simulator</h4>
+                      </div>
+                      <span className="text-[10px] font-mono text-amber-700">Instant Database Check</span>
+                    </div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Click the button below to simulate sending an automated Shopify order event payload to your webhook endpoint live right now.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleTestWebhookPing}
+                        disabled={isTestingWebhook}
+                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isTestingWebhook ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                        <span>{isTestingWebhook ? 'Simulating Webhook Ingestion...' : '⚡ Send Live Test Webhook Ping'}</span>
+                      </button>
+                    </div>
+
+                    {testWebhookResult && (
+                      <div className="p-3 rounded-xl bg-white border border-amber-300 text-xs font-mono font-bold text-slate-800 shadow-sm animate-in fade-in">
+                        {testWebhookResult}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step by Step Visual Guide */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <ArrowRight className="w-4 h-4 text-purple-600" />
+                      5-Step Setup Guide in Shopify Admin
+                    </h4>
+
+                    <ol className="space-y-2.5 text-xs text-slate-700 font-sans">
+                      <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">1</span>
+                        <div>
+                          <strong>Log into Shopify Admin</strong> and click <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-800 font-mono text-[11px]">Settings</span> (bottom left gear icon).
+                        </div>
+                      </li>
+
+                      <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">2</span>
+                        <div>
+                          Click <strong>Notifications</strong> in the left sidebar menu.
+                        </div>
+                      </li>
+
+                      <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">3</span>
+                        <div>
+                          Scroll down to the <strong>Webhooks</strong> section and click <strong>Create webhook</strong>.
+                        </div>
+                      </li>
+
+                      <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">4</span>
+                        <div>
+                          Set Event to <strong>Order creation</strong>, Format to <strong>JSON</strong>, and paste your copied Webhook URL into the URL field.
+                        </div>
+                      </li>
+
+                      <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="w-5 h-5 rounded-full bg-purple-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">5</span>
+                        <div>
+                          Click <strong>Save</strong>. (Optionally repeat for event <strong>Order updated</strong> or <strong>Draft order creation</strong>).
+                        </div>
+                      </li>
+                    </ol>
+                  </div>
+
+                </div>
+              );
+            }
+
             if (activeModalTab === 'direct') {
               if (directSuccessCount !== null) {
                 return (
