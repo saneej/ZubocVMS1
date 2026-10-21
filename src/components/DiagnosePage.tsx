@@ -112,6 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders ("createdAt" D
 CREATE INDEX IF NOT EXISTS idx_orders_fulfillment_status ON public.orders ("fulfillmentStatus");
 CREATE INDEX IF NOT EXISTS idx_orders_production_stage ON public.orders ("productionStage");
 CREATE INDEX IF NOT EXISTS idx_orders_customer_name ON public.orders ("customerName");
+CREATE INDEX IF NOT EXISTS idx_orders_customisations ON public.orders USING gin ("customisations");
 
 -- 5. Seed Initial Admin & Config
 INSERT INTO public.staffs ("id", "name", "role", "stationId", "password")

@@ -43,7 +43,8 @@ import {
   Send,
   CalendarCheck,
   Palette,
-  CheckCheck
+  CheckCheck,
+  Zap
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -219,8 +220,9 @@ function normalizeOrder(order: OrderRecord): {
     screenPrinting: Boolean(order.notes?.toLowerCase().includes('screen')),
     dieCutting: Boolean(order.notes?.toLowerCase().includes('die') || order.notes?.toLowerCase().includes('cut')),
     waxStamp: Boolean(order.notes?.toLowerCase().includes('wax')),
-    rubberStamp: false,
+    rubberStamp: Boolean(order.notes?.toLowerCase().includes('rubber')),
     embosserStamp: Boolean(order.notes?.toLowerCase().includes('emboss')),
+    uvDtf: Boolean(order.notes?.toLowerCase().includes('uv') || order.notes?.toLowerCase().includes('dtf')),
     seals: Boolean(order.notes?.toLowerCase().includes('seal'))
   };
 
@@ -1004,6 +1006,9 @@ const FloorOrderCard: React.FC<FloorOrderCardProps> = ({
     { key: 'screenPrinting', label: 'Screen Print', icon: Layers, active: norm.customisations.screenPrinting, done: norm.subAssembly.screenPrinting },
     { key: 'digitalPrinting', label: 'Digital', icon: Printer, active: norm.customisations.digitalPrinting, done: true },
     { key: 'waxStamp', label: 'Wax Stamp', icon: Flame, active: norm.customisations.waxStamp, done: norm.subAssembly.waxSealApplied },
+    { key: 'embosserStamp', label: 'Embosser Stamp', icon: Stamp, active: norm.customisations.embosserStamp, done: norm.subAssembly.envelopeDieCutting },
+    { key: 'rubberStamp', label: 'Rubber Stamp', icon: Stamp, active: norm.customisations.rubberStamp, done: norm.subAssembly.screenPrinting },
+    { key: 'uvDtf', label: 'UV DTF', icon: Zap, active: norm.customisations.uvDtf, done: norm.subAssembly.screenPrinting },
     { key: 'seals', label: 'Seals', icon: Award, active: norm.customisations.seals, done: norm.subAssembly.waxSealApplied }
   ].filter(c => c.active);
 
@@ -1409,6 +1414,9 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
                 { k: 'screenPrinting', label: 'Screen Print' },
                 { k: 'digitalPrinting', label: 'Digital Print' },
                 { k: 'waxStamp', label: 'Wax Stamp' },
+                { k: 'embosserStamp', label: 'Embosser Stamp' },
+                { k: 'rubberStamp', label: 'Rubber Stamp' },
+                { k: 'uvDtf', label: 'UV DTF' },
                 { k: 'seals', label: 'Wax Seals' }
               ].map(({ k, label }) => {
                 const checked = Boolean(customisations[k as keyof ZubocCustomisations]);
@@ -1635,7 +1643,7 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customisations, setCustomisations] = useState<ZubocCustomisations>({
-    goldFoil: true, digitalPrinting: true, screenPrinting: true, dieCutting: true, waxStamp: true, rubberStamp: false, embosserStamp: false, seals: true
+    goldFoil: true, digitalPrinting: true, screenPrinting: true, dieCutting: true, waxStamp: true, rubberStamp: false, embosserStamp: false, uvDtf: false, seals: true
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1758,7 +1766,11 @@ const NewFloorJobModal: React.FC<NewFloorJobModalProps> = ({ currentStaff, onClo
                 { k: 'goldFoil', label: 'Gold Foil' },
                 { k: 'dieCutting', label: 'Die Cut' },
                 { k: 'screenPrinting', label: 'Screen Print' },
-                { k: 'waxStamp', label: 'Wax Stamp' }
+                { k: 'waxStamp', label: 'Wax Stamp' },
+                { k: 'embosserStamp', label: 'Embosser Stamp' },
+                { k: 'rubberStamp', label: 'Rubber Stamp' },
+                { k: 'uvDtf', label: 'UV DTF' },
+                { k: 'seals', label: 'Wax Seals' }
               ].map(({ k, label }) => (
                 <label key={k} className="flex items-center gap-1.5 text-xs text-stone-700">
                   <input

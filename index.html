@@ -24,6 +24,21 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Suppress Vite HMR WebSocket connection close notices in iframe environments
+      window.addEventListener('error', function(e) {
+        if (e && e.message && (e.message.includes('WebSocket') || e.message.includes('@vite/client'))) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e && e.reason && e.reason.message && (e.reason.message.includes('WebSocket') || e.reason.message.includes('@vite/client'))) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

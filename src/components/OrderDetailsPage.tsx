@@ -439,6 +439,17 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-black text-slate-900 font-mono">{order.orderId}</h1>
+              {(() => {
+                const src = (order.order_source || order.orderSource || 'website').toLowerCase();
+                const isWeb = src === 'website';
+                return (
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                    isWeb ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}>
+                    {isWeb ? '🌐 Website (Shopify)' : '📦 Amazon'}
+                  </span>
+                );
+              })()}
               {order.deliveryMethod && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-black uppercase tracking-tight">
                   <Zap className="w-3 h-3" />

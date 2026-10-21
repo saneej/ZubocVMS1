@@ -1,7 +1,7 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload, Save } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload, Save, Globe, ShoppingCart } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
@@ -32,6 +32,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   currentStaffId = 'Operator-ID',
   currentStaffName = 'Operator'
 }) => {
+  const [channelFilter, setChannelFilter] = useState<'website' | 'amazon' | 'ALL'>('website');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED' | 'PENDING'>('ALL');
   const [fulfillmentFilter, setFulfillmentFilter] = useState<string>('ALL');
@@ -40,6 +41,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [isShopifyCsvModalOpen, setIsShopifyCsvModalOpen] = useState(false);
+  const [newOrderSource, setNewOrderSource] = useState<'website' | 'amazon'>('website');
   const [newOrderId, setNewOrderId] = useState("");
   const [newCustomer, setNewCustomer] = useState("");
   const [newAwb, setNewAwb] = useState("");
@@ -53,12 +55,19 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   const handleAddOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOrderId.trim()) {
+    const cleanId = newOrderId.trim();
+    if (!cleanId) {
       alert("Please enter an Order ID");
       return;
     }
+    const digits = cleanId.replace(/\D/g, '');
+    const order_number_num = digits ? parseInt(digits, 10) : undefined;
+
     const orderRecord: OrderRecord = {
-      orderId: newOrderId.trim().toUpperCase(),
+      orderId: cleanId,
+      order_source: newOrderSource,
+      orderSource: newOrderSource,
+      order_number_num,
       staffId: currentStaffName,
       stationId: "Order-Department",
       recordingStartedAt: new Date().toISOString(),
@@ -144,7 +153,16 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }
   });
 
+  // Channel counts
+  const websiteOrdersCount = orders.filter(o => (o.order_source || o.orderSource || 'website').toLowerCase() === 'website').length;
+  const amazonOrdersCount = orders.filter(o => (o.order_source || o.orderSource || '').toLowerCase() === 'amazon').length;
+
   const filteredOrders = orders.filter(order => {
+    // Channel Filter
+    const source = (order.order_source || order.orderSource || 'website').toLowerCase();
+    if (channelFilter === 'website' && source !== 'website') return false;
+    if (channelFilter === 'amazon' && source !== 'amazon') return false;
+
     const q = searchTerm.toLowerCase();
     const matchesSearch = 
       order.orderId.toLowerCase().includes(q) ||
@@ -153,6 +171,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       (order.productSku && order.productSku.toLowerCase().includes(q)) ||
       (order.customerName && order.customerName.toLowerCase().includes(q)) ||
       (order.notes && order.notes.toLowerCase().includes(q)) ||
+      (order.email && order.email.toLowerCase().includes(q)) ||
       order.staffId.toLowerCase().includes(q) ||
       (order.stationId && order.stationId.toLowerCase().includes(q));
 
@@ -165,6 +184,35 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       (order.fulfillmentStatus || 'Pending') === fulfillmentFilter;
 
     return matchesSearch && matchesUploadStatus && matchesFulfillment;
+  });
+
+  // Numeric Sorting for Website (#2889 > #2888 > #1000) & Chronological Date for Amazon
+  filteredOrders.sort((a, b) => {
+    const isWebsiteA = (a.order_source || a.orderSource || 'website').toLowerCase() === 'website';
+    const isWebsiteB = (b.order_source || b.orderSource || 'website').toLowerCase() === 'website';
+
+    if (channelFilter === 'website' || (channelFilter === 'ALL' && isWebsiteA && isWebsiteB)) {
+      const getNum = (o: OrderRecord) => {
+        if (typeof o.order_number_num === 'number' && !isNaN(o.order_number_num)) {
+          return o.order_number_num;
+        }
+        const digits = (o.orderId || '').replace(/\D/g, '');
+        return digits ? parseInt(digits, 10) : -1;
+      };
+      const numA = getNum(a);
+      const numB = getNum(b);
+      if (numA !== numB) {
+        return numB - numA; // Numerically descending: #2889, #2888, #2887...
+      }
+      const dateA = new Date(a.orderReceivedDate || a.createdAt || 0).getTime();
+      const dateB = new Date(b.orderReceivedDate || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    } else {
+      // Amazon or mixed: created_at_order DESC
+      const dateA = new Date(a.orderReceivedDate || a.createdAt || 0).getTime();
+      const dateB = new Date(b.orderReceivedDate || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    }
   });
 
   const handleDelete = async (orderId: string) => {
@@ -443,6 +491,48 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       
       {/* Search & Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+        
+        {/* Channel Filter Tabs (Website vs Amazon) */}
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono mr-2">
+            Channel:
+          </span>
+          <button
+            onClick={() => setChannelFilter('website')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              channelFilter === 'website'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>Website ({websiteOrdersCount})</span>
+          </button>
+
+          <button
+            onClick={() => setChannelFilter('amazon')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              channelFilter === 'amazon'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <span>Amazon ({amazonOrdersCount})</span>
+          </button>
+
+          <button
+            onClick={() => setChannelFilter('ALL')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              channelFilter === 'ALL'
+                ? 'bg-slate-900 text-white shadow-md'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <span>All Channels ({orders.length})</span>
+          </button>
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search Bar + Refresh */}
           <div className="flex items-center gap-2 w-full md:w-80 lg:w-96">

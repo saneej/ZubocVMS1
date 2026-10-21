@@ -41,11 +41,29 @@ const AppContent: React.FC = () => {
     else setActiveTab('search');
   }, [location]);
 
-  const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFFS);
+  const [orders, setOrders] = useState<OrderRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('zuboc_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_FALLBACK_ORDERS;
+  });
+  const [staffList, setStaffList] = useState<StaffMember[]>(() => {
+    try {
+      const cached = localStorage.getItem('zuboc_staffs_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_STAFFS;
+  });
   const [currentStaff, setCurrentStaff] = useState<StaffMember>(INITIAL_STAFFS[0]);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Instant render without blocking loader
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddOrderOpen, setIsAddOrderOpen] = useState<boolean>(false);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
@@ -60,23 +78,25 @@ const AppContent: React.FC = () => {
   });
 
   const fetchOrdersAPI = async () => {
-    try {
-      const serverResponse = await safeFetchJson('/api/orders');
-      if (Array.isArray(serverResponse)) {
-        setOrders(serverResponse);
-        try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(serverResponse)); } catch {}
-        return;
-      }
-    } catch {}
-
+    // 1. Prioritize direct Supabase client-side fetch (bypassing Vercel serverless cold starts instantly)
     try {
       const { data: supaOrders, error: supaErr } = await supabase
         .from('orders')
         .select('*')
         .order('createdAt', { ascending: false });
-      if (!supaErr && Array.isArray(supaOrders)) {
+      if (!supaErr && Array.isArray(supaOrders) && supaOrders.length > 0) {
         setOrders(supaOrders);
         try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(supaOrders)); } catch {}
+        return;
+      }
+    } catch {}
+
+    // 2. Fallback to Express backend API
+    try {
+      const serverResponse = await safeFetchJson('/api/orders');
+      if (Array.isArray(serverResponse) && serverResponse.length > 0) {
+        setOrders(serverResponse);
+        try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(serverResponse)); } catch {}
       }
     } catch {}
   };

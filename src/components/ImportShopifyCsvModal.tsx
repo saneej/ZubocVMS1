@@ -43,6 +43,8 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
   const [detectedFormat, setDetectedFormat] = useState<'Shopify CSV' | 'Custom CSV' | null>(null);
   const [parsedOrders, setParsedOrders] = useState<ParsedShopifyOrder[]>([]);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [filteredOutUnfulfilled, setFilteredOutUnfulfilled] = useState<number>(0);
+  const [duplicateRowsCount, setDuplicateRowsCount] = useState<number>(0);
   
   // Conflict handling: 'skip' | 'overwrite' | 'merge'
   const [conflictStrategy, setConflictStrategy] = useState<'skip' | 'overwrite' | 'merge'>('skip');
@@ -82,13 +84,23 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
     setIsParsing(true);
     setParseError(null);
     setImportResults(null);
+    setFilteredOutUnfulfilled(0);
+    setDuplicateRowsCount(0);
 
     try {
       const buffer = await selectedFile.arrayBuffer();
       const result = parseOrdersCsv(buffer);
 
+      setFilteredOutUnfulfilled(result.filteredOutUnfulfilledCount || 0);
+      setDuplicateRowsCount(result.duplicateRowsDiscarded || 0);
+
       if (!result.success || result.orders.length === 0) {
-        setParseError(result.errors[0] || 'No valid orders found in CSV file.');
+        setParseError(
+          result.errors[0] || 
+          (result.filteredOutUnfulfilledCount > 0 
+            ? `Found ${result.filteredOutUnfulfilledCount} row(s) in CSV, but none had fulfillment status 'fulfilled'. Only fulfilled orders are imported.`
+            : 'No valid orders found in CSV file.')
+        );
         setParsedOrders([]);
         setSelectedOrderIds(new Set());
       } else {
@@ -163,6 +175,9 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
     const formattedPayload = ordersToImport.map(o => {
       const cleanRecord: Partial<OrderRecord> = {
         orderId: o.orderId,
+        order_source: 'website',
+        orderSource: 'website',
+        order_number_num: o.order_number_num,
         customerName: o.customerName,
         contactPerson: o.contactPerson,
         contactPhone: o.contactPhone,
@@ -176,9 +191,31 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
         orderReceivedDate: o.orderReceivedDate,
         fulfillmentStatus: o.fulfillmentStatus,
         notes: o.notes,
+        // All 26 Whitelisted Shopify data fields
+        email: o.email,
+        financialStatus: o.financialStatus,
+        subtotal: o.subtotal,
+        shipping: o.shipping,
+        taxes: o.taxes,
+        total: o.total,
+        discountCode: o.discountCode,
+        discountAmount: o.discountAmount,
+        shippingMethod: o.shippingMethod,
+        shippingName: o.shippingName,
+        shippingStreet: o.shippingStreet,
+        shippingAddress1: o.shippingAddress1,
+        shippingAddress2: o.shippingAddress2,
+        shippingCompany: o.shippingCompany,
+        shippingCity: o.shippingCity,
+        shippingZip: o.shippingZip,
+        shippingProvince: o.shippingProvince,
+        shippingCountry: o.shippingCountry,
+        shippingPhone: o.shippingPhone,
+        lineItems: o.lineItems,
+        isProductionDeckOrder: true,
         recordingStatus: 'PENDING',
         uploadStatus: 'PENDING',
-        createdAt: o.orderReceivedDate || now,
+        createdAt: o.createdAt || o.orderReceivedDate || now,
         updatedAt: now
       };
       return cleanRecord;
@@ -414,10 +451,22 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
                       <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
                         {detectedFormat}
                       </span>
+                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 font-bold text-[10px] rounded-full">
+                        Channel: Website
+                      </span>
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono text-[10px] rounded-full">
+                        26 Whitelist Fields
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-500">
-                      Found <strong className="text-slate-800">{parsedOrders.length} unique orders</strong> ready for import
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                      <span>Found <strong className="text-slate-800">{parsedOrders.length} unique orders</strong> ready for import</span>
+                      {filteredOutUnfulfilled > 0 && (
+                        <span className="text-amber-600 font-medium">({filteredOutUnfulfilled} unfulfilled ignored)</span>
+                      )}
+                      {duplicateRowsCount > 0 && (
+                        <span className="text-blue-600 font-medium">({duplicateRowsCount} duplicate item rows merged)</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

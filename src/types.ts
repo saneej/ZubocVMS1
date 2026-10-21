@@ -28,6 +28,7 @@ export interface ZubocCustomisations {
   waxStamp?: boolean;
   rubberStamp?: boolean;
   embosserStamp?: boolean;
+  uvDtf?: boolean;
   seals?: boolean;
 }
 
@@ -52,6 +53,15 @@ export interface ZubocTimeline {
   dispatchingDate?: string;
 }
 
+export type OrderSource = 'website' | 'amazon';
+
+export interface LineItem {
+  name: string;
+  price?: string | number;
+  sku?: string;
+  quantity?: number;
+}
+
 export interface PaymentGateInfo {
   totalBillingAmount?: number | string;
   advanceReceived?: number | string;
@@ -65,6 +75,9 @@ export interface PaymentGateInfo {
 
 export interface OrderRecord {
   orderId: string;
+  order_source?: OrderSource;
+  orderSource?: OrderSource;
+  order_number_num?: number;
   staffId: string;
   stationId: string;
   recordingStartedAt: string;
@@ -101,6 +114,28 @@ export interface OrderRecord {
   remarks?: string;
   chatNotes?: ChatNote[];
   auditLogs?: { timestamp: string; staffId: string; action: string; details: string; type: 'EDIT_LOG' | 'CHANGE_LOG' | 'USER_LOG' }[];
+  
+  // Shopify 26 Target Data Points
+  email?: string;
+  financialStatus?: string;
+  subtotal?: string | number;
+  shipping?: string | number;
+  taxes?: string | number;
+  total?: string | number;
+  discountCode?: string;
+  discountAmount?: string | number;
+  shippingMethod?: string;
+  shippingName?: string;
+  shippingStreet?: string;
+  shippingAddress1?: string;
+  shippingAddress2?: string;
+  shippingCompany?: string;
+  shippingCity?: string;
+  shippingZip?: string;
+  shippingProvince?: string;
+  shippingCountry?: string;
+  shippingPhone?: string;
+  lineItems?: LineItem[];
   
   // Zuboc Client Order & Production Tracking Form fields
   clientName?: string;

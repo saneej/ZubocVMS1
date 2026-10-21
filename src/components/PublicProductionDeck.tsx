@@ -27,7 +27,8 @@ import {
   MessageSquare,
   CalendarCheck,
   Palette,
-  CheckCheck
+  CheckCheck,
+  Stamp
 } from 'lucide-react';
 import { 
   OrderRecord, 
@@ -159,8 +160,9 @@ function normalizeOrder(order: OrderRecord) {
     screenPrinting: Boolean(order.notes?.toLowerCase().includes('screen')),
     dieCutting: Boolean(order.notes?.toLowerCase().includes('die') || order.notes?.toLowerCase().includes('cut')),
     waxStamp: Boolean(order.notes?.toLowerCase().includes('wax')),
-    rubberStamp: false,
+    rubberStamp: Boolean(order.notes?.toLowerCase().includes('rubber')),
     embosserStamp: Boolean(order.notes?.toLowerCase().includes('emboss')),
+    uvDtf: Boolean(order.notes?.toLowerCase().includes('uv') || order.notes?.toLowerCase().includes('dtf')),
     seals: Boolean(order.notes?.toLowerCase().includes('seal'))
   };
 
@@ -472,6 +474,24 @@ export const PublicProductionDeck: React.FC = () => {
                                 <span>Digital</span>
                               </span>
                             )}
+                            {norm.customisations.embosserStamp && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center gap-1">
+                                <Stamp className="w-2.5 h-2.5" />
+                                <span>Embosser Stamp</span>
+                              </span>
+                            )}
+                            {norm.customisations.rubberStamp && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                                <Stamp className="w-2.5 h-2.5" />
+                                <span>Rubber Stamp</span>
+                              </span>
+                            )}
+                            {norm.customisations.uvDtf && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-50 text-violet-700 border border-violet-200/60 flex items-center gap-1">
+                                <Zap className="w-2.5 h-2.5" />
+                                <span>UV DTF</span>
+                              </span>
+                            )}
                             {norm.customisations.seals && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-teal-50 text-teal-700 border border-teal-200/60 flex items-center gap-1">
                                 <Award className="w-2.5 h-2.5" />
@@ -611,28 +631,40 @@ const PublicOrderDetailsModal: React.FC<PublicOrderDetailsModalProps> = ({ order
         {/* Customisations Breakdown */}
         <div className="space-y-2">
           <h4 className="text-[11px] font-black uppercase text-stone-500 tracking-wider">Craft &amp; Customisations</h4>
-          <div className="grid grid-cols-2 gap-2 font-medium">
-            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.goldFoil ? 'bg-amber-50 border-amber-200 text-amber-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-medium text-xs">
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.goldFoil ? 'bg-amber-50 border-amber-200 text-amber-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
               <Sparkles className={`w-4 h-4 ${norm.customisations.goldFoil ? 'text-amber-500' : ''}`} />
               <span>Gold Foil</span>
             </div>
-            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.screenPrinting ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.screenPrinting ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
               <Layers className={`w-4 h-4 ${norm.customisations.screenPrinting ? 'text-blue-500' : ''}`} />
               <span>Screen Print</span>
             </div>
-            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.dieCutting ? 'bg-purple-50 border-purple-200 text-purple-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.dieCutting ? 'bg-purple-50 border-purple-200 text-purple-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
               <Scissors className={`w-4 h-4 ${norm.customisations.dieCutting ? 'text-purple-500' : ''}`} />
               <span>Die Cutting</span>
             </div>
-            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.waxStamp ? 'bg-rose-50 border-rose-200 text-rose-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.waxStamp ? 'bg-rose-50 border-rose-200 text-rose-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
               <Flame className={`w-4 h-4 ${norm.customisations.waxStamp ? 'text-rose-500' : ''}`} />
               <span>Wax Seal</span>
             </div>
-            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.digitalPrinting ? 'bg-slate-100 border-slate-200 text-slate-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.embosserStamp ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Stamp className={`w-4 h-4 ${norm.customisations.embosserStamp ? 'text-indigo-500' : ''}`} />
+              <span>Embosser Stamp</span>
+            </div>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.rubberStamp ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Stamp className={`w-4 h-4 ${norm.customisations.rubberStamp ? 'text-emerald-500' : ''}`} />
+              <span>Rubber Stamp</span>
+            </div>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.uvDtf ? 'bg-violet-50 border-violet-200 text-violet-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+              <Zap className={`w-4 h-4 ${norm.customisations.uvDtf ? 'text-violet-500' : ''}`} />
+              <span>UV DTF</span>
+            </div>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.digitalPrinting ? 'bg-slate-100 border-slate-200 text-slate-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
               <Printer className={`w-4 h-4 ${norm.customisations.digitalPrinting ? 'text-slate-500' : ''}`} />
               <span>Digital</span>
             </div>
-            <div className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.seals ? 'bg-teal-50 border-teal-200 text-teal-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
+            <div className={`p-2 rounded-xl border flex items-center gap-2 transition-all ${norm.customisations.seals ? 'bg-teal-50 border-teal-200 text-teal-900 font-bold' : 'bg-stone-50 border-stone-200 text-stone-400 opacity-60'}`}>
               <Award className={`w-4 h-4 ${norm.customisations.seals ? 'text-teal-500' : ''}`} />
               <span>Seals</span>
             </div>

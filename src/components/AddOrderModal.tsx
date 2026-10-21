@@ -21,6 +21,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
   currentStaffId = 'Admin-01',
   currentStaffName = 'Admin'
 }) => {
+  const [orderSource, setOrderSource] = useState<'website' | 'amazon'>('website');
   const [orderId, setOrderId] = useState('');
   const [courier, setCourier] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<string>('Normal');
@@ -71,8 +72,15 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       timestamp: now
     }] : [];
 
+    // Parse numeric value for sorting
+    const digits = cleanId.replace(/\D/g, '');
+    const order_number_num = digits ? parseInt(digits, 10) : undefined;
+
     const newRecord: Partial<OrderRecord> = {
       orderId: cleanId,
+      order_source: orderSource,
+      orderSource: orderSource,
+      order_number_num,
       courier: courier.trim() || undefined,
       deliveryMethod: deliveryMethod || 'Normal',
       awbNumber: awb.trim() || undefined,
@@ -189,20 +197,70 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+
+          {/* Channel / Order Source Selector */}
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+              Sales Channel / Order Source <span className="text-rose-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderSource('website');
+                  if (!orderId || orderId.startsWith('402-')) setOrderId('#2888');
+                }}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  orderSource === 'website'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Website / Shopify</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderSource('amazon');
+                  if (!orderId || orderId.startsWith('#')) setOrderId('402-');
+                }}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  orderSource === 'amazon'
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-300"></span>
+                <span>Amazon</span>
+              </button>
+            </div>
+          </div>
           
           {/* Order ID Input */}
           <div className="bg-[#832f5e]/5 p-3.5 rounded-xl border border-[#832f5e]/20">
-            <label className="block text-xs font-bold text-[#832f5e] uppercase tracking-wider mb-1">
-              Order ID / Barcode <span className="text-rose-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[#832f5e] uppercase tracking-wider">
+                Order ID / Number <span className="text-rose-500">*</span>
+              </label>
+              <span className="text-[10px] font-mono text-slate-500">
+                {orderSource === 'website' ? 'Format: #2888' : 'Format: 402-1234567-1234567'}
+              </span>
+            </div>
             <input
               type="text"
               required
-              placeholder="e.g. ORD-98214"
+              placeholder={orderSource === 'website' ? 'e.g. #2888' : 'e.g. 402-1234567-1234567'}
               value={orderId}
               onChange={(e) => setOrderId(e.target.value)}
               className="w-full px-3.5 py-2.5 text-sm font-mono font-bold rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#832f5e] bg-white"
             />
+            <p className="text-[11px] text-slate-500 mt-1">
+              {orderSource === 'website' 
+                ? 'Website orders are sorted numerically (highest number first).' 
+                : 'Amazon orders are sorted chronologically by order date.'}
+            </p>
           </div>
 
           {/* PACKAGE & SHIPMENT DETAILS */}
