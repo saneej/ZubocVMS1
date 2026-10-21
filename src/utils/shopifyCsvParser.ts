@@ -243,14 +243,7 @@ export function parseOrdersCsv(fileBuffer: ArrayBuffer | Uint8Array): CsvParseRe
         const row = extractWhitelistedShopifyFields(raw);
         if (!row || !row.Name) continue;
 
-        // Rule 1: Fulfilled Only (case-insensitive)
-        const fulfillmentStatus = (row['Fulfillment Status'] || '').trim().toLowerCase();
-        if (fulfillmentStatus !== 'fulfilled') {
-          filteredOutUnfulfilledCount++;
-          continue;
-        }
-
-        // Rule 2: Deduplication on (order_source, order_name, lineitem_sku, lineitem_name)
+        // Allow all orders (fulfilled, unfulfilled, draft, etc.)
         const source: OrderSource = 'website';
         const orderName = row.Name.trim();
         const sku = (row['Lineitem sku'] || '').trim().toLowerCase();
@@ -323,8 +316,8 @@ export function parseOrdersCsv(fileBuffer: ArrayBuffer | Uint8Array): CsvParseRe
 
           // Target 26 Shopify Fields
           email: firstRow.Email,
-          financialStatus: firstRow['Financial Status'] || 'paid',
-          fulfillmentStatus: 'Fulfilled',
+          financialStatus: firstRow['Financial Status'] || 'pending',
+          fulfillmentStatus: firstRow['Fulfillment Status'] ? (firstRow['Fulfillment Status'].trim().charAt(0).toUpperCase() + firstRow['Fulfillment Status'].trim().slice(1)) : 'Unfulfilled',
           subtotal: firstRow.Subtotal,
           shipping: firstRow.Shipping,
           taxes: firstRow.Taxes,
@@ -358,7 +351,7 @@ export function parseOrdersCsv(fileBuffer: ArrayBuffer | Uint8Array): CsvParseRe
           // System fields
           source: 'Shopify CSV',
           lineItemCount: lineItems.length,
-          isProductionDeckOrder: true,
+          isProductionDeckOrder: false,
           createdAt,
           updatedAt: nowIso
         });

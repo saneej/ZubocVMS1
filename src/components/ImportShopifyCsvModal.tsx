@@ -251,7 +251,7 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
         shippingCountry: o.shippingCountry,
         shippingPhone: o.shippingPhone,
         lineItems: o.lineItems,
-        isProductionDeckOrder: true,
+        isProductionDeckOrder: false,
         recordingStatus: 'PENDING',
         uploadStatus: 'PENDING',
         createdAt: o.createdAt || o.orderReceivedDate || now,

@@ -1655,7 +1655,8 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
   const cleanToken = accessToken.trim();
 
   try {
-    const shopifyRes = await fetch(`https://${cleanShop}/admin/api/2023-10/orders.json?status=any&fulfillment_status=fulfilled&limit=100`, {
+    // 1. Fetch regular orders (any status, any fulfillment status)
+    const shopifyRes = await fetch(`https://${cleanShop}/admin/api/2023-10/orders.json?status=any&limit=250`, {
       method: 'GET',
       headers: {
         'X-Shopify-Access-Token': cleanToken,
@@ -1671,12 +1672,33 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
     const shopifyData = await shopifyRes.json() as { orders?: any[] };
     const rawOrders = shopifyData.orders || [];
 
+    // 2. Fetch draft orders (manually created draft orders)
+    let rawDraftOrders: any[] = [];
+    try {
+      const draftRes = await fetch(`https://${cleanShop}/admin/api/2023-10/draft_orders.json?status=any&limit=250`, {
+        method: 'GET',
+        headers: {
+          'X-Shopify-Access-Token': cleanToken,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (draftRes.ok) {
+        const draftData = await draftRes.json() as { draft_orders?: any[] };
+        rawDraftOrders = draftData.draft_orders || [];
+      }
+    } catch (draftErr) {
+      console.warn('Could not fetch draft orders from Shopify API:', draftErr);
+    }
+
     const now = new Date().toISOString();
     const importedRecords: OrderRecord[] = [];
+    const processedOrderNames = new Set<string>();
 
+    // Process regular orders
     for (const ord of rawOrders) {
       const orderName = String(ord.name || ord.order_number || ord.id).trim();
       if (!orderName) continue;
+      processedOrderNames.add(orderName);
 
       const digits = orderName.replace(/\D/g, '');
       const order_number_num = digits ? parseInt(digits, 10) : undefined;
@@ -1693,6 +1715,11 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
       const shippingAddr = ord.shipping_address || ord.billing_address || {};
       const customerObj = ord.customer || {};
 
+      const rawFulfillment = ord.fulfillment_status;
+      const fulfillmentStatus = rawFulfillment
+        ? (rawFulfillment.charAt(0).toUpperCase() + rawFulfillment.slice(1).toLowerCase())
+        : 'Unfulfilled';
+
       const record: OrderRecord = {
         orderId: orderName,
         order_source: 'website',
@@ -1706,8 +1733,8 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
         uploadStatus: 'PENDING',
 
         email: ord.email || customerObj.email,
-        financialStatus: ord.financial_status || 'paid',
-        fulfillmentStatus: 'Fulfilled',
+        financialStatus: ord.financial_status || 'pending',
+        fulfillmentStatus,
         subtotal: ord.subtotal_price,
         shipping: ord.total_shipping_price_set?.shop_money?.amount || ord.shipping_lines?.[0]?.price || '0',
         taxes: ord.total_tax,
@@ -1737,7 +1764,93 @@ apiRouter.post('/shopify/fetch-direct', async (req, res) => {
         shippingCountry: shippingAddr.country,
         shippingPhone: shippingAddr.phone,
         notes: ord.note || undefined,
-        isProductionDeckOrder: true,
+        isProductionDeckOrder: false,
+        createdAt,
+        updatedAt: now
+      };
+
+      ordersStore[orderName] = record;
+      importedRecords.push(record);
+
+      if (firestoreDb && !firestoreQuotaExceeded) {
+        try {
+          await setDoc(doc(firestoreDb, 'orders', orderName), cleanForFirestore(record), { merge: true });
+        } catch {}
+      }
+      saveOrderToSupabase(record).catch(() => {});
+    }
+
+    // Process draft orders (open/uncompleted draft orders created manually in Shopify)
+    for (const draft of rawDraftOrders) {
+      // If draft order has converted to an order or is already processed, skip
+      if (draft.order_id || (draft.name && processedOrderNames.has(draft.name))) {
+        continue;
+      }
+
+      const orderName = String(draft.name || (`DRAFT-${draft.id}`)).trim();
+      if (!orderName || processedOrderNames.has(orderName)) continue;
+      processedOrderNames.add(orderName);
+
+      const digits = orderName.replace(/\D/g, '');
+      const order_number_num = digits ? parseInt(digits, 10) : undefined;
+      const createdAt = draft.created_at || now;
+
+      const lineItems = (draft.line_items || []).map((li: any) => ({
+        name: li.name || li.title || 'Draft Product Item',
+        sku: li.sku || undefined,
+        price: li.price || undefined,
+        quantity: li.quantity || 1
+      }));
+
+      const skus = lineItems.map((li: any) => li.sku || li.name).filter(Boolean);
+      const shippingAddr = draft.shipping_address || draft.billing_address || {};
+      const customerObj = draft.customer || {};
+
+      const record: OrderRecord = {
+        orderId: orderName,
+        order_source: 'website',
+        orderSource: 'website',
+        order_number_num,
+        staffId: 'Shopify Direct API (Draft)',
+        stationId: 'Web-Fulfillment',
+        recordingStartedAt: createdAt,
+        durationSeconds: 0,
+        recordingStatus: 'PENDING',
+        uploadStatus: 'PENDING',
+
+        email: draft.email || customerObj.email,
+        financialStatus: draft.status || 'draft',
+        fulfillmentStatus: 'Draft',
+        subtotal: draft.subtotal_price,
+        shipping: draft.shipping_line?.price || '0',
+        taxes: draft.total_tax,
+        total: draft.total_price,
+        orderTotal: draft.total_price,
+        orderAmount: draft.subtotal_price,
+        shippingAmount: draft.shipping_line?.price || '0',
+        discountCode: undefined,
+        discountAmount: '0',
+        shippingMethod: draft.shipping_line?.title || 'Shopify Draft',
+        courier: draft.shipping_line?.title || 'Shopify Draft',
+        orderReceivedDate: createdAt,
+        lineItems,
+        productSku: skus.length > 0 ? skus.join(', ') : 'Shopify Draft Item',
+        itemCount: lineItems.reduce((acc: number, li: any) => acc + (li.quantity || 1), 0),
+        customerName: `${shippingAddr.first_name || customerObj.first_name || ''} ${shippingAddr.last_name || customerObj.last_name || ''}`.trim() || draft.email || 'Shopify Draft Customer',
+        shippingName: `${shippingAddr.first_name || ''} ${shippingAddr.last_name || ''}`.trim() || undefined,
+        contactPerson: `${shippingAddr.first_name || ''} ${shippingAddr.last_name || ''}`.trim() || undefined,
+        contactPhone: shippingAddr.phone || customerObj.phone || undefined,
+        shippingStreet: shippingAddr.address1,
+        shippingAddress1: shippingAddr.address1,
+        shippingAddress2: shippingAddr.address2,
+        shippingCompany: shippingAddr.company,
+        shippingCity: shippingAddr.city,
+        shippingZip: shippingAddr.zip,
+        shippingProvince: shippingAddr.province,
+        shippingCountry: shippingAddr.country,
+        shippingPhone: shippingAddr.phone,
+        notes: draft.note || undefined,
+        isProductionDeckOrder: false,
         createdAt,
         updatedAt: now
       };
