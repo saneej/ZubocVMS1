@@ -495,6 +495,19 @@ function normalizeIsoDate(dateVal) {
   }
   return void 0;
 }
+function isAmazonOrder(order) {
+  if (!order) return false;
+  const src = String(order.order_source || order.orderSource || "").toLowerCase().trim();
+  if (src === "amazon" || src.includes("amazon")) return true;
+  const id = String(order.orderId || "").trim();
+  if (/^40[0-9]-/i.test(id)) return true;
+  if (/^171-/i.test(id)) return true;
+  if (/^026-/i.test(id)) return true;
+  if (/\d{3}-\d{7}-\d{7}/.test(id)) return true;
+  if (/amazon/i.test(id)) return true;
+  if (/amazon/i.test(String(order.courier || ""))) return true;
+  return false;
+}
 function cleanForSupabase(obj) {
   if (!obj || typeof obj !== "object") return obj;
   const cleaned = {};
@@ -517,6 +530,13 @@ function cleanForSupabase(obj) {
   }
   if (!cleaned.createdAt) cleaned.createdAt = nowIso;
   if (!cleaned.updatedAt) cleaned.updatedAt = nowIso;
+  if (isAmazonOrder(obj) || isAmazonOrder(cleaned)) {
+    cleaned.order_source = "amazon";
+    cleaned.orderSource = "amazon";
+  } else if (!cleaned.order_source) {
+    cleaned.order_source = "website";
+    cleaned.orderSource = "website";
+  }
   return cleaned;
 }
 async function saveOrderToSupabase(record) {
@@ -1264,9 +1284,17 @@ apiRouter.get("/orders", async (req, res) => {
       console.warn("Supabase sync warning on GET /orders:", e?.message);
     }
   }
-  const orders = Object.values(ordersStore).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const orders = Object.values(ordersStore).map((o) => {
+    if (!o || !o.orderId) return o;
+    if (isAmazonOrder(o)) {
+      return { ...o, order_source: "amazon", orderSource: "amazon" };
+    }
+    return { ...o, order_source: o.order_source || "website", orderSource: o.orderSource || "website" };
+  }).sort((a, b) => {
+    const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+  });
   res.json(orders);
 });
 apiRouter.get("/orders/:orderId", async (req, res) => {

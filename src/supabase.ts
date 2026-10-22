@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { isAmazonOrder } from './types';
 
 // Support VITE_ environment variables for deployment flexibility
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://bdfgscjiuqccoidkeaqh.supabase.co';
@@ -127,6 +128,14 @@ export function cleanForSupabase(obj: any): any {
 
   if (!cleaned.createdAt) cleaned.createdAt = nowIso;
   if (!cleaned.updatedAt) cleaned.updatedAt = nowIso;
+
+  if (isAmazonOrder(obj) || isAmazonOrder(cleaned)) {
+    cleaned.order_source = 'amazon';
+    cleaned.orderSource = 'amazon';
+  } else if (!cleaned.order_source) {
+    cleaned.order_source = 'website';
+    cleaned.orderSource = 'website';
+  }
 
   return cleaned;
 }

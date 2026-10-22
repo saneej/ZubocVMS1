@@ -55,6 +55,20 @@ export interface ZubocTimeline {
 
 export type OrderSource = 'website' | 'amazon';
 
+export function isAmazonOrder(order: any): boolean {
+  if (!order) return false;
+  const src = String(order.order_source || order.orderSource || '').toLowerCase().trim();
+  if (src === 'amazon' || src.includes('amazon')) return true;
+  const id = String(order.orderId || '').trim();
+  if (/^40[0-9]-/i.test(id)) return true;
+  if (/^171-/i.test(id)) return true;
+  if (/^026-/i.test(id)) return true;
+  if (/\d{3}-\d{7}-\d{7}/.test(id)) return true;
+  if (/amazon/i.test(id)) return true;
+  if (/amazon/i.test(String(order.courier || ''))) return true;
+  return false;
+}
+
 export interface LineItem {
   name: string;
   price?: string | number;

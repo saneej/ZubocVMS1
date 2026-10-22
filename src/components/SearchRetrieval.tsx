@@ -2,7 +2,7 @@ import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST, formatDateForInput } from '../utils/time';
 import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload, Save, Globe, ShoppingCart } from 'lucide-react';
-import { OrderRecord } from '../types';
+import { OrderRecord, isAmazonOrder } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
 import { exportOrdersToPDF, exportSingleOrderPDF } from '../utils/pdfExport';
@@ -39,6 +39,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
 
+  // Listen for channel switch requests (e.g. when an Amazon order is created)
+  useEffect(() => {
+    const handleSwitch = (e: any) => {
+      const targetChannel = e?.detail;
+      if (targetChannel === 'amazon' || targetChannel === 'website' || targetChannel === 'ALL') {
+        setChannelFilter(targetChannel);
+      }
+    };
+    window.addEventListener('zuboc_switch_channel', handleSwitch);
+    return () => window.removeEventListener('zuboc_switch_channel', handleSwitch);
+  }, []);
+
   const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [isShopifyCsvModalOpen, setIsShopifyCsvModalOpen] = useState(false);
   const [newOrderSource, setNewOrderSource] = useState<'website' | 'amazon'>('website');
@@ -62,8 +74,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }
     const digits = cleanId.replace(/\D/g, '');
     const order_number_num = digits ? parseInt(digits, 10) : undefined;
-    const isAmazonPattern = /\d{3}-\d{7}-\d{7}/.test(cleanId) || /amazon/i.test(cleanId) || cleanId.toLowerCase().startsWith('402-') || cleanId.toLowerCase().startsWith('171-') || cleanId.toLowerCase().startsWith('403-') || cleanId.toLowerCase().startsWith('408-');
-    const finalSource = (newOrderSource === 'amazon' || isAmazonPattern) ? 'amazon' : 'website';
+    const isAmazon = newOrderSource === 'amazon' || isAmazonOrder({ orderId: cleanId, order_source: newOrderSource, courier: newCourier });
+    const finalSource: 'amazon' | 'website' = isAmazon ? 'amazon' : 'website';
 
     const orderRecord: OrderRecord = {
       orderId: cleanId,
@@ -92,7 +104,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       if (onUpdateOrder) {
         await onUpdateOrder(orderRecord);
       }
-      setChannelFilter(newOrderSource);
+      setChannelFilter(finalSource);
       setIsAddOrderOpen(false);
       setNewOrderId("");
       setNewCustomer("");
@@ -158,22 +170,14 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   });
 
   // Channel counts
-  const websiteOrdersCount = orders.filter(o => {
-    const src = String(o?.order_source || o?.orderSource || 'website').toLowerCase();
-    return !src.includes('amazon');
-  }).length;
-
-  const amazonOrdersCount = orders.filter(o => {
-    const src = String(o?.order_source || o?.orderSource || '').toLowerCase();
-    return src.includes('amazon');
-  }).length;
+  const websiteOrdersCount = orders.filter(o => !isAmazonOrder(o)).length;
+  const amazonOrdersCount = orders.filter(o => isAmazonOrder(o)).length;
 
   const filteredOrders = orders.filter(order => {
     if (!order) return false;
 
     // Channel Filter
-    const source = String(order.order_source || order.orderSource || 'website').toLowerCase();
-    const isAmazon = source.includes('amazon');
+    const isAmazon = isAmazonOrder(order);
     const isWebsite = !isAmazon;
 
     if (channelFilter === 'website' && !isWebsite) return false;
@@ -207,35 +211,33 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     return matchesSearch && matchesUploadStatus && matchesFulfillment;
   });
 
-  // Numeric Sorting for Website (#2889 > #2888 > #1000) & Chronological Date for Amazon
+  // Sorting: Every newly added order is listed at the VERY TOP
   filteredOrders.sort((a, b) => {
     if (!a || !b) return 0;
-    const isWebsiteA = String(a?.order_source || a?.orderSource || 'website').toLowerCase() === 'website';
-    const isWebsiteB = String(b?.order_source || b?.orderSource || 'website').toLowerCase() === 'website';
 
-    if (channelFilter === 'website' || (channelFilter === 'ALL' && isWebsiteA && isWebsiteB)) {
-      const getNum = (o: OrderRecord) => {
-        if (!o) return -1;
-        if (typeof o.order_number_num === 'number' && !isNaN(o.order_number_num)) {
-          return o.order_number_num;
-        }
-        const digits = String(o.orderId || '').replace(/\D/g, '');
-        return digits ? parseInt(digits, 10) : -1;
-      };
-      const numA = getNum(a);
-      const numB = getNum(b);
-      if (numA !== numB) {
-        return numB - numA; // Numerically descending: #2889, #2888, #2887...
-      }
-      const dateA = new Date(a.orderReceivedDate || a.createdAt || 0).getTime();
-      const dateB = new Date(b.orderReceivedDate || b.createdAt || 0).getTime();
-      return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
-    } else {
-      // Amazon or mixed: created_at_order DESC
-      const dateA = new Date(a.orderReceivedDate || a.createdAt || 0).getTime();
-      const dateB = new Date(b.orderReceivedDate || b.createdAt || 0).getTime();
-      return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+    // 1. Primary: Sort by createdAt/updatedAt/recordingStartedAt/orderReceivedDate DESC so newly added orders are ALWAYS listed at the top
+    const getRecency = (o: OrderRecord) => {
+      const dt = o.createdAt || o.updatedAt || o.recordingStartedAt || o.orderReceivedDate;
+      const t = dt ? new Date(dt).getTime() : 0;
+      return isNaN(t) ? 0 : t;
+    };
+    const timeA = getRecency(a);
+    const timeB = getRecency(b);
+
+    if (timeA !== timeB) {
+      return timeB - timeA; // Descending: newest created on top
     }
+
+    // 2. Secondary tie-breaker: order number descending
+    const getNum = (o: OrderRecord) => {
+      if (!o) return -1;
+      if (typeof o.order_number_num === 'number' && !isNaN(o.order_number_num)) {
+        return o.order_number_num;
+      }
+      const digits = String(o.orderId || '').replace(/\D/g, '');
+      return digits ? parseInt(digits, 10) : -1;
+    };
+    return getNum(b) - getNum(a);
   });
 
   const handleDelete = async (orderId: string) => {

@@ -16,7 +16,7 @@ import { ProductionDeck } from './components/ProductionDeck';
 import { PublicProductionDeck } from './components/PublicProductionDeck';
 import { DiagnosePage } from './components/DiagnosePage';
 import { SalesReports } from './components/SalesReports';
-import { OrderRecord, StaffMember, AppSettings } from './types';
+import { OrderRecord, StaffMember, AppSettings, isAmazonOrder } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { safeFetchJson } from './utils/api';
@@ -105,7 +105,16 @@ const AppContent: React.FC = () => {
       }
     } catch {}
 
-    const mergedList = Object.values(allOrdersMap);
+    const mergedList = Object.values(allOrdersMap).map(o => {
+      if (isAmazonOrder(o)) {
+        return { ...o, order_source: 'amazon' as const, orderSource: 'amazon' as const };
+      }
+      return { ...o, order_source: o.order_source || 'website', orderSource: o.orderSource || 'website' };
+    }).sort((a, b) => {
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    });
     if (mergedList.length > 0) {
       setOrders(mergedList);
       try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(mergedList)); } catch {}
@@ -148,17 +157,17 @@ const AppContent: React.FC = () => {
         { event: '*', schema: 'public', table: 'orders' },
         (payload: any) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const record = payload.new as OrderRecord;
-            if (record && record.orderId) {
+            const rawRecord = payload.new as OrderRecord;
+            if (rawRecord && rawRecord.orderId) {
+              const isAmazon = isAmazonOrder(rawRecord);
+              const record: OrderRecord = {
+                ...rawRecord,
+                order_source: isAmazon ? 'amazon' : (rawRecord.order_source || 'website'),
+                orderSource: isAmazon ? 'amazon' : (rawRecord.orderSource || 'website'),
+              };
               setOrders(prev => {
-                const idx = prev.findIndex(o => o.orderId === record.orderId);
-                let next: OrderRecord[];
-                if (idx >= 0) {
-                  next = [...prev];
-                  next[idx] = { ...next[idx], ...record };
-                } else {
-                  next = [record, ...prev];
-                }
+                const filtered = prev.filter(o => o.orderId !== record.orderId);
+                const next = [record, ...filtered];
                 try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(next)); } catch {}
                 return next;
               });
@@ -283,9 +292,18 @@ const AppContent: React.FC = () => {
   };
 
   const handleOrderCompleted = async (newRecord: OrderRecord) => {
-    // 1. Update React state and browser cache immediately (Instant UI)
+    const isAmazon = isAmazonOrder(newRecord);
+    const finalRecord: OrderRecord = {
+      ...newRecord,
+      order_source: isAmazon ? 'amazon' : (newRecord.order_source || 'website'),
+      orderSource: isAmazon ? 'amazon' : (newRecord.orderSource || 'website'),
+      createdAt: newRecord.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // 1. Update React state and browser cache immediately (Always at index 0 / TOP)
     setOrders(prev => {
-      const next = [newRecord, ...prev.filter(o => o.orderId !== newRecord.orderId)];
+      const next = [finalRecord, ...prev.filter(o => o.orderId !== finalRecord.orderId)];
       try {
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(next));
       } catch {}
@@ -297,10 +315,23 @@ const AppContent: React.FC = () => {
       await safeFetchJson('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRecord)
+        body: JSON.stringify(finalRecord)
       });
       broadcastSync();
     } catch {}
+
+    // 3. Write directly to Supabase client-side as well
+    try {
+      const supaPayload = cleanForSupabase(finalRecord);
+      if (supaPayload && supaPayload.orderId) {
+        await supabase.from('orders').upsert(supaPayload, { onConflict: 'orderId' });
+      }
+    } catch {}
+
+    // 4. Switch channel filter tab so newly added order is immediately visible
+    window.dispatchEvent(new CustomEvent('zuboc_switch_channel', { 
+      detail: isAmazon ? 'amazon' : 'website' 
+    }));
   };
 
   const handleUpdateOrder = async (updatedOrder: OrderRecord) => {

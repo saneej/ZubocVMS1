@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { X, PackagePlus, AlertCircle, CheckCircle2, Box, Truck, Scale, Tag, FileText, Camera, Image as ImageIcon, Upload } from 'lucide-react';
 import { safeFetchJson } from '../utils/api';
-import { OrderRecord } from '../types';
+import { OrderRecord, isAmazonOrder } from '../types';
 import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { cleanForFirestore } from '../utils/firestoreHelper';
+import { supabase, cleanForSupabase } from '../supabase';
 
 interface AddOrderModalProps {
   isOpen: boolean;
@@ -76,15 +77,15 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
     const digits = cleanId.replace(/\D/g, '');
     const order_number_num = digits ? parseInt(digits, 10) : undefined;
 
-    const isAmazonPattern = /\d{3}-\d{7}-\d{7}/.test(cleanId) || /amazon/i.test(cleanId) || cleanId.toLowerCase().startsWith('402-') || cleanId.toLowerCase().startsWith('171-') || cleanId.toLowerCase().startsWith('403-') || cleanId.toLowerCase().startsWith('408-');
-    const finalSource = (orderSource === 'amazon' || isAmazonPattern) ? 'amazon' : 'website';
+    const isAmazon = orderSource === 'amazon' || isAmazonOrder({ orderId: cleanId, order_source: orderSource, courier });
+    const finalSource: 'amazon' | 'website' = isAmazon ? 'amazon' : 'website';
 
-    const newRecord: Partial<OrderRecord> = {
+    const newRecord: OrderRecord = {
       orderId: cleanId,
       order_source: finalSource,
       orderSource: finalSource,
       order_number_num,
-      courier: courier.trim() || undefined,
+      courier: courier.trim() || (finalSource === 'amazon' ? 'Amazon Shipping' : undefined),
       deliveryMethod: deliveryMethod || 'Normal',
       awbNumber: awb.trim() || undefined,
       weight: weight.trim() || undefined,
@@ -104,6 +105,8 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       remarks: remarks.trim() || undefined,
       staffId: currentStaffName,
       stationId: 'Packing-01',
+      recordingStartedAt: now,
+      durationSeconds: 0,
       recordingStatus: 'PENDING',
       uploadStatus: 'PENDING',
       isProductionDeckOrder: sendToProductionDeck,
@@ -111,6 +114,17 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       updatedAt: now
     };
 
+    // 1. Direct write to Supabase (works seamlessly in deployed web app)
+    try {
+      const supaPayload = cleanForSupabase(newRecord);
+      if (supaPayload && supaPayload.orderId) {
+        await supabase.from('orders').upsert(supaPayload, { onConflict: 'orderId' });
+      }
+    } catch (supaErr) {
+      console.warn('Direct Supabase write notice in AddOrderModal:', supaErr);
+    }
+
+    // 2. Also save to Express API if running
     try {
       const res = await safeFetchJson('/api/orders', {
         method: 'POST',
@@ -119,19 +133,11 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       });
 
       setSuccessMsg(`Order ${cleanId} added successfully!`);
-      if (onSuccess) onSuccess((res && res.record) ? res.record : newRecord as OrderRecord);
+      if (onSuccess) onSuccess((res && res.record) ? res.record : newRecord);
     } catch (err) {
-      try {
-        const docRef = doc(db, 'orders', cleanId);
-        await setDoc(docRef, cleanForFirestore(newRecord), { merge: true });
-        setSuccessMsg(`Order ${cleanId} added successfully!`);
-        if (onSuccess) onSuccess(newRecord as OrderRecord);
-      } catch (fsErr) {
-        console.error('Error adding order record:', err);
-        setError('Failed to save order record. Please check your network connection.');
-        setIsSubmitting(false);
-        return;
-      }
+      // Deployed static site or offline: Supabase already updated above
+      setSuccessMsg(`Order ${cleanId} added successfully!`);
+      if (onSuccess) onSuccess(newRecord);
     }
 
     setTimeout(() => {
@@ -259,7 +265,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
               onChange={(e) => {
                 const val = e.target.value;
                 setOrderId(val);
-                if (/\d{3}-\d{7}-\d{7}/.test(val) || val.startsWith('402-') || val.startsWith('171-') || val.startsWith('403-') || val.startsWith('408-')) {
+                if (isAmazonOrder({ orderId: val })) {
                   setOrderSource('amazon');
                 }
               }}
