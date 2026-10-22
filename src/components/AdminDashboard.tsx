@@ -239,13 +239,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
         return (
-          o.orderId.toLowerCase().includes(q) ||
-          (o.awbNumber && o.awbNumber.toLowerCase().includes(q)) ||
-          (o.courier && o.courier.toLowerCase().includes(q)) ||
-          (o.productSku && o.productSku.toLowerCase().includes(q)) ||
-          (o.customerName && o.customerName.toLowerCase().includes(q)) ||
-          (o.notes && o.notes.toLowerCase().includes(q)) ||
-          o.staffId.toLowerCase().includes(q)
+          (o.orderId ? String(o.orderId).toLowerCase() : '').includes(q) ||
+          (o.awbNumber ? String(o.awbNumber).toLowerCase() : '').includes(q) ||
+          (o.courier ? String(o.courier).toLowerCase() : '').includes(q) ||
+          (o.productSku ? String(o.productSku).toLowerCase() : '').includes(q) ||
+          (o.customerName ? String(o.customerName).toLowerCase() : '').includes(q) ||
+          (o.notes ? String(o.notes).toLowerCase() : '').includes(q) ||
+          (o.staffId ? String(o.staffId).toLowerCase() : '').includes(q)
         );
       })
       .sort((a, b) => {

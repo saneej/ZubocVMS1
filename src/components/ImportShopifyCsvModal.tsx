@@ -246,18 +246,19 @@ export const ImportShopifyCsvModal: React.FC<ImportShopifyCsvModalProps> = ({
   };
 
   const filteredOrders = parsedOrders.filter(o => {
+    if (!o) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
-      o.orderId.toLowerCase().includes(q) ||
-      (o.customerName && o.customerName.toLowerCase().includes(q)) ||
-      (o.contactPhone && o.contactPhone.toLowerCase().includes(q)) ||
-      (o.productSku && o.productSku.toLowerCase().includes(q))
+      (o.orderId ? String(o.orderId).toLowerCase() : '').includes(q) ||
+      (o.customerName && String(o.customerName).toLowerCase().includes(q)) ||
+      (o.contactPhone && String(o.contactPhone).toLowerCase().includes(q)) ||
+      (o.productSku && String(o.productSku).toLowerCase().includes(q))
     );
   });
 
-  const existingSet = new Set(existingOrderIds.map(id => id.toLowerCase()));
-  const conflictCount = parsedOrders.filter(o => existingSet.has(o.orderId.toLowerCase())).length;
+  const existingSet = new Set(existingOrderIds.filter(Boolean).map(id => String(id).toLowerCase()));
+  const conflictCount = parsedOrders.filter(o => o && o.orderId && existingSet.has(String(o.orderId).toLowerCase())).length;
 
   const handleStartImport = async () => {
     const ordersToImport = parsedOrders.filter(o => selectedOrderIds.has(o.orderId));

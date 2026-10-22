@@ -68,16 +68,16 @@ export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertI
   const alertMap = new Map<string, LiveAlertItem>();
 
   ordersList.forEach(order => {
-    if (order.isDispatched) return;
-    if (order.productionStage === 'DISPATCH') return;
+    if (order.isDispatched || order.is_dispatched) return;
+    if (order.productionStage === 'DISPATCH' || order.productionStage === 'DISPATCHED') return;
 
     const fullStatus = (order.fulfillmentStatus || '').toLowerCase();
-    if (fullStatus === 'shipped' || fullStatus === 'delivered' || fullStatus === 'dispatched') return;
+    if (fullStatus === 'shipped' || fullStatus === 'delivered' || fullStatus === 'dispatched' || fullStatus === 'fulfilled') return;
 
     if (order.recordingStatus === 'COMPLETED') return;
 
-    // Must have a valid dispatch date
-    const rawDate = order.dispatchDate || order.promisedDeliveryDate || order.stageDueDates?.DISPATCH;
+    // Check all possible date fields including stageDueDates, timeline, and orderReceivedDate
+    const rawDate = order.dispatchDate || order.promisedDeliveryDate || order.stageDueDates?.DISPATCH || order.timeline?.dispatchingDate || order.orderReceivedDate;
     const normalizedDate = normalizeDateStr(rawDate);
     if (!normalizedDate) return;
 

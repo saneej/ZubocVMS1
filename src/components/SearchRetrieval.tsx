@@ -154,26 +154,28 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   });
 
   // Channel counts
-  const websiteOrdersCount = orders.filter(o => (o.order_source || o.orderSource || 'website').toLowerCase() === 'website').length;
-  const amazonOrdersCount = orders.filter(o => (o.order_source || o.orderSource || '').toLowerCase() === 'amazon').length;
+  const websiteOrdersCount = orders.filter(o => String(o.order_source || o.orderSource || 'website').toLowerCase() === 'website').length;
+  const amazonOrdersCount = orders.filter(o => String(o.order_source || o.orderSource || '').toLowerCase() === 'amazon').length;
 
   const filteredOrders = orders.filter(order => {
+    if (!order) return false;
+
     // Channel Filter
-    const source = (order.order_source || order.orderSource || 'website').toLowerCase();
+    const source = String(order.order_source || order.orderSource || 'website').toLowerCase();
     if (channelFilter === 'website' && source !== 'website') return false;
     if (channelFilter === 'amazon' && source !== 'amazon') return false;
 
     const q = searchTerm.toLowerCase();
     const matchesSearch = 
-      order.orderId.toLowerCase().includes(q) ||
-      (order.awbNumber && order.awbNumber.toLowerCase().includes(q)) ||
-      (order.courier && order.courier.toLowerCase().includes(q)) ||
-      (order.productSku && order.productSku.toLowerCase().includes(q)) ||
-      (order.customerName && order.customerName.toLowerCase().includes(q)) ||
-      (order.notes && order.notes.toLowerCase().includes(q)) ||
-      (order.email && order.email.toLowerCase().includes(q)) ||
-      order.staffId.toLowerCase().includes(q) ||
-      (order.stationId && order.stationId.toLowerCase().includes(q));
+      (order.orderId ? String(order.orderId).toLowerCase() : '').includes(q) ||
+      (order.awbNumber ? String(order.awbNumber).toLowerCase() : '').includes(q) ||
+      (order.courier ? String(order.courier).toLowerCase() : '').includes(q) ||
+      (order.productSku ? String(order.productSku).toLowerCase() : '').includes(q) ||
+      (order.customerName ? String(order.customerName).toLowerCase() : '').includes(q) ||
+      (order.notes ? String(order.notes).toLowerCase() : '').includes(q) ||
+      (order.email ? String(order.email).toLowerCase() : '').includes(q) ||
+      (order.staffId ? String(order.staffId).toLowerCase() : '').includes(q) ||
+      (order.stationId ? String(order.stationId).toLowerCase() : '').includes(q);
 
     const matchesUploadStatus = 
       statusFilter === 'ALL' || 

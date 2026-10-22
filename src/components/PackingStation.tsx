@@ -979,10 +979,10 @@ export const PackingStation: React.FC<PackingStationProps> = ({
     if (!preOrderSearch.trim()) return true;
     const q = preOrderSearch.toLowerCase();
     return (
-      o.orderId.toLowerCase().includes(q) ||
-      (o.awbNumber && o.awbNumber.toLowerCase().includes(q)) ||
-      (o.customerName && o.customerName.toLowerCase().includes(q)) ||
-      (o.productSku && o.productSku.toLowerCase().includes(q))
+      (o.orderId ? String(o.orderId).toLowerCase() : '').includes(q) ||
+      (o.awbNumber && String(o.awbNumber).toLowerCase().includes(q)) ||
+      (o.customerName && String(o.customerName).toLowerCase().includes(q)) ||
+      (o.productSku && String(o.productSku).toLowerCase().includes(q))
     );
   });
 
