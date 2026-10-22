@@ -1,6 +1,6 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
-import { formatIST } from '../utils/time';
+import { formatIST, formatDateForInput } from '../utils/time';
 import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload, Save, Globe, ShoppingCart } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { Link } from 'react-router-dom';
@@ -90,6 +90,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       if (onUpdateOrder) {
         await onUpdateOrder(orderRecord);
       }
+      setChannelFilter(newOrderSource);
       setIsAddOrderOpen(false);
       setNewOrderId("");
       setNewCustomer("");
@@ -117,6 +118,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [editContactPerson, setEditContactPerson] = useState('');
   const [editContactPhone, setEditContactPhone] = useState('');
   const [editOrderReceivedDate, setEditOrderReceivedDate] = useState('');
+  const [editDispatchScheduledDate, setEditDispatchScheduledDate] = useState('');
   const [editDispatchDate, setEditDispatchDate] = useState('');
   const [editOrderAmount, setEditOrderAmount] = useState('');
   const [editShippingAmount, setEditShippingAmount] = useState('');
@@ -154,16 +156,26 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   });
 
   // Channel counts
-  const websiteOrdersCount = orders.filter(o => String(o.order_source || o.orderSource || 'website').toLowerCase() === 'website').length;
-  const amazonOrdersCount = orders.filter(o => String(o.order_source || o.orderSource || '').toLowerCase() === 'amazon').length;
+  const websiteOrdersCount = orders.filter(o => {
+    const src = String(o?.order_source || o?.orderSource || 'website').toLowerCase();
+    return !src.includes('amazon');
+  }).length;
+
+  const amazonOrdersCount = orders.filter(o => {
+    const src = String(o?.order_source || o?.orderSource || '').toLowerCase();
+    return src.includes('amazon');
+  }).length;
 
   const filteredOrders = orders.filter(order => {
     if (!order) return false;
 
     // Channel Filter
     const source = String(order.order_source || order.orderSource || 'website').toLowerCase();
-    if (channelFilter === 'website' && source !== 'website') return false;
-    if (channelFilter === 'amazon' && source !== 'amazon') return false;
+    const isAmazon = source.includes('amazon');
+    const isWebsite = !isAmazon;
+
+    if (channelFilter === 'website' && !isWebsite) return false;
+    if (channelFilter === 'amazon' && !isAmazon) return false;
 
     const q = searchTerm.toLowerCase();
     const matchesSearch = 
@@ -237,12 +249,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     setEditCustomer(order.customerName || '');
     setEditContactPerson(order.contactPerson || '');
     setEditContactPhone(order.contactPhone || '');
-    setEditOrderReceivedDate(order.orderReceivedDate || '');
-    setEditDispatchDate(order.dispatchDate || '');
+    setEditOrderReceivedDate(formatDateForInput(order.orderReceivedDate));
+    setEditDispatchScheduledDate(formatDateForInput(order.dispatchScheduledDate || order.dispatch_scheduled_date || order.dispatchDate));
+    setEditDispatchDate(formatDateForInput(order.dispatchDate));
     setEditOrderAmount(order.orderAmount || '');
     setEditShippingAmount(order.shippingAmount || '');
     setEditOrderTotal(order.orderTotal || '');
-    setEditDeliveredDate(order.deliveredDate || '');
+    setEditDeliveredDate(formatDateForInput(order.deliveredDate));
     setEditNotes(order.notes || '');
     setEditRemarks(order.remarks || '');
     setEditFulfillmentStatus(order.fulfillmentStatus || 'Pending');
@@ -278,6 +291,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     checkChange('Contact Person', editingOrder.contactPerson, editContactPerson.trim());
     checkChange('Contact Phone', editingOrder.contactPhone, editContactPhone.trim());
     checkChange('Received Date', editingOrder.orderReceivedDate, editOrderReceivedDate);
+    checkChange('Dispatch Scheduled Date', editingOrder.dispatchScheduledDate, editDispatchScheduledDate);
     checkChange('Despatch Date', editingOrder.dispatchDate, editDispatchDate);
     checkChange('Order Amount', editingOrder.orderAmount, editOrderAmount.trim());
     checkChange('Shipping Amount', editingOrder.shippingAmount, editShippingAmount.trim());
@@ -314,7 +328,9 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       contactPerson: editContactPerson.trim() || undefined,
       contactPhone: editContactPhone.trim() || undefined,
       orderReceivedDate: editOrderReceivedDate || undefined,
-      dispatchDate: editDispatchDate || undefined,
+      dispatchScheduledDate: editDispatchScheduledDate || undefined,
+      dispatch_scheduled_date: editDispatchScheduledDate || undefined,
+      dispatchDate: editDispatchDate || editDispatchScheduledDate || undefined,
       orderAmount: editOrderAmount.trim() || undefined,
       shippingAmount: editShippingAmount.trim() || undefined,
       orderTotal: editOrderTotal.trim() || undefined,
@@ -1021,6 +1037,17 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       value={editOrderReceivedDate}
                       onChange={(e) => setEditOrderReceivedDate(e.target.value)}
                       className="w-full bg-white border border-slate-200 focus:border-blue-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Dispatch Scheduled Date */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase mb-0.5">Dispatch Scheduled Date (Due Date)</label>
+                    <input
+                      type="date"
+                      value={editDispatchScheduledDate}
+                      onChange={(e) => setEditDispatchScheduledDate(e.target.value)}
+                      className="w-full bg-amber-50/50 border border-amber-300 focus:border-amber-600 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold focus:outline-none"
                     />
                   </div>
 

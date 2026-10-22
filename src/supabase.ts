@@ -37,7 +37,7 @@ export const SUPABASE_ALLOWED_COLUMNS = new Set([
   'total', 'discountCode', 'discountAmount', 'shippingMethod', 'shippingName',
   'shippingStreet', 'shippingAddress1', 'shippingAddress2', 'shippingCompany',
   'shippingCity', 'shippingZip', 'shippingProvince', 'shippingCountry',
-  'shippingPhone', 'lineItems'
+  'shippingPhone', 'lineItems', 'dispatchScheduledDate', 'dispatch_scheduled_date'
 ]);
 
 export const SUPABASE_DATE_FIELDS = new Set([
@@ -49,7 +49,9 @@ export const SUPABASE_DATE_FIELDS = new Set([
   'dispatchDate',
   'deliveredDate',
   'formFillingDate',
-  'promisedDeliveryDate'
+  'promisedDeliveryDate',
+  'dispatchScheduledDate',
+  'dispatch_scheduled_date'
 ]);
 
 export function normalizeIsoDate(dateVal?: any): string | undefined {

@@ -187,7 +187,7 @@ function normalizeOrder(order: OrderRecord): {
   }
 
   const stageSpecificDueDate = order.stageDueDates?.[stage];
-  const dueDate = stageSpecificDueDate || order.promisedDeliveryDate || order.dispatchDate || order.deliveredDate || order.orderReceivedDate || '';
+  const dueDate = order.dispatchScheduledDate || order.dispatch_scheduled_date || stageSpecificDueDate || order.promisedDeliveryDate || order.dispatchDate || order.timeline?.dispatchingDate || '';
   let dueStatus: 'DUE_TODAY' | 'DUE_TOMORROW' | 'DAYS_LEFT' | 'OVERDUE' | 'NO_DATE' = 'NO_DATE';
   let dueDays = 0;
 
@@ -433,7 +433,14 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   }, []);
 
   const normalizedList = useMemo(() => {
-    return orders.filter(ord => ord.isProductionDeckOrder).map(ord => ({
+    return orders.filter(ord => 
+      ord.isProductionDeckOrder || 
+      Boolean(ord.dispatchScheduledDate) ||
+      Boolean(ord.dispatch_scheduled_date) ||
+      Boolean(ord.dispatchDate) || 
+      Boolean(ord.promisedDeliveryDate) || 
+      Boolean(ord.stageDueDates?.DISPATCH)
+    ).map(ord => ({
       raw: ord,
       norm: normalizeOrder(ord)
     }));

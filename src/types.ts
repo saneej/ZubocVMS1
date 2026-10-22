@@ -147,6 +147,8 @@ export interface OrderRecord {
   subAssemblyProgress?: SubAssemblyProgress;
   timeline?: ZubocTimeline;
   promisedDeliveryDate?: string;
+  dispatchScheduledDate?: string;
+  dispatch_scheduled_date?: string;
   paymentGate?: PaymentGateInfo;
   productionStage?: ProductionStage;
   stageDueDates?: Record<string, string>;

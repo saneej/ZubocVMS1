@@ -76,8 +76,8 @@ export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertI
 
     if (order.recordingStatus === 'COMPLETED') return;
 
-    // Check all possible date fields including stageDueDates, timeline, and orderReceivedDate
-    const rawDate = order.dispatchDate || order.promisedDeliveryDate || order.stageDueDates?.DISPATCH || order.timeline?.dispatchingDate || order.orderReceivedDate;
+    // STRICTLY check for explicit planned dispatch date (prioritizing dispatchScheduledDate)
+    const rawDate = order.dispatchScheduledDate || order.dispatch_scheduled_date || order.dispatchDate || order.promisedDeliveryDate || order.stageDueDates?.DISPATCH || order.timeline?.dispatchingDate;
     const normalizedDate = normalizeDateStr(rawDate);
     if (!normalizedDate) return;
 
@@ -91,12 +91,12 @@ export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertI
     const diffMs = todayMs - orderMs;
     const daysOverdue = isOverdue ? Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))) : 0;
 
-    const orderId = order.orderId || 'N/A';
-    const clientName = order.customerName || order.clientName || order.contactPerson || `Client #${orderId}`;
+    const rawId = String(order.orderId || 'N/A').replace(/^#+/, '');
+    const clientName = order.customerName || order.clientName || order.contactPerson || `Client #${rawId}`;
     const product = order.product || order.productSku || 'Stationery Job';
 
-    alertMap.set(orderId, {
-      orderId,
+    alertMap.set(rawId, {
+      orderId: rawId,
       clientName,
       product,
       dispatchDate: normalizedDate,
@@ -208,7 +208,7 @@ export const LiveAlertTicker: React.FC<LiveAlertTickerProps> = ({
                   <Clock className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
                 )}
 
-                <span className="font-black font-mono text-sm md:text-base">#{item.orderId}</span>
+                <span className="font-black font-mono text-sm md:text-base">#{item.orderId.replace(/^#+/, '')}</span>
 
                 <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
                   item.isOverdue ? 'bg-rose-600 text-white' : 'bg-amber-500 text-slate-950'

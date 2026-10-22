@@ -1621,7 +1621,8 @@ const handleSaveOrderRequest = async (req: express.Request, res: express.Respons
   // Auto-calculate order_source and numeric sort key
   const digits = orderId.replace(/\D/g, '');
   const parsedNum = digits ? parseInt(digits, 10) : undefined;
-  const order_source = req.body.order_source || req.body.orderSource || existing?.order_source || existing?.orderSource || 'website';
+  const rawSource = String(req.body.order_source || req.body.orderSource || existing?.order_source || existing?.orderSource || 'website').trim().toLowerCase();
+  const order_source = rawSource.includes('amazon') ? 'amazon' : 'website';
   const order_number_num = req.body.order_number_num !== undefined ? req.body.order_number_num : (existing?.order_number_num !== undefined ? existing.order_number_num : parsedNum);
 
   // Merge with existing if present, otherwise start new

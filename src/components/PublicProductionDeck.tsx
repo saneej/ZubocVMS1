@@ -131,7 +131,7 @@ function normalizeOrder(order: OrderRecord) {
   }
 
   const stageSpecificDueDate = order.stageDueDates?.[stage];
-  const dueDate = stageSpecificDueDate || order.promisedDeliveryDate || order.dispatchDate || order.deliveredDate || order.orderReceivedDate || '';
+  const dueDate = order.dispatchScheduledDate || order.dispatch_scheduled_date || stageSpecificDueDate || order.promisedDeliveryDate || order.dispatchDate || order.timeline?.dispatchingDate || '';
   
   let dueStatus: 'DUE_TODAY' | 'DUE_TOMORROW' | 'DAYS_LEFT' | 'OVERDUE' | 'NO_DATE' = 'NO_DATE';
   let dueDays = 0;
@@ -231,14 +231,14 @@ export const PublicProductionDeck: React.FC = () => {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setOrders(parsed.filter((o: OrderRecord) => o.isProductionDeckOrder));
+            setOrders(parsed);
           }
         } catch {}
       }
 
       const res = await safeFetchJson('/api/orders');
       if (res && Array.isArray(res) && res.length > 0) {
-        setOrders(res.filter((o: OrderRecord) => o.isProductionDeckOrder));
+        setOrders(res);
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(res));
       }
     } catch (e) {
@@ -286,7 +286,16 @@ export const PublicProductionDeck: React.FC = () => {
       DISPATCHED: []
     };
 
-    orders.filter(o => o.isProductionDeckOrder).forEach(ord => {
+    const visibleOrders = orders.filter(o => 
+      o.isProductionDeckOrder || 
+      Boolean(o.dispatchScheduledDate) ||
+      Boolean(o.dispatch_scheduled_date) ||
+      Boolean(o.dispatchDate) || 
+      Boolean(o.promisedDeliveryDate) || 
+      Boolean(o.stageDueDates?.DISPATCH)
+    );
+
+    visibleOrders.forEach(ord => {
       const norm = normalizeOrder(ord);
       if (map[norm.stage]) {
         map[norm.stage].push({ raw: ord, norm });

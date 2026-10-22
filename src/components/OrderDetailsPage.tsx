@@ -163,6 +163,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
         contactPerson: order.contactPerson || '',
         contactPhone: order.contactPhone || '',
         orderReceivedDate: formatDateForInput(order.orderReceivedDate),
+        dispatchScheduledDate: formatDateForInput(order.dispatchScheduledDate || order.dispatch_scheduled_date || order.dispatchDate || order.promisedDeliveryDate),
         dispatchDate: formatDateForInput(order.dispatchDate || order.promisedDeliveryDate || order.timeline?.dispatchingDate),
         deliveredDate: formatDateForInput(order.deliveredDate),
         notes: order.notes || '',
@@ -196,6 +197,12 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     };
 
     const syncFields: Partial<OrderRecord> = { ...updatedFields };
+
+    if (updatedFields.dispatchScheduledDate !== undefined) {
+      syncFields.dispatch_scheduled_date = updatedFields.dispatchScheduledDate;
+      if (!syncFields.dispatchDate) syncFields.dispatchDate = updatedFields.dispatchScheduledDate;
+      if (!syncFields.promisedDeliveryDate) syncFields.promisedDeliveryDate = updatedFields.dispatchScheduledDate;
+    }
 
     if (updatedFields.dispatchDate !== undefined) {
       syncFields.promisedDeliveryDate = updatedFields.dispatchDate;
@@ -947,6 +954,12 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         <span className="text-slate-900 font-bold text-xs">{order.orderReceivedDate || '—'}</span>
                       </div>
                       <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500 text-xs">Dispatch Scheduled Date</span>
+                        <span className="text-amber-700 font-bold text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          {order.dispatchScheduledDate || order.dispatch_scheduled_date || order.dispatchDate || '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
                         <span className="text-slate-500 text-xs">Despatch Date</span>
                         <span className="text-slate-900 font-bold text-xs">{order.dispatchDate || '—'}</span>
                       </div>
@@ -966,6 +979,19 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                           value={formatDateForInput(formData.orderReceivedDate)}
                           onChange={(e) => setFormData({ ...formData, orderReceivedDate: e.target.value })}
                           className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-800 uppercase mb-1 flex items-center gap-1">
+                          <span>Dispatch Scheduled Date</span>
+                          <span className="text-[9px] font-bold text-amber-600">(Primary Due Date)</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={formatDateForInput(formData.dispatchScheduledDate)}
+                          onChange={(e) => setFormData({ ...formData, dispatchScheduledDate: e.target.value })}
+                          className="w-full bg-amber-50/50 border border-amber-300 focus:border-amber-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
                         />
                       </div>
 
@@ -993,6 +1019,8 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         <button
                           onClick={() => handleSaveFields({
                             orderReceivedDate: formData.orderReceivedDate,
+                            dispatchScheduledDate: formData.dispatchScheduledDate,
+                            dispatch_scheduled_date: formData.dispatchScheduledDate,
                             dispatchDate: formData.dispatchDate,
                             deliveredDate: formData.deliveredDate
                           }, 'Updated order timeline dates')}
