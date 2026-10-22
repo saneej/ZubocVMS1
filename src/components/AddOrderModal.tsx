@@ -76,10 +76,13 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
     const digits = cleanId.replace(/\D/g, '');
     const order_number_num = digits ? parseInt(digits, 10) : undefined;
 
+    const isAmazonPattern = /\d{3}-\d{7}-\d{7}/.test(cleanId) || /amazon/i.test(cleanId) || cleanId.toLowerCase().startsWith('402-') || cleanId.toLowerCase().startsWith('171-') || cleanId.toLowerCase().startsWith('403-') || cleanId.toLowerCase().startsWith('408-');
+    const finalSource = (orderSource === 'amazon' || isAmazonPattern) ? 'amazon' : 'website';
+
     const newRecord: Partial<OrderRecord> = {
       orderId: cleanId,
-      order_source: orderSource,
-      orderSource: orderSource,
+      order_source: finalSource,
+      orderSource: finalSource,
       order_number_num,
       courier: courier.trim() || undefined,
       deliveryMethod: deliveryMethod || 'Normal',
@@ -253,7 +256,13 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
               required
               placeholder={orderSource === 'website' ? 'e.g. #2888' : 'e.g. 402-1234567-1234567'}
               value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setOrderId(val);
+                if (/\d{3}-\d{7}-\d{7}/.test(val) || val.startsWith('402-') || val.startsWith('171-') || val.startsWith('403-') || val.startsWith('408-')) {
+                  setOrderSource('amazon');
+                }
+              }}
               className="w-full px-3.5 py-2.5 text-sm font-mono font-bold rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#832f5e] bg-white"
             />
             <p className="text-[11px] text-slate-500 mt-1">

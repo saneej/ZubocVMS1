@@ -62,11 +62,13 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     }
     const digits = cleanId.replace(/\D/g, '');
     const order_number_num = digits ? parseInt(digits, 10) : undefined;
+    const isAmazonPattern = /\d{3}-\d{7}-\d{7}/.test(cleanId) || /amazon/i.test(cleanId) || cleanId.toLowerCase().startsWith('402-') || cleanId.toLowerCase().startsWith('171-') || cleanId.toLowerCase().startsWith('403-') || cleanId.toLowerCase().startsWith('408-');
+    const finalSource = (newOrderSource === 'amazon' || isAmazonPattern) ? 'amazon' : 'website';
 
     const orderRecord: OrderRecord = {
       orderId: cleanId,
-      order_source: newOrderSource,
-      orderSource: newOrderSource,
+      order_source: finalSource,
+      orderSource: finalSource,
       order_number_num,
       staffId: currentStaffName,
       stationId: "Order-Department",

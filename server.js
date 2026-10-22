@@ -1348,7 +1348,8 @@ var handleSaveOrderRequest = async (req, res) => {
   const digits = orderId.replace(/\D/g, "");
   const parsedNum = digits ? parseInt(digits, 10) : void 0;
   const rawSource = String(req.body.order_source || req.body.orderSource || existing?.order_source || existing?.orderSource || "website").trim().toLowerCase();
-  const order_source = rawSource.includes("amazon") ? "amazon" : "website";
+  const isAmazonPattern = /\d{3}-\d{7}-\d{7}/.test(orderId) || /amazon/i.test(orderId) || orderId.toLowerCase().startsWith("402-") || orderId.toLowerCase().startsWith("171-") || orderId.toLowerCase().startsWith("403-") || orderId.toLowerCase().startsWith("408-");
+  const order_source = rawSource.includes("amazon") || isAmazonPattern ? "amazon" : "website";
   const order_number_num = req.body.order_number_num !== void 0 ? req.body.order_number_num : existing?.order_number_num !== void 0 ? existing.order_number_num : parsedNum;
   const record = {
     ...existing || {},
