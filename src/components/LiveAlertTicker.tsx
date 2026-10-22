@@ -69,12 +69,10 @@ export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertI
 
   ordersList.forEach(order => {
     if (order.isDispatched || order.is_dispatched) return;
-    if (order.productionStage === 'DISPATCH' || order.productionStage === 'DISPATCHED') return;
+    if (order.productionStage === 'DISPATCHED') return;
 
     const fullStatus = (order.fulfillmentStatus || '').toLowerCase();
     if (fullStatus === 'shipped' || fullStatus === 'delivered' || fullStatus === 'dispatched' || fullStatus === 'fulfilled') return;
-
-    if (order.recordingStatus === 'COMPLETED') return;
 
     // STRICTLY check for explicit planned dispatch date (prioritizing dispatchScheduledDate)
     const rawDate = order.dispatchScheduledDate || order.dispatch_scheduled_date || order.dispatchDate || order.promisedDeliveryDate || order.stageDueDates?.DISPATCH || order.timeline?.dispatchingDate;

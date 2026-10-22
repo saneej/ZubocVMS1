@@ -199,20 +199,34 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     const syncFields: Partial<OrderRecord> = { ...updatedFields };
 
     if (updatedFields.dispatchScheduledDate !== undefined) {
-      syncFields.dispatch_scheduled_date = updatedFields.dispatchScheduledDate;
-      if (!syncFields.dispatchDate) syncFields.dispatchDate = updatedFields.dispatchScheduledDate;
-      if (!syncFields.promisedDeliveryDate) syncFields.promisedDeliveryDate = updatedFields.dispatchScheduledDate;
+      syncFields.dispatch_scheduled_date = updatedFields.dispatchScheduledDate || "";
+      syncFields.dispatchScheduledDate = updatedFields.dispatchScheduledDate || "";
+      if (!updatedFields.dispatchScheduledDate) {
+        syncFields.dispatchDate = "";
+        syncFields.promisedDeliveryDate = "";
+        syncFields.stageDueDates = {
+          ...(order.stageDueDates || {}),
+          DISPATCH: ""
+        };
+        syncFields.timeline = {
+          ...(order.timeline || {}),
+          dispatchingDate: ""
+        };
+      } else {
+        if (!syncFields.dispatchDate) syncFields.dispatchDate = updatedFields.dispatchScheduledDate;
+        if (!syncFields.promisedDeliveryDate) syncFields.promisedDeliveryDate = updatedFields.dispatchScheduledDate;
+      }
     }
 
     if (updatedFields.dispatchDate !== undefined) {
-      syncFields.promisedDeliveryDate = updatedFields.dispatchDate;
+      syncFields.promisedDeliveryDate = updatedFields.dispatchDate || "";
       syncFields.timeline = {
-        ...(order.timeline || {}),
-        dispatchingDate: updatedFields.dispatchDate
+        ...(syncFields.timeline || order.timeline || {}),
+        dispatchingDate: updatedFields.dispatchDate || ""
       };
       syncFields.stageDueDates = {
         ...(order.stageDueDates || {}),
-        DISPATCH: updatedFields.dispatchDate
+        DISPATCH: updatedFields.dispatchDate || ""
       };
     }
 
@@ -973,7 +987,18 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                   ) : (
                     <div className="space-y-3 pt-1 text-xs">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Order Received Date</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase">Order Received Date</label>
+                          {formData.orderReceivedDate && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, orderReceivedDate: '' })}
+                              className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                            >
+                              Clear Date
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="date"
                           value={formatDateForInput(formData.orderReceivedDate)}
@@ -983,10 +1008,21 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-amber-800 uppercase mb-1 flex items-center gap-1">
-                          <span>Dispatch Scheduled Date</span>
-                          <span className="text-[9px] font-bold text-amber-600">(Primary Due Date)</span>
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-bold text-amber-800 uppercase flex items-center gap-1">
+                            <span>Dispatch Scheduled Date</span>
+                            <span className="text-[9px] font-bold text-amber-600">(Primary Due Date)</span>
+                          </label>
+                          {formData.dispatchScheduledDate && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, dispatchScheduledDate: '' })}
+                              className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                            >
+                              Clear Date
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="date"
                           value={formatDateForInput(formData.dispatchScheduledDate)}
@@ -996,7 +1032,18 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Despatch Date</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase">Despatch Date</label>
+                          {formData.dispatchDate && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, dispatchDate: '' })}
+                              className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                            >
+                              Clear Date
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="date"
                           value={formatDateForInput(formData.dispatchDate)}
@@ -1006,7 +1053,18 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Delivered Date</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase">Delivered Date</label>
+                          {formData.deliveredDate && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, deliveredDate: '' })}
+                              className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                            >
+                              Clear Date
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="date"
                           value={formatDateForInput(formData.deliveredDate)}

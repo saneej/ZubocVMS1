@@ -1037,7 +1037,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
                   {/* Received Date */}
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Order Received Date</label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Order Received Date</label>
+                      {editOrderReceivedDate && (
+                        <button
+                          type="button"
+                          onClick={() => setEditOrderReceivedDate('')}
+                          className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                        >
+                          Clear Date
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="date"
                       value={editOrderReceivedDate}
@@ -1048,7 +1059,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
                   {/* Dispatch Scheduled Date */}
                   <div>
-                    <label className="block text-[10px] font-bold text-amber-800 uppercase mb-0.5">Dispatch Scheduled Date (Due Date)</label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[10px] font-bold text-amber-800 uppercase">Dispatch Scheduled Date (Due Date)</label>
+                      {editDispatchScheduledDate && (
+                        <button
+                          type="button"
+                          onClick={() => setEditDispatchScheduledDate('')}
+                          className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                        >
+                          Clear Date
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="date"
                       value={editDispatchScheduledDate}
@@ -1059,7 +1081,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
                   {/* Despatch Date */}
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Despatch Date</label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Despatch Date</label>
+                      {editDispatchDate && (
+                        <button
+                          type="button"
+                          onClick={() => setEditDispatchDate('')}
+                          className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                        >
+                          Clear Date
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="date"
                       value={editDispatchDate}
