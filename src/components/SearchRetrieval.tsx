@@ -177,17 +177,21 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     if (channelFilter === 'website' && !isWebsite) return false;
     if (channelFilter === 'amazon' && !isAmazon) return false;
 
-    const q = searchTerm.toLowerCase();
-    const matchesSearch = 
-      (order.orderId ? String(order.orderId).toLowerCase() : '').includes(q) ||
-      (order.awbNumber ? String(order.awbNumber).toLowerCase() : '').includes(q) ||
-      (order.courier ? String(order.courier).toLowerCase() : '').includes(q) ||
-      (order.productSku ? String(order.productSku).toLowerCase() : '').includes(q) ||
-      (order.customerName ? String(order.customerName).toLowerCase() : '').includes(q) ||
-      (order.notes ? String(order.notes).toLowerCase() : '').includes(q) ||
-      (order.email ? String(order.email).toLowerCase() : '').includes(q) ||
-      (order.staffId ? String(order.staffId).toLowerCase() : '').includes(q) ||
-      (order.stationId ? String(order.stationId).toLowerCase() : '').includes(q);
+    const q = searchTerm.toLowerCase().trim();
+    const qClean = q.replace(/^#+/, '');
+    const matchesSearch = !q ||
+      (order.orderId ? String(order.orderId).toLowerCase().includes(q) || String(order.orderId).toLowerCase().replace(/^#+/, '').includes(qClean) : false) ||
+      (order.awbNumber ? String(order.awbNumber).toLowerCase().includes(q) : false) ||
+      (order.courier ? String(order.courier).toLowerCase().includes(q) : false) ||
+      (order.productSku ? String(order.productSku).toLowerCase().includes(q) : false) ||
+      (order.customerName ? String(order.customerName).toLowerCase().includes(q) : false) ||
+      (order.contactPerson ? String(order.contactPerson).toLowerCase().includes(q) : false) ||
+      (order.contactPhone ? String(order.contactPhone).toLowerCase().includes(q) : false) ||
+      (order.notes ? String(order.notes).toLowerCase().includes(q) : false) ||
+      (order.remarks ? String(order.remarks).toLowerCase().includes(q) : false) ||
+      (order.email ? String(order.email).toLowerCase().includes(q) : false) ||
+      (order.staffId ? String(order.staffId).toLowerCase().includes(q) : false) ||
+      (order.stationId ? String(order.stationId).toLowerCase().includes(q) : false);
 
     const matchesUploadStatus = 
       statusFilter === 'ALL' || 
@@ -202,15 +206,17 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   // Numeric Sorting for Website (#2889 > #2888 > #1000) & Chronological Date for Amazon
   filteredOrders.sort((a, b) => {
-    const isWebsiteA = (a.order_source || a.orderSource || 'website').toLowerCase() === 'website';
-    const isWebsiteB = (b.order_source || b.orderSource || 'website').toLowerCase() === 'website';
+    if (!a || !b) return 0;
+    const isWebsiteA = String(a?.order_source || a?.orderSource || 'website').toLowerCase() === 'website';
+    const isWebsiteB = String(b?.order_source || b?.orderSource || 'website').toLowerCase() === 'website';
 
     if (channelFilter === 'website' || (channelFilter === 'ALL' && isWebsiteA && isWebsiteB)) {
       const getNum = (o: OrderRecord) => {
+        if (!o) return -1;
         if (typeof o.order_number_num === 'number' && !isNaN(o.order_number_num)) {
           return o.order_number_num;
         }
-        const digits = (o.orderId || '').replace(/\D/g, '');
+        const digits = String(o.orderId || '').replace(/\D/g, '');
         return digits ? parseInt(digits, 10) : -1;
       };
       const numA = getNum(a);
@@ -220,12 +226,12 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       }
       const dateA = new Date(a.orderReceivedDate || a.createdAt || 0).getTime();
       const dateB = new Date(b.orderReceivedDate || b.createdAt || 0).getTime();
-      return dateB - dateA;
+      return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
     } else {
       // Amazon or mixed: created_at_order DESC
       const dateA = new Date(a.orderReceivedDate || a.createdAt || 0).getTime();
       const dateB = new Date(b.orderReceivedDate || b.createdAt || 0).getTime();
-      return dateB - dateA;
+      return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
     }
   });
 

@@ -470,12 +470,21 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      result = result.filter(item => 
-        item.raw.orderId.toLowerCase().includes(q) ||
-        item.norm.clientName.toLowerCase().includes(q) ||
-        item.norm.product.toLowerCase().includes(q) ||
-        item.norm.notes.toLowerCase().includes(q)
-      );
+      const qClean = q.replace(/^#+/, '');
+      result = result.filter(item => {
+        if (!item) return false;
+        const rawId = item.raw?.orderId ? String(item.raw.orderId).toLowerCase() : '';
+        const clientName = item.norm?.clientName ? String(item.norm.clientName).toLowerCase() : '';
+        const product = item.norm?.product ? String(item.norm.product).toLowerCase() : '';
+        const notes = item.norm?.notes ? String(item.norm.notes).toLowerCase() : '';
+        return (
+          rawId.includes(q) ||
+          rawId.replace(/^#+/, '').includes(qClean) ||
+          clientName.includes(q) ||
+          product.includes(q) ||
+          notes.includes(q)
+        );
+      });
     }
 
     if (selectedUrgencyFilter === 'dueToday') {
