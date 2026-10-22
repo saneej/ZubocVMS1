@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Send, Palette, AlertCircle, CheckCircle2, Upload, Paperclip, FileText, Trash2, Clock, Sparkles } from 'lucide-react';
+import { X, Send, Palette, Factory, AlertCircle, CheckCircle2, Upload, Paperclip, FileText, Trash2, Clock, Sparkles } from 'lucide-react';
 import { OrderRecord, OrderAttachment, WorkflowPriority } from '../types';
 import { safeFetchJson } from '../utils/api';
 
@@ -24,7 +24,8 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
   const [instructions, setInstructions] = useState('');
   const [attachments, setAttachments] = useState<OrderAttachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingDesign, setIsSubmittingDesign] = useState(false);
+  const [isSubmittingProd, setIsSubmittingProd] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !order) return null;
@@ -67,14 +68,13 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
     setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendToDesign = async () => {
     if (!instructions.trim()) {
       setError('Please provide design instructions or specifications for the Design department.');
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmittingDesign(true);
     setError(null);
 
     try {
@@ -103,7 +103,45 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
       console.error('Send to design error:', err);
       setError(err?.message || 'Failed to forward order to Design department');
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingDesign(false);
+    }
+  };
+
+  const handleSendDirectToProduction = async () => {
+    setIsSubmittingProd(true);
+    setError(null);
+
+    try {
+      const payload = {
+        orderId: order.orderId,
+        productionInstructions: instructions.trim() || 'Direct to production - no design required',
+        priority,
+        creAttachments: attachments,
+        staffId: currentStaffId,
+        staffName: currentStaffName
+      };
+
+      const res = await safeFetchJson('/api/workflow/send-to-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res && res.success) {
+        onSuccess({
+          ...order,
+          isDesignRequired: false,
+          workflowStatus: 'PRODUCTION_PENDING'
+        });
+        onClose();
+      } else {
+        throw new Error(res?.error || 'Failed to send order directly to production');
+      }
+    } catch (err: any) {
+      console.error('Send to production error:', err);
+      setError(err?.message || 'Failed to send order directly to production');
+    } finally {
+      setIsSubmittingProd(false);
     }
   };
 
@@ -119,9 +157,9 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-black text-slate-900">Forward to Design Department</h2>
+                <h2 className="text-lg font-black text-slate-900">Forward Order Workflow</h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  CRE Workflow
+                  CRE Control
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
@@ -138,64 +176,57 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
         </div>
 
         {error && (
-          <div className="mt-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-center gap-2 animate-shake">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          
-          {/* Priority Selection */}
+        <div className="mt-4 space-y-4">
+          {/* Priority Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Design Urgency & Priority <span className="text-rose-500">*</span>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              Urgency & Priority *
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkflowPriority[]).map((p) => {
-                const isSelected = priority === p;
-                const colors = {
-                  LOW: isSelected ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200',
-                  NORMAL: isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200',
-                  HIGH: isSelected ? 'bg-amber-600 text-white border-amber-600' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200',
-                  URGENT: isSelected ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
-                };
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPriority(p)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${colors[p]}`}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
+              {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkflowPriority[]).map(p => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPriority(p)}
+                  className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    priority === p
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-200'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Design Instructions */}
+          {/* Instructions / Remarks */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Design Instructions & Client Specifications <span className="text-rose-500">*</span>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              Instructions & Client Specifications
             </label>
             <textarea
-              required
-              rows={4}
+              rows={3}
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="e.g. Custom gold foil stamp with client initials 'R&A'. Dimensions 50x50mm on burgundy box cover. Vector curve provided in reference..."
-              className="w-full px-4 py-3 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all font-medium leading-relaxed"
+              placeholder="Enter design instructions (required for design) or production notes (for direct to production)..."
+              className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 rounded-2xl p-3 text-xs text-slate-900 focus:outline-none"
             />
           </div>
 
-          {/* Attachments Section */}
+          {/* File Attachments */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Drawings & Reference Attachments <span className="text-slate-400 font-normal lowercase">(optional)</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                Reference Drawings & Attachments (optional)
               </label>
-              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors">
+              <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Files</span>
                 <input
@@ -216,8 +247,8 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
               </div>
             )}
 
-            {attachments.length > 0 ? (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            {attachments.length > 0 && (
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1 mb-2">
                 {attachments.map((file) => (
                   <div
                     key={file.id}
@@ -238,42 +269,62 @@ export const SendToDesignModal: React.FC<SendToDesignModalProps> = ({
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="p-4 border-2 border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400">
-                Support for PDF, CAD (DWG, DXF, STEP), JPG, PNG, AI, PSD, and ZIP specs.
-              </div>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          {/* Action Buttons: Send to Design vs Send Directly to Production */}
+          <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
+              disabled={isSubmittingDesign || isSubmittingProd}
               className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || isUploading}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Forwarding...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>Send to Design Department</span>
-                </>
-              )}
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSendDirectToProduction}
+                disabled={isSubmittingDesign || isSubmittingProd || isUploading}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingProd ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Factory className="w-4 h-4" />
+                    <span>Send Directly to Production</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendToDesign}
+                disabled={isSubmittingDesign || isSubmittingProd || isUploading}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingDesign ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Forwarding...</span>
+                  </>
+                ) : (
+                  <>
+                    <Palette className="w-4 h-4" />
+                    <span>Send to Design Dept</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </form>
+        </div>
+
       </div>
     </div>
   );

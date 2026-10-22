@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 // ffmpeg-static will be dynamically imported when needed to avoid startup crashes
 import { createClient } from '@supabase/supabase-js';
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -401,6 +402,8 @@ interface OrderRecord {
   shippingPhone?: string;
   lineItems?: { name: string; price?: string | number; sku?: string; quantity?: number }[];
   isProductionDeckOrder?: boolean;
+  assignedDesignerId?: string;
+  assignedDesignerName?: string;
 }
 
 interface AppSettings {
@@ -1182,6 +1185,70 @@ apiRouter.get('/supabase/status', async (req, res) => {
   }
 });
 
+// Cloudflare R2 Status & Test Endpoints
+apiRouter.get('/cloudflare/status', async (req, res) => {
+  const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT || process.env.R2_ENDPOINT || '';
+  const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID || '';
+  const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY || '';
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || process.env.R2_BUCKET_NAME || 'zuboc-attachments';
+
+  const configured = Boolean(endpoint && accessKeyId && secretAccessKey);
+  res.json({
+    configured,
+    endpoint: endpoint ? endpoint.replace(/https?:\/\//, '').split('/')[0] : 'Not Set',
+    bucket: bucketName,
+    hasAccessKey: Boolean(accessKeyId),
+    hasSecretKey: Boolean(secretAccessKey),
+    v: APP_VERSION
+  });
+});
+
+apiRouter.post('/cloudflare/test', async (req, res) => {
+  try {
+    const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT || process.env.R2_ENDPOINT || '';
+    const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID || '';
+    const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY || '';
+    const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || process.env.R2_BUCKET_NAME || 'zuboc-attachments';
+
+    if (!endpoint || !accessKeyId || !secretAccessKey) {
+      return res.json({
+        success: false,
+        error: 'Cloudflare R2 environment variables (CLOUDFLARE_R2_ENDPOINT, CLOUDFLARE_R2_ACCESS_KEY_ID, CLOUDFLARE_R2_SECRET_ACCESS_KEY) are missing or incomplete.'
+      });
+    }
+
+    const s3 = new S3Client({
+      region: 'auto',
+      endpoint: endpoint.startsWith('http') ? endpoint : `https://${endpoint}`,
+      credentials: {
+        accessKeyId,
+        secretAccessKey
+      },
+      forcePathStyle: true
+    });
+
+    const { ListObjectsV2Command } = await import('@aws-sdk/client-s3');
+    const command = new ListObjectsV2Command({
+      Bucket: bucketName,
+      MaxKeys: 1
+    });
+
+    const result = await withTimeout(s3.send(command), 8000);
+    return res.json({
+      success: true,
+      message: `Cloudflare R2 connection verified successfully. Bucket "${bucketName}" is accessible.`,
+      objectCount: result.KeyCount || 0
+    });
+  } catch (err: any) {
+    console.error('Cloudflare R2 test error:', err);
+    return res.json({
+      success: false,
+      error: `Cloudflare R2 connection failed: ${err.message || 'Unknown error'}`,
+      code: err.Code || err.name
+    });
+  }
+});
+
 // Deep System Diagnostic Report
 apiRouter.get('/diag/system-report', async (req, res) => {
   const report: any = {
@@ -1735,66 +1802,137 @@ apiRouter.get('/workflow/order/:orderId', async (req, res) => {
 
 // CRE: Send custom order to Design department
 apiRouter.post('/workflow/send-to-design', async (req, res) => {
-  const { orderId, designInstructions, priority, creAttachments, staffId, staffName } = req.body;
-  if (!orderId) {
-    return res.status(400).json({ error: 'Order ID is required' });
-  }
+  try {
+    const { orderId, designInstructions, priority, creAttachments, staffId, staffName } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
 
-  const ord = ordersStore[orderId] || ordersStore[orderId.replace(/^#/, '')];
-  if (!ord) {
-    return res.status(404).json({ error: 'Order not found' });
-  }
+    const cleanId = decodeURIComponent(orderId).trim();
+    const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
+    if (!ord) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
 
-  const now = new Date().toISOString();
-  let wf = workflowsStore[ord.orderId] || {
-    orderId: ord.orderId,
-    isDesignRequired: true,
-    workflowStatus: 'CRE_CREATED',
-    priority: priority || 'NORMAL',
-    currentRevisionNumber: 1,
-    activeDesignFiles: [],
-    creAttachments: [],
-    createdAt: now,
-    updatedAt: now
-  };
-
-  const fromStatus = wf.workflowStatus;
-  wf.isDesignRequired = true;
-  wf.workflowStatus = 'DESIGN_PENDING';
-  wf.priority = priority || wf.priority || 'NORMAL';
-  wf.designInstructions = designInstructions || wf.designInstructions || '';
-  if (Array.isArray(creAttachments)) {
-    wf.creAttachments = [...(wf.creAttachments || []), ...creAttachments];
-    orderAttachmentsStore[ord.orderId] = [...(orderAttachmentsStore[ord.orderId] || []), ...creAttachments];
-  }
-  wf.forwardedToDesignAt = now;
-  wf.forwardedByStaffId = staffId || 'CRE-Staff';
-  wf.forwardedByStaffName = staffName || 'CRE Specialist';
-  wf.updatedAt = now;
-
-  workflowsStore[ord.orderId] = wf;
-  saveLocalBackup();
-
-  logWorkflowAudit(ord.orderId, staffId || 'CRE', staffName || 'CRE Specialist', 'CRE', 'SEND_TO_DESIGN', fromStatus, 'DESIGN_PENDING', `Forwarded to Design department with ${wf.priority} priority`);
-
-  // Supabase Sync
-  const client = getSupabaseClient();
-  if (client) {
-    client.from('department_order_workflow').upsert({
+    const now = new Date().toISOString();
+    let wf = workflowsStore[ord.orderId] || {
       orderId: ord.orderId,
       isDesignRequired: true,
-      workflowStatus: 'DESIGN_PENDING',
-      priority: wf.priority,
-      designInstructions: wf.designInstructions,
-      creAttachments: wf.creAttachments,
-      forwardedToDesignAt: now,
-      forwardedByStaffId: wf.forwardedByStaffId,
-      forwardedByStaffName: wf.forwardedByStaffName,
+      workflowStatus: 'CRE_CREATED',
+      priority: priority || 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: now,
       updatedAt: now
-    }).then(() => {}).catch(() => {});
-  }
+    };
 
-  res.json({ success: true, workflow: wf, message: `Order ${ord.orderId} successfully forwarded to Design department!` });
+    const fromStatus = wf.workflowStatus;
+    wf.isDesignRequired = true;
+    wf.workflowStatus = 'DESIGN_PENDING';
+    wf.priority = priority || wf.priority || 'NORMAL';
+    wf.designInstructions = designInstructions || wf.designInstructions || '';
+    if (Array.isArray(creAttachments)) {
+      wf.creAttachments = [...(wf.creAttachments || []), ...creAttachments];
+      orderAttachmentsStore[ord.orderId] = [...(orderAttachmentsStore[ord.orderId] || []), ...creAttachments];
+    }
+    wf.forwardedToDesignAt = now;
+    wf.forwardedByStaffId = staffId || 'CRE-Staff';
+    wf.forwardedByStaffName = staffName || 'CRE Specialist';
+    wf.updatedAt = now;
+
+    workflowsStore[ord.orderId] = wf;
+    saveLocalBackup();
+
+    logWorkflowAudit(ord.orderId, staffId || 'CRE', staffName || 'CRE Specialist', 'CRE', 'SEND_TO_DESIGN', fromStatus, 'DESIGN_PENDING', `Forwarded to Design department with ${wf.priority} priority`);
+
+    // Supabase Sync
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('department_order_workflow').upsert({
+        orderId: ord.orderId,
+        isDesignRequired: true,
+        workflowStatus: 'DESIGN_PENDING',
+        priority: wf.priority,
+        designInstructions: wf.designInstructions,
+        creAttachments: wf.creAttachments,
+        forwardedToDesignAt: now,
+        forwardedByStaffId: wf.forwardedByStaffId,
+        forwardedByStaffName: wf.forwardedByStaffName,
+        updatedAt: now
+      }).then(() => {}).catch(() => {});
+    }
+
+    res.json({ success: true, workflow: wf, message: `Order ${ord.orderId} successfully forwarded to Design department!` });
+  } catch (err: any) {
+    console.error('Send to design error:', err);
+    res.status(500).json({ error: err?.message || 'Internal server error while forwarding to design' });
+  }
+});
+
+// CRE: Send order directly to Production (bypassing design)
+apiRouter.post('/workflow/send-to-production', async (req, res) => {
+  try {
+    const { orderId, productionInstructions, priority, creAttachments, staffId, staffName } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+
+    const cleanId = decodeURIComponent(orderId).trim();
+    const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
+    if (!ord) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const now = new Date().toISOString();
+    let wf = workflowsStore[ord.orderId] || {
+      orderId: ord.orderId,
+      isDesignRequired: false,
+      workflowStatus: 'CRE_CREATED',
+      priority: priority || 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const fromStatus = wf.workflowStatus;
+    wf.isDesignRequired = false;
+    wf.workflowStatus = 'PRODUCTION_PENDING';
+    wf.priority = priority || wf.priority || 'NORMAL';
+    wf.productionRemarks = productionInstructions || wf.productionRemarks || '';
+    if (Array.isArray(creAttachments)) {
+      wf.creAttachments = [...(wf.creAttachments || []), ...creAttachments];
+      orderAttachmentsStore[ord.orderId] = [...(orderAttachmentsStore[ord.orderId] || []), ...creAttachments];
+    }
+    wf.forwardedByStaffId = staffId || 'CRE-Staff';
+    wf.forwardedByStaffName = staffName || 'CRE Specialist';
+    wf.updatedAt = now;
+
+    workflowsStore[ord.orderId] = wf;
+    saveLocalBackup();
+
+    logWorkflowAudit(ord.orderId, staffId || 'CRE', staffName || 'CRE Specialist', 'CRE', 'SEND_TO_PRODUCTION', fromStatus, 'PRODUCTION_PENDING', `Forwarded directly to Production with ${wf.priority} priority`);
+
+    const client = getSupabaseClient();
+    if (client) {
+      client.from('department_order_workflow').upsert({
+        orderId: ord.orderId,
+        isDesignRequired: false,
+        workflowStatus: 'PRODUCTION_PENDING',
+        priority: wf.priority,
+        productionRemarks: wf.productionRemarks,
+        creAttachments: wf.creAttachments,
+        updatedAt: now
+      }).then(() => {}).catch(() => {});
+    }
+
+    res.json({ success: true, workflow: wf, message: `Order ${ord.orderId} successfully sent directly to Production!` });
+  } catch (err: any) {
+    console.error('Send to production error:', err);
+    res.status(500).json({ error: err?.message || 'Internal server error while sending to production' });
+  }
 });
 
 // DESIGNER: Accept unassigned design order (ATOMIC CONCURRENCY CONTROL)
@@ -1804,14 +1942,26 @@ apiRouter.post('/workflow/accept-order', async (req, res) => {
     return res.status(400).json({ error: 'Order ID and Designer ID are required' });
   }
 
-  const ord = ordersStore[orderId] || ordersStore[orderId.replace(/^#/, '')];
+  const cleanId = decodeURIComponent(orderId).trim();
+  const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
   if (!ord) {
     return res.status(404).json({ error: 'Order not found' });
   }
 
-  const wf = workflowsStore[ord.orderId];
+  let wf = workflowsStore[ord.orderId] || workflowsStore[cleanId] || workflowsStore[cleanId.replace(/^#/, '')];
   if (!wf) {
-    return res.status(404).json({ error: 'Order workflow record not initialized' });
+    wf = {
+      orderId: ord.orderId,
+      isDesignRequired: true,
+      workflowStatus: 'DESIGN_PENDING',
+      priority: 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: ord.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    workflowsStore[ord.orderId] = wf;
   }
 
   // Critical Concurrency Requirement: Conditional Check
@@ -1871,9 +2021,26 @@ apiRouter.post('/workflow/save-draft', async (req, res) => {
   const { orderId, designerId, designerName, designNotes, files } = req.body;
   if (!orderId) return res.status(400).json({ error: 'Order ID is required' });
 
-  const wf = workflowsStore[orderId];
+  const cleanId = decodeURIComponent(orderId).trim();
+  const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
+  let wf = workflowsStore[cleanId] || workflowsStore[cleanId.replace(/^#/, '')] || (ord ? workflowsStore[ord.orderId] : undefined);
+  if (!wf && ord) {
+    wf = {
+      orderId: ord.orderId,
+      isDesignRequired: true,
+      workflowStatus: 'DESIGN_IN_PROGRESS',
+      priority: 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: files || [],
+      creAttachments: [],
+      createdAt: ord.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    workflowsStore[ord.orderId] = wf;
+  }
   if (!wf) return res.status(404).json({ error: 'Workflow not found' });
 
+  const targetId = ord ? ord.orderId : cleanId;
   const now = new Date().toISOString();
   wf.workflowStatus = 'DESIGN_IN_PROGRESS';
   wf.designInstructions = designNotes || wf.designInstructions;
@@ -1881,10 +2048,10 @@ apiRouter.post('/workflow/save-draft', async (req, res) => {
     wf.activeDesignFiles = files;
   }
   wf.updatedAt = now;
-  workflowsStore[orderId] = wf;
+  workflowsStore[targetId] = wf;
   saveLocalBackup();
 
-  logWorkflowAudit(orderId, designerId || wf.assignedDesignerId || 'Designer', designerName || wf.assignedDesignerName || 'Designer', 'DESIGNER', 'SAVE_DRAFT', wf.workflowStatus, 'DESIGN_IN_PROGRESS', 'Design work in progress saved');
+  logWorkflowAudit(targetId, designerId || wf.assignedDesignerId || 'Designer', designerName || wf.assignedDesignerName || 'Designer', 'DESIGNER', 'SAVE_DRAFT', wf.workflowStatus, 'DESIGN_IN_PROGRESS', 'Design work in progress saved');
 
   res.json({ success: true, workflow: wf });
 });
@@ -1897,15 +2064,32 @@ apiRouter.post('/workflow/design-submit', async (req, res) => {
     return res.status(400).json({ error: 'Please upload at least one completed design file before submitting to Production' });
   }
 
-  const wf = workflowsStore[orderId];
+  const cleanId = decodeURIComponent(orderId).trim();
+  const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
+  let wf = workflowsStore[cleanId] || workflowsStore[cleanId.replace(/^#/, '')] || (ord ? workflowsStore[ord.orderId] : undefined);
+  if (!wf && ord) {
+    wf = {
+      orderId: ord.orderId,
+      isDesignRequired: true,
+      workflowStatus: 'DESIGN_PENDING',
+      priority: 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: ord.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    workflowsStore[ord.orderId] = wf;
+  }
   if (!wf) return res.status(404).json({ error: 'Workflow not found' });
 
+  const targetId = ord ? ord.orderId : cleanId;
   const now = new Date().toISOString();
   const nextRevNum = (wf.currentRevisionNumber || 0) + 1;
 
   const newRevision: DesignRevision = {
-    id: `rev_${orderId.replace(/[^a-zA-Z0-9]/g, '_')}_${nextRevNum}_${Date.now()}`,
-    orderId,
+    id: `rev_${targetId.replace(/[^a-zA-Z0-9]/g, '_')}_${nextRevNum}_${Date.now()}`,
+    orderId: targetId,
     revisionNumber: nextRevNum,
     designerId: designerId || wf.assignedDesignerId || 'Designer-01',
     designerName: designerName || wf.assignedDesignerName || 'Designer',
@@ -1916,10 +2100,12 @@ apiRouter.post('/workflow/design-submit', async (req, res) => {
     createdAt: now
   };
 
-  if (!designRevisionsStore[orderId]) designRevisionsStore[orderId] = [];
-  designRevisionsStore[orderId].push(newRevision);
+  if (!designRevisionsStore[targetId]) designRevisionsStore[targetId] = [];
+  designRevisionsStore[targetId].push(newRevision);
 
   const fromStatus = wf.workflowStatus;
+  if (designerId) wf.assignedDesignerId = designerId;
+  if (designerName) wf.assignedDesignerName = designerName;
   wf.workflowStatus = 'DESIGN_SUBMITTED';
   wf.currentRevisionNumber = nextRevNum;
   wf.activeDesignFiles = files;
@@ -1927,15 +2113,21 @@ apiRouter.post('/workflow/design-submit', async (req, res) => {
   wf.clarificationRequest = undefined; // clear pending clarifications
   wf.updatedAt = now;
 
-  workflowsStore[orderId] = wf;
+  workflowsStore[targetId] = wf;
+  if (ord) {
+    ord.assignedDesignerId = wf.assignedDesignerId;
+    ord.assignedDesignerName = wf.assignedDesignerName;
+    ord.updatedAt = now;
+    ordersStore[ord.orderId] = ord;
+  }
   saveLocalBackup();
 
-  logWorkflowAudit(orderId, designerId || 'Designer', designerName || 'Designer', 'DESIGNER', 'SUBMIT_DESIGN_TO_PRODUCTION', fromStatus, 'DESIGN_SUBMITTED', `Revision #${nextRevNum} submitted to Production with ${files.length} design file(s)`);
+  logWorkflowAudit(targetId, designerId || 'Designer', designerName || 'Designer', 'DESIGNER', 'SUBMIT_DESIGN_TO_PRODUCTION', fromStatus, 'DESIGN_SUBMITTED', `Revision #${nextRevNum} submitted to Production with ${files.length} design file(s)`);
 
   const client = getSupabaseClient();
   if (client) {
     client.from('department_order_workflow').upsert({
-      orderId,
+      orderId: targetId,
       workflowStatus: 'DESIGN_SUBMITTED',
       currentRevisionNumber: nextRevNum,
       activeDesignFiles: files,
@@ -2074,8 +2266,33 @@ apiRouter.post('/workflow/production-status', async (req, res) => {
   });
 });
 
+// Cloudflare R2 Client Helper (S3-Compatible Object Storage)
+function getR2Client(): { client: S3Client; bucket: string; publicUrl: string } | null {
+  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
+  const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
+  const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'zuboc-attachments';
+  const publicUrl = (process.env.CLOUDFLARE_R2_PUBLIC_URL || '').replace(/\/+$/, '');
+
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    return null;
+  }
+
+  const client = new S3Client({
+    region: 'auto',
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId,
+      secretAccessKey
+    }
+  });
+
+  return { client, bucket, publicUrl };
+}
+
 // File Upload endpoint for Design & Workflow Attachments (CAD, DWG, DXF, STEP, PDF, JPG, PNG, etc.)
-apiRouter.post('/workflow/upload', upload.array('files', 10), (req, res) => {
+// Supports Cloudflare R2 object storage with seamless local filesystem fallback
+apiRouter.post('/workflow/upload', upload.array('files', 10), async (req, res) => {
   const uploadedFiles = req.files as Express.Multer.File[];
   if (!uploadedFiles || uploadedFiles.length === 0) {
     return res.status(400).json({ error: 'No files uploaded' });
@@ -2083,14 +2300,40 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), (req, res) => {
 
   const { orderId, category, staffId, staffName } = req.body;
   const now = new Date().toISOString();
+  const r2 = getR2Client();
 
-  const results = uploadedFiles.map(file => {
+  const results = await Promise.all(uploadedFiles.map(async (file) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const safeBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
     const uniqueFileName = `${safeBase}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
     const destinationPath = path.join(uploadsDir, uniqueFileName);
 
-    fs.writeFileSync(destinationPath, file.buffer);
+    let fileUrl = `/uploads/${uniqueFileName}`;
+
+    if (r2) {
+      try {
+        const key = `attachments/${uniqueFileName}`;
+        await r2.client.send(new PutObjectCommand({
+          Bucket: r2.bucket,
+          Key: key,
+          Body: file.buffer,
+          ContentType: file.mimetype || 'application/octet-stream'
+        }));
+
+        if (r2.publicUrl) {
+          fileUrl = `${r2.publicUrl}/${key}`;
+        } else {
+          fileUrl = `/api/workflow/r2-file/${encodeURIComponent(key)}`;
+        }
+        console.log(`[R2] Uploaded ${file.originalname} to R2 bucket: ${r2.bucket}/${key}`);
+      } catch (r2Err: any) {
+        console.warn(`[R2] Upload failed for ${file.originalname}, falling back to local storage:`, r2Err?.message);
+        fs.writeFileSync(destinationPath, file.buffer);
+        fileUrl = `/uploads/${uniqueFileName}`;
+      }
+    } else {
+      fs.writeFileSync(destinationPath, file.buffer);
+    }
 
     const attachment = {
       id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -2098,7 +2341,7 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), (req, res) => {
       fileName: file.originalname,
       fileType: ext.replace('.', '').toUpperCase() || 'FILE',
       fileSize: file.size,
-      fileUrl: `/uploads/${uniqueFileName}`,
+      fileUrl,
       category: category || 'DESIGN_FILE',
       uploadedByStaffId: staffId || 'Operator',
       uploadedByStaffName: staffName || 'Operator',
@@ -2111,13 +2354,35 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), (req, res) => {
     }
 
     return attachment;
-  });
+  }));
 
   saveLocalBackup();
   res.json({ success: true, files: results });
 });
 
-// Direct file download endpoint with proper attachment header
+// Stream file directly from Cloudflare R2 (when bucket does not have a public domain)
+apiRouter.get('/workflow/r2-file/:key(*)', async (req, res) => {
+  const r2 = getR2Client();
+  if (!r2) return res.status(404).send('R2 storage not configured');
+  try {
+    const key = req.params.key;
+    const command = new GetObjectCommand({
+      Bucket: r2.bucket,
+      Key: key
+    });
+    const s3Item = await r2.client.send(command);
+    if (!s3Item.Body) return res.status(404).send('File not found in R2');
+    if (s3Item.ContentType) res.setHeader('Content-Type', s3Item.ContentType);
+    if (s3Item.ContentLength) res.setHeader('Content-Length', s3Item.ContentLength);
+    res.setHeader('Content-Disposition', `inline; filename="${path.basename(key)}"`);
+    (s3Item.Body as any).pipe(res);
+  } catch (err: any) {
+    console.warn('R2 file retrieval error:', err?.message);
+    res.status(404).send('File not found in R2');
+  }
+});
+
+// Direct file download endpoint with proper attachment header for local uploads
 apiRouter.get('/workflow/download/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   const filePath = path.join(uploadsDir, filename);

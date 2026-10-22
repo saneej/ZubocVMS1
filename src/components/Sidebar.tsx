@@ -58,8 +58,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   if (currentStaff.role === 'DESIGNER') {
     navItems = [
-      { id: 'designer', label: 'Design Studio Hub', icon: Palette },
-      { id: 'search', label: 'Orders & Archives', icon: Search },
+      { id: 'designer', label: 'Design Studio', icon: Palette },
+      { id: 'history', label: 'History', icon: History },
     ];
   } else if (currentStaff.role === 'PRODUCTION') {
     navItems = [

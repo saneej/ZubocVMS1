@@ -516,7 +516,17 @@ const AppContent: React.FC = () => {
             } />
             <Route path="history" element={
               <RecordingHistory
-                orders={orders}
+                orders={currentStaff.role === 'DESIGNER'
+                  ? orders.filter(o => {
+                      const assignedId = (o as any).assignedDesignerId || (o as any).workflow?.assignedDesignerId;
+                      const assignedName = (o as any).assignedDesignerName || (o as any).workflow?.assignedDesignerName;
+                      const isMine = assignedId === currentStaff.id ||
+                        (assignedName && assignedName.toLowerCase() === currentStaff.name.toLowerCase()) ||
+                        (o.staffId && o.staffId.toLowerCase() === currentStaff.name.toLowerCase());
+                      return isMine;
+                    })
+                  : orders
+                }
                 onRefresh={fetchOrdersAPI}
                 onDeleteOrder={handleDeleteOrder}
               />

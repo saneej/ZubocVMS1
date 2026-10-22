@@ -700,6 +700,61 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     }
   }
 
+  if (cleanPath.includes('/workflow/send-to-design') || cleanPath.includes('/workflow/send-to-production')) {
+    const isProd = cleanPath.includes('send-to-production');
+    const orderId = body.orderId;
+    if (!orderId) throw new Error('Order ID is required');
+
+    const now = new Date().toISOString();
+    let workflows: Record<string, any> = {};
+    try {
+      const cached = localStorage.getItem('zuboc_workflows_store');
+      if (cached) workflows = JSON.parse(cached);
+    } catch {}
+
+    const wf = workflows[orderId] || {
+      orderId,
+      isDesignRequired: !isProd,
+      workflowStatus: isProd ? 'PRODUCTION_PENDING' : 'DESIGN_PENDING',
+      priority: body.priority || 'NORMAL',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    wf.isDesignRequired = !isProd;
+    wf.workflowStatus = isProd ? 'PRODUCTION_PENDING' : 'DESIGN_PENDING';
+    wf.priority = body.priority || wf.priority || 'NORMAL';
+    if (isProd) {
+      wf.productionRemarks = body.productionInstructions || '';
+    } else {
+      wf.designInstructions = body.designInstructions || '';
+    }
+    wf.updatedAt = now;
+
+    workflows[orderId] = wf;
+    localStorage.setItem('zuboc_workflows_store', JSON.stringify(workflows));
+
+    return {
+      success: true,
+      workflow: wf,
+      message: isProd ? `Order ${orderId} sent directly to Production!` : `Order ${orderId} forwarded to Design!`
+    };
+  }
+
+  if (cleanPath.includes('/workflow/upload')) {
+    return {
+      success: true,
+      files: [{
+        id: `att_${Date.now()}`,
+        fileName: 'attachment.pdf',
+        fileSize: 1024,
+        fileUrl: '/uploads/sample.pdf',
+        category: 'DESIGN_FILE',
+        uploadedAt: new Date().toISOString()
+      }]
+    };
+  }
+
   return undefined;
 }
 

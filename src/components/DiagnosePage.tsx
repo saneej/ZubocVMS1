@@ -181,6 +181,65 @@ export const DiagnosePage: React.FC = () => {
   const [sqlCopied, setSqlCopied] = useState(false);
   const [serverTestState, setServerTestState] = useState<{ loading: boolean; result?: any }>({ loading: false });
   const [isSyncing, setIsSyncing] = useState(false);
+  const [cloudflareState, setCloudflareState] = useState<{
+    loading: boolean;
+    configured?: boolean;
+    endpoint?: string;
+    bucket?: string;
+    hasAccessKey?: boolean;
+    hasSecretKey?: boolean;
+    success?: boolean;
+    message?: string;
+    error?: string;
+    objectCount?: number;
+  }>({ loading: false });
+
+  const checkCloudflareStatus = async () => {
+    setCloudflareState(prev => ({ ...prev, loading: true }));
+    addLog('Checking Cloudflare R2 storage configuration...', 'info');
+    try {
+      const res = await safeFetchJson('/api/cloudflare/status');
+      setCloudflareState({
+        loading: false,
+        configured: Boolean(res?.configured),
+        endpoint: res?.endpoint,
+        bucket: res?.bucket,
+        hasAccessKey: res?.hasAccessKey,
+        hasSecretKey: res?.hasSecretKey
+      });
+      if (res?.configured) {
+        addLog('Cloudflare R2 configuration detected and ready for testing.', 'success');
+      } else {
+        addLog('Cloudflare R2 credentials/endpoint not fully set in environment.', 'warn');
+      }
+    } catch (err: any) {
+      setCloudflareState({ loading: false, configured: false, error: err.message });
+      addLog(`Failed to check Cloudflare R2 status: ${err.message}`, 'error');
+    }
+  };
+
+  const handleTestCloudflare = async () => {
+    setCloudflareState(prev => ({ ...prev, loading: true }));
+    addLog('Testing connection to Cloudflare R2 bucket...', 'info');
+    try {
+      const res = await safeFetchJson('/api/cloudflare/test', { method: 'POST' });
+      setCloudflareState(prev => ({
+        ...prev,
+        loading: false,
+        success: Boolean(res?.success),
+        message: res?.message || res?.error,
+        objectCount: res?.objectCount
+      }));
+      if (res?.success) {
+        addLog(`Cloudflare R2 Test Success: ${res.message}`, 'success');
+      } else {
+        addLog(`Cloudflare R2 Test Failed: ${res?.error || 'Unknown error'}`, 'error');
+      }
+    } catch (err: any) {
+      setCloudflareState(prev => ({ ...prev, loading: false, success: false, error: err.message }));
+      addLog(`Cloudflare R2 test exception: ${err.message}`, 'error');
+    }
+  };
 
   const [systemReport, setSystemReport] = useState<{ loading: boolean; data?: any }>({ loading: false });
 
@@ -282,6 +341,7 @@ export const DiagnosePage: React.FC = () => {
   useEffect(() => {
     updateCacheStats();
     checkSupabaseStatus();
+    checkCloudflareStatus();
     addLog('System Diagnostics Portal initialized. All Zero-Waste quota protections verified.', 'info');
   }, []);
 
@@ -668,6 +728,82 @@ export const DiagnosePage: React.FC = () => {
               </pre>
             </div>
           )}
+        </div>
+
+        {/* Cloudflare R2 Connection Card */}
+        <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center font-bold">
+                <UploadCloud className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-extrabold uppercase tracking-wide text-slate-900">
+                    Cloudflare R2 Attachment Storage
+                  </h2>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${cloudflareState.configured ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                    {cloudflareState.configured ? 'Configured ✅' : 'Setup Required ⚠️'}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-stone-500">
+                  Endpoint: {cloudflareState.endpoint || 'Not configured'} &bull; Bucket: {cloudflareState.bucket || 'zuboc-attachments'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={checkCloudflareStatus}
+                disabled={cloudflareState.loading}
+                className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${cloudflareState.loading ? 'animate-spin' : ''}`} />
+                <span>Refresh Status</span>
+              </button>
+
+              <button
+                onClick={handleTestCloudflare}
+                disabled={cloudflareState.loading}
+                className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                {cloudflareState.loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                <span>Test R2 Connection</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-stone-200 bg-stone-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-stone-600">R2 Storage Test Result:</span>
+                {cloudflareState.success === true ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Connected &amp; Accessible
+                  </span>
+                ) : cloudflareState.success === false ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md">
+                    <XCircle className="w-3.5 h-3.5" /> Connection Failed
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-stone-700 bg-stone-200 px-2 py-0.5 rounded-md">
+                    Not Tested Yet
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-stone-500 font-mono">
+                {cloudflareState.message || (cloudflareState.configured 
+                  ? 'Cloudflare R2 credentials are set. Click "Test R2 Connection" to verify bucket reachability.' 
+                  : 'To enable Cloudflare R2 attachments, set CLOUDFLARE_R2_ENDPOINT, CLOUDFLARE_R2_ACCESS_KEY_ID, and CLOUDFLARE_R2_SECRET_ACCESS_KEY in environment variables.')}
+              </p>
+            </div>
+
+            {cloudflareState.objectCount !== undefined && (
+              <div className="text-right font-mono text-xs text-stone-600">
+                Sample Objects Count: <strong className="text-orange-600">{cloudflareState.objectCount}</strong>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Audit Report: Why the Quota Ran Out */}
