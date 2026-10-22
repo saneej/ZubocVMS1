@@ -286,14 +286,7 @@ export const PublicProductionDeck: React.FC = () => {
       DISPATCHED: []
     };
 
-    const visibleOrders = orders.filter(o => 
-      o.isProductionDeckOrder || 
-      Boolean(o.dispatchScheduledDate) ||
-      Boolean(o.dispatch_scheduled_date) ||
-      Boolean(o.dispatchDate) || 
-      Boolean(o.promisedDeliveryDate) || 
-      Boolean(o.stageDueDates?.DISPATCH)
-    );
+    const visibleOrders = orders.filter(o => Boolean(o.isProductionDeckOrder));
 
     visibleOrders.forEach(ord => {
       const norm = normalizeOrder(ord);

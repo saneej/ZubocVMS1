@@ -433,14 +433,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
   }, []);
 
   const normalizedList = useMemo(() => {
-    return orders.filter(ord => 
-      ord.isProductionDeckOrder || 
-      Boolean(ord.dispatchScheduledDate) ||
-      Boolean(ord.dispatch_scheduled_date) ||
-      Boolean(ord.dispatchDate) || 
-      Boolean(ord.promisedDeliveryDate) || 
-      Boolean(ord.stageDueDates?.DISPATCH)
-    ).map(ord => ({
+    return orders.filter(ord => Boolean(ord.isProductionDeckOrder)).map(ord => ({
       raw: ord,
       norm: normalizeOrder(ord)
     }));
