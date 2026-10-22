@@ -109,7 +109,7 @@ export interface OrderRecord {
   orderTotal?: string;
   deliveredDate?: string;
   itemCount?: string | number;
-  fulfillmentStatus?: 'Pending' | 'Packed' | 'Shipped' | 'Fulfilled' | 'Delivered' | string;
+  fulfillmentStatus?: 'Pending' | 'Packed' | 'Fulfilled' | 'Delivered' | string;
   notes?: string;
   remarks?: string;
   chatNotes?: ChatNote[];

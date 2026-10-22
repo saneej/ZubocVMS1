@@ -33,7 +33,7 @@
       "shippingAmount": "",
       "orderTotal": "",
       "itemCount": "1",
-      "fulfillmentStatus": "Pending",
+      "fulfillmentStatus": "Fulfilled",
       "notes": "",
       "remarks": null,
       "chatNotes": [],
@@ -58,6 +58,27 @@
           "details": "Disabled Production Deck listing",
           "staffId": "Sajil",
           "timestamp": "2026-10-22T13:58:52.595Z"
+        },
+        {
+          "type": "CHANGE_LOG",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Pending\" to \"Fulfilled\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:32:44.716Z"
+        },
+        {
+          "type": "CHANGE_LOG",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Fulfilled\" to \"Pending\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:33:32.229Z"
+        },
+        {
+          "timestamp": "2026-10-22T14:36:52.460Z",
+          "staffId": "Sajil",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Pending\" to \"Fulfilled\"",
+          "type": "CHANGE_LOG"
         }
       ],
       "clientName": null,
@@ -80,7 +101,7 @@
       "productionNotes": null,
       "isProductionDeckOrder": false,
       "createdAt": "2026-10-22T13:06:57.327+00:00",
-      "updatedAt": "2026-10-22T13:58:52.595+00:00",
+      "updatedAt": "2026-10-22T14:36:51.286Z",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": null,
@@ -309,7 +330,7 @@
       "shippingAmount": "",
       "orderTotal": "",
       "itemCount": "1",
-      "fulfillmentStatus": "Shipped",
+      "fulfillmentStatus": "Pending",
       "notes": "urgent order for 3 customised rubber stamps (5 Ã 5 inch each) that needs to be dispatched to Delhi by the 23rd oct. Express shipping via Trackon: â¹350/-.( This order needs to reach Delhi, from where they will arrange a Porter service to Gurgaon.)\n\nCUSTOMISED RUBBER STAMP\nSize: 5 Ã 5 inch\nQty: 3 PCS\nRate: â¹849/-\nTotal: â¹2,547/-\nââââââââââ\nð° PRODUCT TOTAL: â¹2,547/-\nð¹ INCLUDING: Customisation & GST\nð EXTRA SHIPPING CHARGES\nShipping via Trackon: â¹350/-\n GRAND TOTAL: â¹2,897/-\nAmount Fully Paid ; 2900 /-â",
       "remarks": "urgent order for 3 customised rubber stamps (5 Ã 5 inch each) that needs to be dispatched to Delhi by the 23rd oct. Express shipping via Trackon: â¹350/-.( This order needs to reach Delhi, from where they will arrange a Porter service to Gurgaon.)\n\nCUSTOMISED RUBBER STAMP\nSize: 5 Ã 5 inch\nQty: 3 PCS\nRate: â¹849/-\nTotal: â¹2,547/-\nââââââââââ\nð° PRODUCT TOTAL: â¹2,547/-\nð¹ INCLUDING: Customisation & GST\nð EXTRA SHIPPING CHARGES\nShipping via Trackon: â¹350/-\n GRAND TOTAL: â¹2,897/-\nAmount Fully Paid ; 2900 /-â",
       "chatNotes": [
@@ -429,6 +450,41 @@
           "details": "Updated order timeline dates",
           "staffId": "Sajil",
           "timestamp": "2026-10-22T12:53:02.338Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:20:46.069Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:20:51.413Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:20:58.389Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:21:50.756Z"
+        },
+        {
+          "type": "CHANGE_LOG",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Shipped\" to \"Pending\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:21:56.569Z"
         }
       ],
       "clientName": "Bela Shelat",
@@ -459,7 +515,7 @@
       "productionNotes": "urgent order for 3 customised rubber stamps (5 Ã 5 inch each) that needs to be dispatched to Delhi by the 23rd oct. Express shipping via Trackon: â¹350/-.( This order needs to reach Delhi, from where they will arrange a Porter service to Gurgaon.)\n\nCUSTOMISED RUBBER STAMP\nSize: 5 Ã 5 inch\nQty: 3 PCS\nRate: â¹849/-\nTotal: â¹2,547/-\nââââââââââ\nð° PRODUCT TOTAL: â¹2,547/-\nð¹ INCLUDING: Customisation & GST\nð EXTRA SHIPPING CHARGES\nShipping via Trackon: â¹350/-\n GRAND TOTAL: â¹2,897/-\nAmount Fully Paid ; 2900 /-â",
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-21T08:23:47.348+00:00",
-      "updatedAt": "2026-10-22T12:53:02.338+00:00",
+      "updatedAt": "2026-10-22T14:21:56.569+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2485,
@@ -492,8 +548,8 @@
       ],
       "dispatchdate": null,
       "ridernumber": null,
-      "dispatch_scheduled_date": null,
-      "dispatchScheduledDate": null,
+      "dispatch_scheduled_date": "2026-10-22T00:00:00.000Z",
+      "dispatchScheduledDate": "2026-10-22T00:00:00.000Z",
       "isDispatched": false
     },
     "TEST-SHOPIFY-1001": {
@@ -871,7 +927,7 @@
       "orderId": "TEST-123",
       "staffId": null,
       "stationId": null,
-      "recordingStartedAt": null,
+      "recordingStartedAt": "2026-10-22T14:33:15.63+00:00",
       "recordingCompletedAt": null,
       "durationSeconds": 0,
       "recordingStatus": "PENDING",
@@ -894,7 +950,7 @@
       "contactPhone": null,
       "fulfillFrom": null,
       "orderReceivedDate": null,
-      "dispatchDate": null,
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
       "deliveredDate": null,
       "orderAmount": null,
       "shippingAmount": null,
@@ -904,7 +960,15 @@
       "notes": null,
       "remarks": null,
       "chatNotes": [],
-      "auditLogs": [],
+      "auditLogs": [
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:33:15.085Z"
+        }
+      ],
       "clientName": null,
       "product": null,
       "formFillingDate": null,
@@ -912,15 +976,20 @@
       "checkedBy": null,
       "customisations": {},
       "subAssemblyProgress": {},
-      "timeline": {},
+      "timeline": {
+        "dispatchingDate": "",
+        "orderConfirmationDate": ""
+      },
       "promisedDeliveryDate": null,
       "paymentGate": {},
       "productionStage": "ORDER_CONFIRMATION",
-      "stageDueDates": {},
+      "stageDueDates": {
+        "ORDER_CONFIRMATION": ""
+      },
       "productionNotes": null,
       "isProductionDeckOrder": false,
       "createdAt": "2026-10-21T05:15:33.207+00:00",
-      "updatedAt": "2026-10-21T05:15:33.207+00:00",
+      "updatedAt": "2026-10-22T14:33:15.085+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": null,
@@ -946,8 +1015,8 @@
       "lineItems": null,
       "dispatchdate": null,
       "ridernumber": null,
-      "dispatch_scheduled_date": null,
-      "dispatchScheduledDate": null,
+      "dispatch_scheduled_date": "2026-10-22T00:00:00.000Z",
+      "dispatchScheduledDate": "2026-10-22T00:00:00.000Z",
       "isDispatched": false
     },
     "#2483": {
@@ -983,7 +1052,7 @@
       "shippingAmount": "159",
       "orderTotal": "810",
       "itemCount": "1",
-      "fulfillmentStatus": "Fulfilled",
+      "fulfillmentStatus": "Pending",
       "notes": null,
       "remarks": null,
       "chatNotes": [],
@@ -994,6 +1063,13 @@
           "details": "Updated order timeline dates",
           "staffId": "saneej",
           "timestamp": "2026-10-22T02:31:48.384Z"
+        },
+        {
+          "type": "CHANGE_LOG",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Fulfilled\" to \"Pending\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:33:40.337Z"
         }
       ],
       "clientName": null,
@@ -1016,7 +1092,7 @@
       "productionNotes": null,
       "isProductionDeckOrder": false,
       "createdAt": "2026-10-20T11:03:20+00:00",
-      "updatedAt": "2026-10-22T02:31:48.384+00:00",
+      "updatedAt": "2026-10-22T14:33:40.337+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2483,
@@ -1086,7 +1162,7 @@
       "shippingAmount": "0",
       "orderTotal": "11100",
       "itemCount": "8",
-      "fulfillmentStatus": "Fulfilled",
+      "fulfillmentStatus": "Pending",
       "notes": "DISPATCHING DATE  29-10-26\n\nð WEDDING INVITATION\n\nâ¨ Customised Wedding Invitation Suite\n\nQty: 50 PCS\n\nâ½ CUSTOMISED ENVELOPE\nSize: 21.5 Ã 15.4 cm\nQty: 50 PCS\nRate: â¹47/- each\nTotal: â¹2,350/-\n\nâ½ INSERT â IDEAL FOR ENVELOPE\nQty: 50 PCS\nRate: â¹14/- each\nTotal: â¹700/-\n\nâ½ INSERT DIE CUTTING CHARGE\nTotal: â¹1,200/-\n\nâ½ DIGITAL PRINT ON INS ERT â SINGLE SIDE\nTotal: â¹500/-\n\nâ½ GOLD FOILING ON INSERT\nTotal: â¹2,600/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\nâ½ CURATION CHARGE\nTotal: â¹850/-\n\nð RSVP CARD â DOUBLE SIDE PRINT\nSize: 10 Ã 8 cm\nQty: 60 PCS\nRate: â¹20/- each\nTotal: â¹1,200/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\n\nð GRAND TOTAL: â¹11,100/-\n\nð¹ INCLUDING: Customisation & GST\n\n\nð PAYMENT TERMS\nGrand Total: â¹11,100/-\n\nâ½ 60% Advance Payment: â¹6,660/- PAID\nâ½ 40% Balance Payment: â¹4,440/-\n\nð Shipping Charges: Extra\n\nð Production will commence only after receipt of the advance payment.\n\nð The balance payment, including applicable shipping charges, must be completed before dispatch.",
       "remarks": "DISPATCHING DATE  29-10-26\n\nð WEDDING INVITATION\n\nâ¨ Customised Wedding Invitation Suite\n\nQty: 50 PCS\n\nâ½ CUSTOMISED ENVELOPE\nSize: 21.5 Ã 15.4 cm\nQty: 50 PCS\nRate: â¹47/- each\nTotal: â¹2,350/-\n\nâ½ INSERT â IDEAL FOR ENVELOPE\nQty: 50 PCS\nRate: â¹14/- each\nTotal: â¹700/-\n\nâ½ INSERT DIE CUTTING CHARGE\nTotal: â¹1,200/-\n\nâ½ DIGITAL PRINT ON INS ERT â SINGLE SIDE\nTotal: â¹500/-\n\nâ½ GOLD FOILING ON INSERT\nTotal: â¹2,600/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\nâ½ CURATION CHARGE\nTotal: â¹850/-\n\nð RSVP CARD â DOUBLE SIDE PRINT\nSize: 10 Ã 8 cm\nQty: 60 PCS\nRate: â¹20/- each\nTotal: â¹1,200/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\n\nð GRAND TOTAL: â¹11,100/-\n\nð¹ INCLUDING: Customisation & GST\n\n\nð PAYMENT TERMS\nGrand Total: â¹11,100/-\n\nâ½ 60% Advance Payment: â¹6,660/- PAID\nâ½ 40% Balance Payment: â¹4,440/-\n\nð Shipping Charges: Extra\n\nð Production will commence only after receipt of the advance payment.\n\nð The balance payment, including applicable shipping charges, must be completed before dispatch.",
       "chatNotes": [],
@@ -1111,6 +1187,13 @@
           "details": "Updated order timeline dates",
           "staffId": "Sajil",
           "timestamp": "2026-10-22T12:47:09.496Z"
+        },
+        {
+          "type": "CHANGE_LOG",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Fulfilled\" to \"Pending\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T14:33:47.553Z"
         }
       ],
       "clientName": "Gauri Sood",
@@ -1146,7 +1229,7 @@
       "productionNotes": "DISPATCHING DATE  29-10-26\n\nð WEDDING INVITATION\n\nâ¨ Customised Wedding Invitation Suite\n\nQty: 50 PCS\n\nâ½ CUSTOMISED ENVELOPE\nSize: 21.5 Ã 15.4 cm\nQty: 50 PCS\nRate: â¹47/- each\nTotal: â¹2,350/-\n\nâ½ INSERT â IDEAL FOR ENVELOPE\nQty: 50 PCS\nRate: â¹14/- each\nTotal: â¹700/-\n\nâ½ INSERT DIE CUTTING CHARGE\nTotal: â¹1,200/-\n\nâ½ DIGITAL PRINT ON INS ERT â SINGLE SIDE\nTotal: â¹500/-\n\nâ½ GOLD FOILING ON INSERT\nTotal: â¹2,600/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\nâ½ CURATION CHARGE\nTotal: â¹850/-\n\nð RSVP CARD â DOUBLE SIDE PRINT\nSize: 10 Ã 8 cm\nQty: 60 PCS\nRate: â¹20/- each\nTotal: â¹1,200/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\n\nð GRAND TOTAL: â¹11,100/-\n\nð¹ INCLUDING: Customisation & GST\n\n\nð PAYMENT TERMS\nGrand Total: â¹11,100/-\n\nâ½ 60% Advance Payment: â¹6,660/- PAID\nâ½ 40% Balance Payment: â¹4,440/-\n\nð Shipping Charges: Extra\n\nð Production will commence only after receipt of the advance payment.\n\nð The balance payment, including applicable shipping charges, must be completed before dispatch.",
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-19T15:22:43+00:00",
-      "updatedAt": "2026-10-22T12:47:09.496+00:00",
+      "updatedAt": "2026-10-22T14:33:47.553+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2482,

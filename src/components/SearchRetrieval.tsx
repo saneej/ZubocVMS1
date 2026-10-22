@@ -144,12 +144,12 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const fulfillmentStats: Record<string, number> = {
     'Pending': 0,
     'Packed': 0,
-    'Shipped': 0,
     'Fulfilled': 0,
     'Delivered': 0
   };
   orders.forEach(o => {
-    const s = o.fulfillmentStatus || 'Pending';
+    let s = o.fulfillmentStatus || 'Pending';
+    if (s === 'Shipped') s = 'Fulfilled';
     if (fulfillmentStats[s] !== undefined) {
       fulfillmentStats[s]++;
     }
@@ -197,9 +197,10 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       statusFilter === 'ALL' || 
       order.uploadStatus === statusFilter;
 
+    const currentFulfillment = (order.fulfillmentStatus === 'Shipped') ? 'Fulfilled' : (order.fulfillmentStatus || 'Pending');
     const matchesFulfillment = 
       fulfillmentFilter === 'ALL' || 
-      (order.fulfillmentStatus || 'Pending') === fulfillmentFilter;
+      currentFulfillment === fulfillmentFilter;
 
     return matchesSearch && matchesUploadStatus && matchesFulfillment;
   });
@@ -648,7 +649,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
               )}
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
-              {['ALL', 'Pending', 'Packed', 'Shipped', 'Fulfilled', 'Delivered'].map((f) => (
+              {['ALL', 'Pending', 'Packed', 'Fulfilled', 'Delivered'].map((f) => (
                 <button
                   key={f}
                   onClick={() => setFulfillmentFilter(f)}
@@ -1144,7 +1145,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                     >
                       <option value="Pending">Pending</option>
                       <option value="Packed">Packed</option>
-                      <option value="Shipped">Shipped</option>
                       <option value="Fulfilled">Fulfilled</option>
                       <option value="Delivered">Delivered</option>
                     </select>

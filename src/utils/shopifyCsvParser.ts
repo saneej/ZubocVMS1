@@ -332,8 +332,11 @@ export function parseOrdersCsv(fileBuffer: ArrayBuffer | Uint8Array): CsvParseRe
 
           // Target 26 Shopify Fields
           email: firstRow.Email,
-          financialStatus: firstRow['Financial Status'] || 'pending',
-          fulfillmentStatus: firstRow['Fulfillment Status'] ? (firstRow['Fulfillment Status'].trim().charAt(0).toUpperCase() + firstRow['Fulfillment Status'].trim().slice(1)) : 'Unfulfilled',
+          fulfillmentStatus: (() => {
+            const rawF = firstRow['Fulfillment Status'] ? firstRow['Fulfillment Status'].trim() : 'Pending';
+            if (rawF.toLowerCase() === 'shipped' || rawF.toLowerCase() === 'fulfilled') return 'Fulfilled';
+            return rawF ? (rawF.charAt(0).toUpperCase() + rawF.slice(1)) : 'Pending';
+          })(),
           subtotal: firstRow.Subtotal,
           shipping: firstRow.Shipping,
           taxes: firstRow.Taxes,

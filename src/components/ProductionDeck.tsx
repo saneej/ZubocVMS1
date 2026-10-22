@@ -177,7 +177,7 @@ function normalizeOrder(order: OrderRecord): {
   else if (stage === 'QC_PACKED') stage = 'PRODUCTION_CURATION';
   else if (stage === 'DISPATCHED') stage = 'DISPATCH';
   else if (!order.productionStage) {
-    if (order.fulfillmentStatus === 'Shipped' || order.fulfillmentStatus === 'Delivered') {
+    if (order.fulfillmentStatus === 'Shipped' || order.fulfillmentStatus === 'Fulfilled' || order.fulfillmentStatus === 'Delivered') {
       stage = 'DISPATCH';
     } else if (order.fulfillmentStatus === 'Packed' || order.recordingStatus === 'COMPLETED') {
       stage = 'PHOTOSHOOT';
@@ -549,7 +549,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const updated: OrderRecord = {
       ...order,
       productionStage: targetStage,
-      fulfillmentStatus: (targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') ? 'Shipped' : targetStage === 'PHOTOSHOOT' ? 'Packed' : 'Pending',
+      fulfillmentStatus: (targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') ? 'Fulfilled' : targetStage === 'PHOTOSHOOT' ? 'Packed' : 'Pending',
       updatedAt: new Date().toISOString()
     };
 
@@ -570,7 +570,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const updated: OrderRecord = {
       ...order,
       productionStage: targetStage,
-      fulfillmentStatus: (targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') ? 'Shipped' : targetStage === 'PHOTOSHOOT' ? 'Packed' : 'Pending',
+      fulfillmentStatus: (targetStage === 'DISPATCH' || targetStage === 'DISPATCHED') ? 'Fulfilled' : targetStage === 'PHOTOSHOOT' ? 'Packed' : 'Pending',
       updatedAt: new Date().toISOString()
     };
 
@@ -583,7 +583,7 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
     const updated: OrderRecord = {
       ...dispatchOverrideOrder,
       productionStage: 'DISPATCH',
-      fulfillmentStatus: 'Shipped',
+      fulfillmentStatus: 'Fulfilled',
       paymentGate: {
         ...(dispatchOverrideOrder.paymentGate || {}),
         adminDispatchOverride: true,
@@ -1250,7 +1250,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
         balanceStatus
       },
       chatNotes: updatedNotes,
-      fulfillmentStatus: currentStage === 'DISPATCHED' ? 'Shipped' : currentStage === 'QC_PACKED' ? 'Packed' : 'Pending',
+      fulfillmentStatus: currentStage === 'DISPATCHED' ? 'Fulfilled' : currentStage === 'QC_PACKED' ? 'Packed' : 'Pending',
       updatedAt: new Date().toISOString()
     };
     
@@ -1313,7 +1313,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
         balanceStatus
       },
       chatNotes,
-      fulfillmentStatus: currentStage === 'DISPATCHED' ? 'Shipped' : currentStage === 'QC_PACKED' ? 'Packed' : 'Pending',
+      fulfillmentStatus: currentStage === 'DISPATCHED' ? 'Fulfilled' : currentStage === 'QC_PACKED' ? 'Packed' : 'Pending',
       updatedAt: now
     };
 

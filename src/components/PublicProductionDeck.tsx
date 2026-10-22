@@ -121,7 +121,7 @@ function normalizeOrder(order: OrderRecord) {
   else if (stage === 'QC_PACKED') stage = 'PRODUCTION_CURATION';
   else if (stage === 'DISPATCHED') stage = 'DISPATCH';
   else if (!order.productionStage) {
-    if (order.fulfillmentStatus === 'Shipped' || order.fulfillmentStatus === 'Delivered') {
+    if (order.fulfillmentStatus === 'Shipped' || order.fulfillmentStatus === 'Fulfilled' || order.fulfillmentStatus === 'Delivered') {
       stage = 'DISPATCH';
     } else if (order.fulfillmentStatus === 'Packed' || order.recordingStatus === 'COMPLETED') {
       stage = 'PHOTOSHOOT';

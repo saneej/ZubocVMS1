@@ -132,13 +132,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const rawFulfillmentStats: Record<string, number> = {
     'Pending': 0,
     'Packed': 0,
-    'Shipped': 0,
     'Fulfilled': 0,
     'Delivered': 0
   };
 
   orders.forEach(o => {
-    const s = o.fulfillmentStatus || 'Pending';
+    let s = o.fulfillmentStatus || 'Pending';
+    if (s === 'Shipped') s = 'Fulfilled';
     rawFulfillmentStats[s] = (rawFulfillmentStats[s] || 0) + 1;
   });
 
@@ -168,9 +168,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const workflowRank: Record<string, number> = {
       'Pending': 1,
       'Packed': 2,
-      'Shipped': 3,
-      'Fulfilled': 4,
-      'Delivered': 5
+      'Fulfilled': 3,
+      'Delivered': 4
     };
 
     return entries.sort((a, b) => (workflowRank[a.status] || 99) - (workflowRank[b.status] || 99));
@@ -225,8 +224,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return orders
       .filter(o => {
         // Status filter
-        if (selectedStatusFilter !== 'ALL' && (o.fulfillmentStatus || 'Pending') !== selectedStatusFilter) {
-          return false;
+        if (selectedStatusFilter !== 'ALL') {
+          const normStatus = (o.fulfillmentStatus === 'Shipped') ? 'Fulfilled' : (o.fulfillmentStatus || 'Pending');
+          if (normStatus !== selectedStatusFilter) return false;
         }
 
         // Courier filter
@@ -657,7 +657,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <option value="ALL">All Statuses</option>
               <option value="Pending">Pending</option>
               <option value="Packed">Packed</option>
-              <option value="Shipped">Shipped</option>
               <option value="Fulfilled">Fulfilled</option>
               <option value="Delivered">Delivered</option>
             </select>
@@ -782,19 +781,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="p-3.5 text-xs">
                       <div className="space-y-1.5 min-w-[130px]">
                         <select
-                          value={order.fulfillmentStatus || 'Pending'}
+                          value={order.fulfillmentStatus === 'Shipped' ? 'Fulfilled' : (order.fulfillmentStatus || 'Pending')}
                           onChange={(e) => handleQuickStatusUpdate(order, e.target.value)}
                           className={`w-full px-2 py-1 rounded-xl border text-[10px] font-extrabold focus:outline-none cursor-pointer ${
                             order.fulfillmentStatus === 'Delivered' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
-                            order.fulfillmentStatus === 'Shipped' ? 'bg-blue-50 text-blue-800 border-blue-300' :
-                            order.fulfillmentStatus === 'Fulfilled' ? 'bg-purple-50 text-purple-800 border-purple-300' :
+                            (order.fulfillmentStatus === 'Fulfilled' || order.fulfillmentStatus === 'Shipped') ? 'bg-purple-50 text-purple-800 border-purple-300' :
                             order.fulfillmentStatus === 'Packed' ? 'bg-amber-50 text-amber-800 border-amber-300' :
                             'bg-slate-50 text-slate-700 border-slate-300'
                           }`}
                         >
                           <option value="Pending">Pending</option>
                           <option value="Packed">Packed</option>
-                          <option value="Shipped">Shipped</option>
                           <option value="Fulfilled">Fulfilled</option>
                           <option value="Delivered">Delivered</option>
                         </select>
