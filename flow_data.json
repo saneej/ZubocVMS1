@@ -1,14 +1,290 @@
 {
   "orders": {
-    "#2485": {
-      "orderId": "#2485",
-      "staffId": "Staff-01",
+    "402-6533563": {
+      "orderId": "402-6533563",
+      "staffId": "Sajil",
       "stationId": "Packing-01",
-      "recordingStartedAt": "2026-10-21T05:28:54.753+00:00",
-      "recordingCompletedAt": "2026-10-21T06:03:34.762+00:00",
+      "recordingStartedAt": "2026-10-22T12:48:58.703+00:00",
+      "recordingCompletedAt": "2026-10-22T13:06:57.327+00:00",
       "durationSeconds": 0,
       "recordingStatus": "PENDING",
       "uploadStatus": "PENDING",
+      "evidenceType": null,
+      "videoUrl": "",
+      "photoUrls": [],
+      "photoDataUrl": null,
+      "telegramChatId": null,
+      "telegramMessageId": null,
+      "telegramFileId": null,
+      "telegramMessageLink": null,
+      "awbNumber": "",
+      "courier": "",
+      "deliveryMethod": "Normal",
+      "weight": "",
+      "productSku": "",
+      "customerName": "",
+      "contactPerson": "",
+      "contactPhone": "",
+      "fulfillFrom": "",
+      "orderReceivedDate": null,
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
+      "deliveredDate": null,
+      "orderAmount": "",
+      "shippingAmount": "",
+      "orderTotal": "",
+      "itemCount": "1",
+      "fulfillmentStatus": "Pending",
+      "notes": "",
+      "remarks": null,
+      "chatNotes": [],
+      "auditLogs": [
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T13:47:47.406Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Enabled Production Deck listing",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T13:58:34.828Z"
+        },
+        {
+          "timestamp": "2026-10-22T13:58:52.595Z",
+          "staffId": "Sajil",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Disabled Production Deck listing",
+          "type": "EDIT_LOG"
+        }
+      ],
+      "clientName": null,
+      "product": null,
+      "formFillingDate": null,
+      "preparedBy": null,
+      "checkedBy": null,
+      "customisations": {},
+      "subAssemblyProgress": {},
+      "timeline": {
+        "dispatchingDate": "",
+        "orderConfirmationDate": ""
+      },
+      "promisedDeliveryDate": null,
+      "paymentGate": {},
+      "productionStage": "ORDER_CONFIRMATION",
+      "stageDueDates": {
+        "ORDER_CONFIRMATION": ""
+      },
+      "productionNotes": null,
+      "isProductionDeckOrder": false,
+      "createdAt": "2026-10-22T13:06:57.327+00:00",
+      "updatedAt": "2026-10-22T13:58:51.320Z",
+      "order_source": "website",
+      "orderSource": "website",
+      "order_number_num": null,
+      "email": null,
+      "financialStatus": null,
+      "subtotal": null,
+      "shipping": null,
+      "taxes": null,
+      "total": null,
+      "discountCode": null,
+      "discountAmount": null,
+      "shippingMethod": null,
+      "shippingName": null,
+      "shippingStreet": null,
+      "shippingAddress1": null,
+      "shippingAddress2": null,
+      "shippingCompany": null,
+      "shippingCity": null,
+      "shippingZip": null,
+      "shippingProvince": null,
+      "shippingCountry": null,
+      "shippingPhone": null,
+      "lineItems": null,
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": "2026-10-22T00:00:00.000Z",
+      "dispatchScheduledDate": "2026-10-22T00:00:00.000Z",
+      "isDispatched": false
+    },
+    "tsdfhj": {
+      "orderId": "tsdfhj",
+      "staffId": "Sajil",
+      "stationId": "Packing-01",
+      "recordingStartedAt": "2026-10-22T12:52:25.586+00:00",
+      "recordingCompletedAt": "2026-10-22T12:52:26.207+00:00",
+      "durationSeconds": 0,
+      "recordingStatus": "PENDING",
+      "uploadStatus": "PENDING",
+      "evidenceType": null,
+      "videoUrl": "",
+      "photoUrls": [],
+      "photoDataUrl": null,
+      "telegramChatId": null,
+      "telegramMessageId": null,
+      "telegramFileId": null,
+      "telegramMessageLink": null,
+      "awbNumber": "",
+      "courier": "",
+      "deliveryMethod": "Normal",
+      "weight": "",
+      "productSku": "",
+      "customerName": "",
+      "contactPerson": "",
+      "contactPhone": "",
+      "fulfillFrom": "",
+      "orderReceivedDate": "",
+      "dispatchDate": "",
+      "deliveredDate": "",
+      "orderAmount": "",
+      "shippingAmount": "",
+      "orderTotal": "",
+      "itemCount": "1",
+      "fulfillmentStatus": "Pending",
+      "notes": "",
+      "remarks": null,
+      "chatNotes": [],
+      "auditLogs": [],
+      "clientName": null,
+      "product": null,
+      "formFillingDate": null,
+      "preparedBy": null,
+      "checkedBy": null,
+      "customisations": {},
+      "subAssemblyProgress": {},
+      "timeline": {},
+      "promisedDeliveryDate": null,
+      "paymentGate": {},
+      "productionStage": "ORDER_CONFIRMATION",
+      "stageDueDates": {},
+      "productionNotes": null,
+      "isProductionDeckOrder": false,
+      "createdAt": "2026-10-22T12:52:25.586+00:00",
+      "updatedAt": "2026-10-22T12:52:26.207+00:00",
+      "order_source": "website",
+      "orderSource": "website",
+      "order_number_num": null,
+      "email": null,
+      "financialStatus": null,
+      "subtotal": null,
+      "shipping": null,
+      "taxes": null,
+      "total": null,
+      "discountCode": null,
+      "discountAmount": null,
+      "shippingMethod": null,
+      "shippingName": null,
+      "shippingStreet": null,
+      "shippingAddress1": null,
+      "shippingAddress2": null,
+      "shippingCompany": null,
+      "shippingCity": null,
+      "shippingZip": null,
+      "shippingProvince": null,
+      "shippingCountry": null,
+      "shippingPhone": null,
+      "lineItems": null,
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
+    },
+    "402-489651": {
+      "orderId": "402-489651",
+      "staffId": "Sajil",
+      "stationId": "Packing-01",
+      "recordingStartedAt": null,
+      "recordingCompletedAt": null,
+      "durationSeconds": 0,
+      "recordingStatus": "PENDING",
+      "uploadStatus": "PENDING",
+      "evidenceType": null,
+      "videoUrl": null,
+      "photoUrls": [],
+      "photoDataUrl": null,
+      "telegramChatId": null,
+      "telegramMessageId": null,
+      "telegramFileId": null,
+      "telegramMessageLink": null,
+      "awbNumber": "sad",
+      "courier": "Delhivery",
+      "deliveryMethod": "Normal",
+      "weight": "asd",
+      "productSku": "asd",
+      "customerName": null,
+      "contactPerson": null,
+      "contactPhone": null,
+      "fulfillFrom": null,
+      "orderReceivedDate": null,
+      "dispatchDate": null,
+      "deliveredDate": null,
+      "orderAmount": null,
+      "shippingAmount": null,
+      "orderTotal": null,
+      "itemCount": "1",
+      "fulfillmentStatus": "Pending",
+      "notes": null,
+      "remarks": null,
+      "chatNotes": [],
+      "auditLogs": [],
+      "clientName": null,
+      "product": null,
+      "formFillingDate": null,
+      "preparedBy": null,
+      "checkedBy": null,
+      "customisations": {},
+      "subAssemblyProgress": {},
+      "timeline": {},
+      "promisedDeliveryDate": null,
+      "paymentGate": {},
+      "productionStage": "ORDER_CONFIRMATION",
+      "stageDueDates": {},
+      "productionNotes": null,
+      "isProductionDeckOrder": true,
+      "createdAt": "2026-10-22T12:48:07.397+00:00",
+      "updatedAt": "2026-10-22T12:48:07.312+00:00",
+      "order_source": "amazon",
+      "orderSource": "amazon",
+      "order_number_num": 402489651,
+      "email": null,
+      "financialStatus": null,
+      "subtotal": null,
+      "shipping": null,
+      "taxes": null,
+      "total": null,
+      "discountCode": null,
+      "discountAmount": null,
+      "shippingMethod": null,
+      "shippingName": null,
+      "shippingStreet": null,
+      "shippingAddress1": null,
+      "shippingAddress2": null,
+      "shippingCompany": null,
+      "shippingCity": null,
+      "shippingZip": null,
+      "shippingProvince": null,
+      "shippingCountry": null,
+      "shippingPhone": null,
+      "lineItems": null,
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
+    },
+    "#2485": {
+      "orderId": "#2485",
+      "staffId": "Sajil",
+      "stationId": "Packing-01",
+      "recordingStartedAt": "2026-10-21T08:23:44.77+00:00",
+      "recordingCompletedAt": "2026-10-21T08:23:47.996+00:00",
+      "durationSeconds": 0,
+      "recordingStatus": "COMPLETED",
+      "uploadStatus": "SUCCESS",
       "evidenceType": null,
       "videoUrl": "",
       "photoUrls": [],
@@ -23,25 +299,57 @@
       "weight": "",
       "productSku": "CS-STP-5-RINK-006",
       "customerName": "Bela Shelat",
-      "contactPerson": "Bela Shelat",
-      "contactPhone": "+919582244688/9311113002",
+      "contactPerson": "",
+      "contactPhone": "",
       "fulfillFrom": "",
-      "orderReceivedDate": "2026-10-20T18:46:47.000Z",
-      "dispatchDate": null,
+      "orderReceivedDate": null,
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
       "deliveredDate": null,
-      "orderAmount": "2547",
-      "shippingAmount": "350",
-      "orderTotal": "2897",
+      "orderAmount": "",
+      "shippingAmount": "",
+      "orderTotal": "",
       "itemCount": "1",
-      "fulfillmentStatus": "Pending",
+      "fulfillmentStatus": "Shipped",
       "notes": "urgent order for 3 customised rubber stamps (5 Ã 5 inch each) that needs to be dispatched to Delhi by the 23rd oct. Express shipping via Trackon: â¹350/-.( This order needs to reach Delhi, from where they will arrange a Porter service to Gurgaon.)\n\nCUSTOMISED RUBBER STAMP\nSize: 5 Ã 5 inch\nQty: 3 PCS\nRate: â¹849/-\nTotal: â¹2,547/-\nââââââââââ\nð° PRODUCT TOTAL: â¹2,547/-\nð¹ INCLUDING: Customisation & GST\nð EXTRA SHIPPING CHARGES\nShipping via Trackon: â¹350/-\n GRAND TOTAL: â¹2,897/-\nAmount Fully Paid ; 2900 /-â",
-      "remarks": null,
+      "remarks": "urgent order for 3 customised rubber stamps (5 Ã 5 inch each) that needs to be dispatched to Delhi by the 23rd oct. Express shipping via Trackon: â¹350/-.( This order needs to reach Delhi, from where they will arrange a Porter service to Gurgaon.)\n\nCUSTOMISED RUBBER STAMP\nSize: 5 Ã 5 inch\nQty: 3 PCS\nRate: â¹849/-\nTotal: â¹2,547/-\nââââââââââ\nð° PRODUCT TOTAL: â¹2,547/-\nð¹ INCLUDING: Customisation & GST\nð EXTRA SHIPPING CHARGES\nShipping via Trackon: â¹350/-\n GRAND TOTAL: â¹2,897/-\nAmount Fully Paid ; 2900 /-â",
       "chatNotes": [
         {
           "id": "note-1792562647862-y1f3w",
           "text": "Hi",
           "staffId": "Zuboc",
           "timestamp": "2026-10-21T06:04:07.862Z"
+        },
+        {
+          "id": "note-1792573154268-09e1h",
+          "text": "hi",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T08:59:14.268Z"
+        },
+        {
+          "id": "1792573173958",
+          "text": "hi",
+          "staffId": "s",
+          "staffName": "Sajil",
+          "timestamp": "2026-10-21T08:59:33.958Z"
+        },
+        {
+          "id": "note-1792603945193-eivu5",
+          "text": "hi",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:32:25.193Z"
+        },
+        {
+          "id": "note-1792603965051-q5qjd",
+          "text": "hii",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:32:45.051Z"
+        },
+        {
+          "id": "1792650783749",
+          "text": "is the production done?",
+          "staffId": "floor-op-557",
+          "staffName": "Production Floor Operator",
+          "timestamp": "2026-10-22T06:33:03.749Z"
         }
       ],
       "auditLogs": [
@@ -72,24 +380,86 @@
           "details": "Enabled Production Deck listing",
           "staffId": "Zuboc",
           "timestamp": "2026-10-21T06:04:13.135Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Added chat note: \"hi\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T08:59:14.268Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Zuboc",
+          "timestamp": "2026-10-21T15:59:35.717Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:32:03.956Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Added chat note: \"hi\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:32:25.194Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Added chat note: \"hii\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:32:45.051Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "saneej",
+          "timestamp": "2026-10-22T02:31:34.135Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T12:53:02.338Z"
         }
       ],
-      "clientName": null,
-      "product": null,
-      "formFillingDate": null,
-      "preparedBy": null,
-      "checkedBy": null,
-      "customisations": {},
+      "clientName": "Bela Shelat",
+      "product": "CS-STP-5-RINK-006",
+      "formFillingDate": "2026-10-21T00:00:00.000Z",
+      "preparedBy": "Sajil",
+      "checkedBy": "Supervisor",
+      "customisations": {
+        "rubberStamp": true
+      },
       "subAssemblyProgress": {},
-      "timeline": {},
-      "promisedDeliveryDate": null,
-      "paymentGate": {},
-      "productionStage": "DESIGNING_OUT",
-      "stageDueDates": {},
-      "productionNotes": null,
+      "timeline": {
+        "dispatchingDate": "2026-10-22",
+        "orderConfirmationDate": ""
+      },
+      "promisedDeliveryDate": "2026-10-22T00:00:00.000Z",
+      "paymentGate": {
+        "balanceAmount": 0,
+        "balanceStatus": "COMPLETED",
+        "advanceReceived": 0,
+        "totalBillingAmount": 0
+      },
+      "productionStage": "DISPATCH",
+      "stageDueDates": {
+        "DISPATCH": "2026-10-23",
+        "ORDER_CONFIRMATION": ""
+      },
+      "productionNotes": "urgent order for 3 customised rubber stamps (5 Ã 5 inch each) that needs to be dispatched to Delhi by the 23rd oct. Express shipping via Trackon: â¹350/-.( This order needs to reach Delhi, from where they will arrange a Porter service to Gurgaon.)\n\nCUSTOMISED RUBBER STAMP\nSize: 5 Ã 5 inch\nQty: 3 PCS\nRate: â¹849/-\nTotal: â¹2,547/-\nââââââââââ\nð° PRODUCT TOTAL: â¹2,547/-\nð¹ INCLUDING: Customisation & GST\nð EXTRA SHIPPING CHARGES\nShipping via Trackon: â¹350/-\n GRAND TOTAL: â¹2,897/-\nAmount Fully Paid ; 2900 /-â",
       "isProductionDeckOrder": true,
-      "createdAt": "2026-10-21T06:03:24.923+00:00",
-      "updatedAt": "2026-10-21T06:04:58.891+00:00",
+      "createdAt": "2026-10-21T08:23:47.348+00:00",
+      "updatedAt": "2026-10-22T12:53:02.338+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2485,
@@ -119,40 +489,45 @@
           "price": "849",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "TEST-SHOPIFY-1001": {
       "orderId": "TEST-SHOPIFY-1001",
-      "staffId": "Shopify Direct API",
-      "stationId": "Web-Fulfillment",
-      "recordingStartedAt": "2026-10-21T05:15:44.485+00:00",
-      "recordingCompletedAt": null,
+      "staffId": "Sajil",
+      "stationId": "Packing-01",
+      "recordingStartedAt": "2026-10-21T08:23:34.634+00:00",
+      "recordingCompletedAt": "2026-10-21T08:23:37.613+00:00",
       "durationSeconds": 0,
-      "recordingStatus": "PENDING",
-      "uploadStatus": "PENDING",
+      "recordingStatus": "COMPLETED",
+      "uploadStatus": "SUCCESS",
       "evidenceType": null,
-      "videoUrl": null,
+      "videoUrl": "",
       "photoUrls": [],
       "photoDataUrl": null,
       "telegramChatId": null,
       "telegramMessageId": null,
       "telegramFileId": null,
       "telegramMessageLink": null,
-      "awbNumber": null,
+      "awbNumber": "",
       "courier": "Delhivery",
       "deliveryMethod": "Normal",
-      "weight": null,
+      "weight": "",
       "productSku": "SKU123",
       "customerName": "Test Customer",
-      "contactPerson": "Test Person",
-      "contactPhone": "1234567890",
-      "fulfillFrom": null,
-      "orderReceivedDate": "2026-10-21T05:15:44.485Z",
-      "dispatchDate": null,
-      "deliveredDate": null,
-      "orderAmount": "100.00",
-      "shippingAmount": "10.00",
-      "orderTotal": "115.00",
+      "contactPerson": "",
+      "contactPhone": "",
+      "fulfillFrom": "",
+      "orderReceivedDate": "",
+      "dispatchDate": "",
+      "deliveredDate": "",
+      "orderAmount": "",
+      "shippingAmount": "",
+      "orderTotal": "",
       "itemCount": "1",
       "fulfillmentStatus": "Unfulfilled",
       "notes": "Customer note",
@@ -173,8 +548,8 @@
       "stageDueDates": {},
       "productionNotes": null,
       "isProductionDeckOrder": false,
-      "createdAt": "2026-10-21T05:15:44.485+00:00",
-      "updatedAt": "2026-10-21T05:15:44.485+00:00",
+      "createdAt": "2026-10-21T08:23:37.074+00:00",
+      "updatedAt": "2026-10-21T08:23:37.613+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 1001,
@@ -203,40 +578,45 @@
           "price": "100",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#TEST-VERCEL-001": {
       "orderId": "#TEST-VERCEL-001",
-      "staffId": null,
-      "stationId": null,
-      "recordingStartedAt": null,
-      "recordingCompletedAt": null,
+      "staffId": "Sajil",
+      "stationId": "Packing-01",
+      "recordingStartedAt": "2026-10-21T08:23:07.123+00:00",
+      "recordingCompletedAt": "2026-10-21T08:23:11.542+00:00",
       "durationSeconds": 0,
-      "recordingStatus": "PENDING",
-      "uploadStatus": "PENDING",
+      "recordingStatus": "COMPLETED",
+      "uploadStatus": "SUCCESS",
       "evidenceType": null,
-      "videoUrl": null,
+      "videoUrl": "",
       "photoUrls": [],
       "photoDataUrl": null,
       "telegramChatId": null,
       "telegramMessageId": null,
       "telegramFileId": null,
       "telegramMessageLink": null,
-      "awbNumber": null,
-      "courier": null,
+      "awbNumber": "",
+      "courier": "",
       "deliveryMethod": "Normal",
-      "weight": null,
-      "productSku": null,
+      "weight": "",
+      "productSku": "",
       "customerName": "Vercel Deployment Test",
-      "contactPerson": null,
-      "contactPhone": null,
-      "fulfillFrom": null,
-      "orderReceivedDate": null,
-      "dispatchDate": null,
-      "deliveredDate": null,
-      "orderAmount": "150.00",
-      "shippingAmount": null,
-      "orderTotal": "150.00",
+      "contactPerson": "",
+      "contactPhone": "",
+      "fulfillFrom": "",
+      "orderReceivedDate": "",
+      "dispatchDate": "",
+      "deliveredDate": "",
+      "orderAmount": "",
+      "shippingAmount": "",
+      "orderTotal": "",
       "itemCount": "1",
       "fulfillmentStatus": "Pending",
       "notes": "Updated via /api/orders/:orderId route",
@@ -257,8 +637,8 @@
       "stageDueDates": {},
       "productionNotes": null,
       "isProductionDeckOrder": false,
-      "createdAt": "2026-10-21T05:42:30.438+00:00",
-      "updatedAt": "2026-10-21T05:42:31.003+00:00",
+      "createdAt": "2026-10-21T08:23:10.89+00:00",
+      "updatedAt": "2026-10-21T08:23:11.542+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 1,
@@ -281,7 +661,12 @@
       "shippingProvince": null,
       "shippingCountry": null,
       "shippingPhone": null,
-      "lineItems": null
+      "lineItems": null,
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#TEST-VERCEL-002": {
       "orderId": "#TEST-VERCEL-002",
@@ -359,7 +744,12 @@
       "shippingProvince": null,
       "shippingCountry": null,
       "shippingPhone": null,
-      "lineItems": null
+      "lineItems": null,
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2484": {
       "orderId": "#2484",
@@ -405,6 +795,20 @@
           "details": "Enabled Production Deck listing",
           "staffId": "saneej",
           "timestamp": "2026-10-21T05:41:01.368Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:28:55.256Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:29:06.655Z"
         }
       ],
       "clientName": null,
@@ -417,12 +821,12 @@
       "timeline": {},
       "promisedDeliveryDate": null,
       "paymentGate": {},
-      "productionStage": "CLIENT_APPROVAL",
+      "productionStage": "PRODUCTION_CURATION",
       "stageDueDates": {},
       "productionNotes": null,
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-21T05:30:52.344+00:00",
-      "updatedAt": "2026-10-21T05:47:05.752+00:00",
+      "updatedAt": "2026-10-22T02:34:35.279+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2484,
@@ -456,7 +860,12 @@
           "price": "1500",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "TEST-123": {
       "orderId": "TEST-123",
@@ -534,13 +943,18 @@
       "shippingProvince": null,
       "shippingCountry": null,
       "shippingPhone": null,
-      "lineItems": null
+      "lineItems": null,
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2483": {
       "orderId": "#2483",
       "staffId": null,
       "stationId": null,
-      "recordingStartedAt": null,
+      "recordingStartedAt": "2026-10-22T02:31:48.796+00:00",
       "recordingCompletedAt": null,
       "durationSeconds": 0,
       "recordingStatus": "PENDING",
@@ -562,8 +976,8 @@
       "contactPerson": "DS jamwal",
       "contactPhone": "9990560993",
       "fulfillFrom": null,
-      "orderReceivedDate": "2026-10-20T11:03:20.000Z",
-      "dispatchDate": null,
+      "orderReceivedDate": "2026-10-20T00:00:00.000Z",
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
       "deliveredDate": null,
       "orderAmount": "651",
       "shippingAmount": "159",
@@ -573,7 +987,15 @@
       "notes": null,
       "remarks": null,
       "chatNotes": [],
-      "auditLogs": [],
+      "auditLogs": [
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "saneej",
+          "timestamp": "2026-10-22T02:31:48.384Z"
+        }
+      ],
       "clientName": null,
       "product": null,
       "formFillingDate": null,
@@ -581,15 +1003,20 @@
       "checkedBy": null,
       "customisations": {},
       "subAssemblyProgress": {},
-      "timeline": {},
-      "promisedDeliveryDate": null,
+      "timeline": {
+        "dispatchingDate": "2026-10-22",
+        "orderConfirmationDate": "2026-10-20"
+      },
+      "promisedDeliveryDate": "2026-10-22T00:00:00.000Z",
       "paymentGate": {},
       "productionStage": "ORDER_CONFIRMATION",
-      "stageDueDates": {},
+      "stageDueDates": {
+        "ORDER_CONFIRMATION": "2026-10-20"
+      },
       "productionNotes": null,
       "isProductionDeckOrder": false,
       "createdAt": "2026-10-20T11:03:20+00:00",
-      "updatedAt": "2026-10-21T05:28:39.484+00:00",
+      "updatedAt": "2026-10-22T02:31:48.384+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2483,
@@ -619,7 +1046,12 @@
           "price": "651",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2482": {
       "orderId": "#2482",
@@ -647,14 +1079,14 @@
       "contactPerson": "Gauri Sood",
       "contactPhone": "8296000000",
       "fulfillFrom": null,
-      "orderReceivedDate": "2026-10-19T15:22:43.000Z",
-      "dispatchDate": "2026-10-19T15:22:43.000Z",
+      "orderReceivedDate": "2026-10-19T00:00:00.000Z",
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
       "deliveredDate": null,
       "orderAmount": "11100",
       "shippingAmount": "0",
       "orderTotal": "11100",
       "itemCount": "8",
-      "fulfillmentStatus": "Pending",
+      "fulfillmentStatus": "Fulfilled",
       "notes": "DISPATCHING DATE  29-10-26\n\nð WEDDING INVITATION\n\nâ¨ Customised Wedding Invitation Suite\n\nQty: 50 PCS\n\nâ½ CUSTOMISED ENVELOPE\nSize: 21.5 Ã 15.4 cm\nQty: 50 PCS\nRate: â¹47/- each\nTotal: â¹2,350/-\n\nâ½ INSERT â IDEAL FOR ENVELOPE\nQty: 50 PCS\nRate: â¹14/- each\nTotal: â¹700/-\n\nâ½ INSERT DIE CUTTING CHARGE\nTotal: â¹1,200/-\n\nâ½ DIGITAL PRINT ON INS ERT â SINGLE SIDE\nTotal: â¹500/-\n\nâ½ GOLD FOILING ON INSERT\nTotal: â¹2,600/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\nâ½ CURATION CHARGE\nTotal: â¹850/-\n\nð RSVP CARD â DOUBLE SIDE PRINT\nSize: 10 Ã 8 cm\nQty: 60 PCS\nRate: â¹20/- each\nTotal: â¹1,200/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\n\nð GRAND TOTAL: â¹11,100/-\n\nð¹ INCLUDING: Customisation & GST\n\n\nð PAYMENT TERMS\nGrand Total: â¹11,100/-\n\nâ½ 60% Advance Payment: â¹6,660/- PAID\nâ½ 40% Balance Payment: â¹4,440/-\n\nð Shipping Charges: Extra\n\nð Production will commence only after receipt of the advance payment.\n\nð The balance payment, including applicable shipping charges, must be completed before dispatch.",
       "remarks": "DISPATCHING DATE  29-10-26\n\nð WEDDING INVITATION\n\nâ¨ Customised Wedding Invitation Suite\n\nQty: 50 PCS\n\nâ½ CUSTOMISED ENVELOPE\nSize: 21.5 Ã 15.4 cm\nQty: 50 PCS\nRate: â¹47/- each\nTotal: â¹2,350/-\n\nâ½ INSERT â IDEAL FOR ENVELOPE\nQty: 50 PCS\nRate: â¹14/- each\nTotal: â¹700/-\n\nâ½ INSERT DIE CUTTING CHARGE\nTotal: â¹1,200/-\n\nâ½ DIGITAL PRINT ON INS ERT â SINGLE SIDE\nTotal: â¹500/-\n\nâ½ GOLD FOILING ON INSERT\nTotal: â¹2,600/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\nâ½ CURATION CHARGE\nTotal: â¹850/-\n\nð RSVP CARD â DOUBLE SIDE PRINT\nSize: 10 Ã 8 cm\nQty: 60 PCS\nRate: â¹20/- each\nTotal: â¹1,200/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\n\nð GRAND TOTAL: â¹11,100/-\n\nð¹ INCLUDING: Customisation & GST\n\n\nð PAYMENT TERMS\nGrand Total: â¹11,100/-\n\nâ½ 60% Advance Payment: â¹6,660/- PAID\nâ½ 40% Balance Payment: â¹4,440/-\n\nð Shipping Charges: Extra\n\nð Production will commence only after receipt of the advance payment.\n\nð The balance payment, including applicable shipping charges, must be completed before dispatch.",
       "chatNotes": [],
@@ -665,6 +1097,20 @@
           "details": "Enabled Production Deck listing",
           "staffId": "saneej",
           "timestamp": "2026-10-21T05:46:18.414Z"
+        },
+        {
+          "type": "CHANGE_LOG",
+          "action": "QUICK_STATUS_UPDATE",
+          "details": "Fulfillment status changed from \"Pending\" to \"Fulfilled\"",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-21T17:34:30.643Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T12:47:09.496Z"
         }
       ],
       "clientName": "Gauri Sood",
@@ -682,8 +1128,11 @@
         "screenPrinting": true,
         "envelopeDieCutting": true
       },
-      "timeline": {},
-      "promisedDeliveryDate": "2026-10-19T15:22:43.000Z",
+      "timeline": {
+        "dispatchingDate": "2026-10-22",
+        "orderConfirmationDate": "2026-10-19"
+      },
+      "promisedDeliveryDate": "2026-10-22T00:00:00.000Z",
       "paymentGate": {
         "balanceAmount": 11100,
         "balanceStatus": "PENDING",
@@ -691,11 +1140,13 @@
         "totalBillingAmount": 11100
       },
       "productionStage": "PHOTOSHOOT",
-      "stageDueDates": {},
+      "stageDueDates": {
+        "ORDER_CONFIRMATION": "2026-10-19"
+      },
       "productionNotes": "DISPATCHING DATE  29-10-26\n\nð WEDDING INVITATION\n\nâ¨ Customised Wedding Invitation Suite\n\nQty: 50 PCS\n\nâ½ CUSTOMISED ENVELOPE\nSize: 21.5 Ã 15.4 cm\nQty: 50 PCS\nRate: â¹47/- each\nTotal: â¹2,350/-\n\nâ½ INSERT â IDEAL FOR ENVELOPE\nQty: 50 PCS\nRate: â¹14/- each\nTotal: â¹700/-\n\nâ½ INSERT DIE CUTTING CHARGE\nTotal: â¹1,200/-\n\nâ½ DIGITAL PRINT ON INS ERT â SINGLE SIDE\nTotal: â¹500/-\n\nâ½ GOLD FOILING ON INSERT\nTotal: â¹2,600/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\nâ½ CURATION CHARGE\nTotal: â¹850/-\n\nð RSVP CARD â DOUBLE SIDE PRINT\nSize: 10 Ã 8 cm\nQty: 60 PCS\nRate: â¹20/- each\nTotal: â¹1,200/-\n\nâ½ DESIGNING CHARGE\nTotal: â¹850/-\n\n\nð GRAND TOTAL: â¹11,100/-\n\nð¹ INCLUDING: Customisation & GST\n\n\nð PAYMENT TERMS\nGrand Total: â¹11,100/-\n\nâ½ 60% Advance Payment: â¹6,660/- PAID\nâ½ 40% Balance Payment: â¹4,440/-\n\nð Shipping Charges: Extra\n\nð Production will commence only after receipt of the advance payment.\n\nð The balance payment, including applicable shipping charges, must be completed before dispatch.",
       "isProductionDeckOrder": true,
       "createdAt": "2026-10-19T15:22:43+00:00",
-      "updatedAt": "2026-10-21T05:49:42.691+00:00",
+      "updatedAt": "2026-10-22T12:47:09.496+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2482,
@@ -759,13 +1210,18 @@
           "price": "20",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2481": {
       "orderId": "#2481",
       "staffId": null,
       "stationId": null,
-      "recordingStartedAt": null,
+      "recordingStartedAt": "2026-10-22T02:31:58.583+00:00",
       "recordingCompletedAt": null,
       "durationSeconds": 0,
       "recordingStatus": "PENDING",
@@ -787,8 +1243,8 @@
       "contactPerson": "Afrin Jahangeer",
       "contactPhone": "9447000000",
       "fulfillFrom": null,
-      "orderReceivedDate": "2026-10-19T14:55:53.000Z",
-      "dispatchDate": null,
+      "orderReceivedDate": "2026-10-19T00:00:00.000Z",
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
       "deliveredDate": null,
       "orderAmount": "1611",
       "shippingAmount": "159",
@@ -798,7 +1254,22 @@
       "notes": "20-10-2026 DISPATCH\n\nnot light aqua its light blue",
       "remarks": null,
       "chatNotes": [],
-      "auditLogs": [],
+      "auditLogs": [
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "saneej",
+          "timestamp": "2026-10-22T02:31:58.129Z"
+        },
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "saneej",
+          "timestamp": "2026-10-22T02:32:03.366Z"
+        }
+      ],
       "clientName": null,
       "product": null,
       "formFillingDate": null,
@@ -806,15 +1277,20 @@
       "checkedBy": null,
       "customisations": {},
       "subAssemblyProgress": {},
-      "timeline": {},
-      "promisedDeliveryDate": null,
+      "timeline": {
+        "dispatchingDate": "2026-10-22",
+        "orderConfirmationDate": "2026-10-19"
+      },
+      "promisedDeliveryDate": "2026-10-22T00:00:00.000Z",
       "paymentGate": {},
       "productionStage": "ORDER_CONFIRMATION",
-      "stageDueDates": {},
+      "stageDueDates": {
+        "ORDER_CONFIRMATION": "2026-10-19"
+      },
       "productionNotes": null,
       "isProductionDeckOrder": false,
       "createdAt": "2026-10-19T14:55:53+00:00",
-      "updatedAt": "2026-10-21T05:28:39.528+00:00",
+      "updatedAt": "2026-10-22T02:32:03.366+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2481,
@@ -867,7 +1343,12 @@
           "price": "179",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2480": {
       "orderId": "#2480",
@@ -986,7 +1467,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2479": {
       "orderId": "#2479",
@@ -1080,7 +1566,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2478": {
       "orderId": "#2478",
@@ -1165,7 +1656,12 @@
           "price": "1799",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2477": {
       "orderId": "#2477",
@@ -1250,7 +1746,12 @@
           "price": "599",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2476": {
       "orderId": "#2476",
@@ -1341,7 +1842,12 @@
           "price": "149",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2475": {
       "orderId": "#2475",
@@ -1438,7 +1944,12 @@
           "price": "2359",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2474": {
       "orderId": "#2474",
@@ -1529,7 +2040,12 @@
           "price": "2499",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2473": {
       "orderId": "#2473",
@@ -1614,7 +2130,12 @@
           "price": "176",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2472": {
       "orderId": "#2472",
@@ -1705,13 +2226,18 @@
           "price": "126",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2471": {
       "orderId": "#2471",
       "staffId": null,
       "stationId": null,
-      "recordingStartedAt": null,
+      "recordingStartedAt": "2026-10-22T12:47:21.923+00:00",
       "recordingCompletedAt": null,
       "durationSeconds": 0,
       "recordingStatus": "PENDING",
@@ -1733,8 +2259,8 @@
       "contactPerson": "Venu Sethumadhavan Nair",
       "contactPhone": "9845000000",
       "fulfillFrom": null,
-      "orderReceivedDate": "2026-10-17T11:44:15.000Z",
-      "dispatchDate": null,
+      "orderReceivedDate": "2026-10-17T00:00:00.000Z",
+      "dispatchDate": "2026-10-22T00:00:00.000Z",
       "deliveredDate": null,
       "orderAmount": "3591",
       "shippingAmount": "250",
@@ -1744,7 +2270,15 @@
       "notes": null,
       "remarks": null,
       "chatNotes": [],
-      "auditLogs": [],
+      "auditLogs": [
+        {
+          "type": "EDIT_LOG",
+          "action": "EDIT_ORDER_DETAILS",
+          "details": "Updated order timeline dates",
+          "staffId": "Sajil",
+          "timestamp": "2026-10-22T12:47:21.398Z"
+        }
+      ],
       "clientName": null,
       "product": null,
       "formFillingDate": null,
@@ -1752,15 +2286,20 @@
       "checkedBy": null,
       "customisations": {},
       "subAssemblyProgress": {},
-      "timeline": {},
-      "promisedDeliveryDate": null,
+      "timeline": {
+        "dispatchingDate": "2026-10-22",
+        "orderConfirmationDate": "2026-10-17"
+      },
+      "promisedDeliveryDate": "2026-10-22T00:00:00.000Z",
       "paymentGate": {},
       "productionStage": "ORDER_CONFIRMATION",
-      "stageDueDates": {},
+      "stageDueDates": {
+        "ORDER_CONFIRMATION": "2026-10-17"
+      },
       "productionNotes": null,
       "isProductionDeckOrder": false,
       "createdAt": "2026-10-17T11:44:15+00:00",
-      "updatedAt": "2026-10-21T05:28:39.614+00:00",
+      "updatedAt": "2026-10-22T12:47:21.398+00:00",
       "order_source": "website",
       "orderSource": "website",
       "order_number_num": 2471,
@@ -1808,7 +2347,12 @@
           "price": "149",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2470": {
       "orderId": "#2470",
@@ -1893,7 +2437,12 @@
           "price": "479",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2469": {
       "orderId": "#2469",
@@ -1978,7 +2527,12 @@
           "price": "499",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2468": {
       "orderId": "#2468",
@@ -2068,7 +2622,12 @@
           "price": "1399",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2467": {
       "orderId": "#2467",
@@ -2159,7 +2718,12 @@
           "price": "998",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2466": {
       "orderId": "#2466",
@@ -2250,7 +2814,12 @@
           "price": "849",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2465": {
       "orderId": "#2465",
@@ -2340,7 +2909,12 @@
           "price": "149",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2464": {
       "orderId": "#2464",
@@ -2425,7 +2999,12 @@
           "price": "399",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2463": {
       "orderId": "#2463",
@@ -2514,7 +3093,12 @@
           "price": "150",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2462": {
       "orderId": "#2462",
@@ -2599,7 +3183,12 @@
           "price": "998",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2461": {
       "orderId": "#2461",
@@ -2684,7 +3273,12 @@
           "price": "126",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2460": {
       "orderId": "#2460",
@@ -2780,7 +3374,12 @@
           "price": "2000",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2459": {
       "orderId": "#2459",
@@ -2870,7 +3469,12 @@
           "price": "23",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2458": {
       "orderId": "#2458",
@@ -2994,7 +3598,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2457": {
       "orderId": "#2457",
@@ -3084,7 +3693,12 @@
           "price": "2359",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2456": {
       "orderId": "#2456",
@@ -3168,7 +3782,12 @@
           "price": "2500",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2455": {
       "orderId": "#2455",
@@ -3272,7 +3891,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2454": {
       "orderId": "#2454",
@@ -3357,7 +3981,12 @@
           "price": "449",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2453": {
       "orderId": "#2453",
@@ -3442,7 +4071,12 @@
           "price": "200",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2452": {
       "orderId": "#2452",
@@ -3527,7 +4161,12 @@
           "price": "1249",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2451": {
       "orderId": "#2451",
@@ -3626,7 +4265,12 @@
           "price": "750",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2450": {
       "orderId": "#2450",
@@ -3760,7 +4404,12 @@
           "price": "1250",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2449": {
       "orderId": "#2449",
@@ -3844,7 +4493,12 @@
           "price": "1699",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2448": {
       "orderId": "#2448",
@@ -3934,7 +4588,12 @@
           "price": "18",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2447": {
       "orderId": "#2447",
@@ -4025,7 +4684,12 @@
           "price": "530",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2446": {
       "orderId": "#2446",
@@ -4116,7 +4780,12 @@
           "price": "2239",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2445": {
       "orderId": "#2445",
@@ -4201,7 +4870,12 @@
           "price": "2359",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2444": {
       "orderId": "#2444",
@@ -4292,7 +4966,12 @@
           "price": "135",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2443": {
       "orderId": "#2443",
@@ -4387,7 +5066,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2442": {
       "orderId": "#2442",
@@ -4477,7 +5161,12 @@
           "price": "23",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2441": {
       "orderId": "#2441",
@@ -4562,7 +5251,12 @@
           "price": "849",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2440": {
       "orderId": "#2440",
@@ -4656,7 +5350,12 @@
           "price": "600",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2439": {
       "orderId": "#2439",
@@ -4746,7 +5445,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2438": {
       "orderId": "#2438",
@@ -4831,7 +5535,12 @@
           "price": "898",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2437": {
       "orderId": "#2437",
@@ -4922,7 +5631,12 @@
           "price": "235",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2436": {
       "orderId": "#2436",
@@ -5031,7 +5745,12 @@
           "price": "179",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2435": {
       "orderId": "#2435",
@@ -5128,7 +5847,12 @@
           "price": "2359",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2434": {
       "orderId": "#2434",
@@ -5213,7 +5937,12 @@
           "price": "499",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2433": {
       "orderId": "#2433",
@@ -5304,7 +6033,12 @@
           "price": "649",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2432": {
       "orderId": "#2432",
@@ -5398,7 +6132,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2431": {
       "orderId": "#2431",
@@ -5483,7 +6222,12 @@
           "price": "849",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2430": {
       "orderId": "#2430",
@@ -5568,7 +6312,12 @@
           "price": "849",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2429": {
       "orderId": "#2429",
@@ -5653,7 +6402,12 @@
           "price": "599",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2428": {
       "orderId": "#2428",
@@ -5744,7 +6498,12 @@
           "price": "649",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2427": {
       "orderId": "#2427",
@@ -5829,7 +6588,12 @@
           "price": "235",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2426": {
       "orderId": "#2426",
@@ -5934,7 +6698,12 @@
           "price": "850",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2425": {
       "orderId": "#2425",
@@ -6019,7 +6788,12 @@
           "price": "849",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2424": {
       "orderId": "#2424",
@@ -6110,7 +6884,12 @@
           "price": "127",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2423": {
       "orderId": "#2423",
@@ -6244,7 +7023,12 @@
           "price": "0",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2422": {
       "orderId": "#2422",
@@ -6346,7 +7130,12 @@
           "price": "3299",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2421": {
       "orderId": "#2421",
@@ -6431,7 +7220,12 @@
           "price": "1299",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2420": {
       "orderId": "#2420",
@@ -6516,7 +7310,12 @@
           "price": "599",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2419": {
       "orderId": "#2419",
@@ -6601,7 +7400,12 @@
           "price": "1299",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2418": {
       "orderId": "#2418",
@@ -6692,7 +7496,12 @@
           "price": "179",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2417": {
       "orderId": "#2417",
@@ -6777,7 +7586,12 @@
           "price": "449",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2416": {
       "orderId": "#2416",
@@ -6862,7 +7676,12 @@
           "price": "1299",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2415": {
       "orderId": "#2415",
@@ -6953,7 +7772,12 @@
           "price": "159",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2414": {
       "orderId": "#2414",
@@ -7044,7 +7868,12 @@
           "price": "2359",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2413": {
       "orderId": "#2413",
@@ -7129,7 +7958,12 @@
           "price": "399",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2412": {
       "orderId": "#2412",
@@ -7214,7 +8048,12 @@
           "price": "599",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2411": {
       "orderId": "#2411",
@@ -7298,7 +8137,12 @@
           "price": "159",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2410": {
       "orderId": "#2410",
@@ -7383,7 +8227,12 @@
           "price": "2359",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2409": {
       "orderId": "#2409",
@@ -7467,7 +8316,12 @@
           "price": "110",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     },
     "#2408": {
       "orderId": "#2408",
@@ -7564,7 +8418,12 @@
           "price": "97",
           "quantity": 1
         }
-      ]
+      ],
+      "dispatchdate": null,
+      "ridernumber": null,
+      "dispatch_scheduled_date": null,
+      "dispatchScheduledDate": null,
+      "isDispatched": false
     }
   },
   "settings": {
