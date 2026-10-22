@@ -231,14 +231,14 @@ export const PublicProductionDeck: React.FC = () => {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setOrders(parsed.filter((o: OrderRecord) => o.isProductionDeckOrder));
+            setOrders(parsed);
           }
         } catch {}
       }
 
       const res = await safeFetchJson('/api/orders');
       if (res && Array.isArray(res) && res.length > 0) {
-        setOrders(res.filter((o: OrderRecord) => o.isProductionDeckOrder));
+        setOrders(res);
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(res));
       }
     } catch (e) {
