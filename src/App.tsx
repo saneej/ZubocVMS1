@@ -16,6 +16,10 @@ import { ProductionDeck } from './components/ProductionDeck';
 import { PublicProductionDeck } from './components/PublicProductionDeck';
 import { DiagnosePage } from './components/DiagnosePage';
 import { SalesReports } from './components/SalesReports';
+import { DesignerDashboard } from './components/DesignerDashboard';
+import { ProductionWorkflowDashboard } from './components/ProductionWorkflowDashboard';
+import { UserManagementModal } from './components/UserManagementModal';
+import { LiveAlertTicker } from './components/LiveAlertTicker';
 import { OrderRecord, StaffMember, AppSettings, isAmazonOrder } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from './firebase';
@@ -26,13 +30,15 @@ import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
 import { INITIAL_STAFFS } from './utils/initialStaffs';
 
 const AppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales'>('station');
+  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow'>('station');
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const path = location.pathname;
     if (path.includes('/production-deck')) setActiveTab('deck');
+    else if (path.includes('/designer')) setActiveTab('designer');
+    else if (path.includes('/production-workflow')) setActiveTab('production-workflow');
     else if (path.includes('/station')) setActiveTab('station');
     else if (path.includes('/calculator')) setActiveTab('calculator');
     else if (path.includes('/admin') || path.includes('/insights')) setActiveTab('admin');
@@ -66,6 +72,7 @@ const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false); // Instant render without blocking loader
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddOrderOpen, setIsAddOrderOpen] = useState<boolean>(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState<boolean>(false);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
   const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
   const [isFirestoreQuotaExceeded, setIsFirestoreQuotaExceeded] = useState<boolean>(false);
@@ -284,6 +291,13 @@ const AppContent: React.FC = () => {
     setCurrentStaff(staff);
     setIsLoggedIn(true);
     localStorage.setItem('zuboc_auth_user', JSON.stringify(staff));
+    if (staff.role === 'DESIGNER') {
+      navigate('/designer');
+    } else if (staff.role === 'PRODUCTION') {
+      navigate('/production-workflow');
+    } else {
+      navigate('/orders');
+    }
   };
 
   const handleLogout = () => {
@@ -420,7 +434,7 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={(tab) => navigate(tab === 'search' ? '/orders' : tab === 'deck' ? '/production-deck' : `/${tab}`)}
+        setActiveTab={(tab) => navigate(tab === 'search' ? '/orders' : tab === 'deck' ? '/production-deck' : tab === 'designer' ? '/designer' : tab === 'production-workflow' ? '/production-workflow' : `/${tab}`)}
         currentStaff={currentStaff}
         setCurrentStaff={(st) => {
           setCurrentStaff(st);
@@ -428,6 +442,7 @@ const AppContent: React.FC = () => {
         }}
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenUserManagement={() => setIsUserManagementOpen(true)}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
         staffList={staffList}
@@ -445,6 +460,9 @@ const AppContent: React.FC = () => {
           onOpenAddOrder={() => setIsAddOrderOpen(true)}
           onOpenDeck={() => navigate('/production-deck')}
         />
+        {!location.pathname.includes('/production-deck') && (
+          <LiveAlertTicker orders={orders} />
+        )}
         {isFirestoreQuotaExceeded && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-xs text-amber-800 flex items-center justify-between gap-3">
             <span>Firestore daily read quota limit reached. Backup & Cache Mode Active.</span>
@@ -538,6 +556,15 @@ const AppContent: React.FC = () => {
                 orders={orders}
               />
             } />
+            <Route path="designer" element={
+              <DesignerDashboard currentStaff={currentStaff} />
+            } />
+            <Route path="production-workflow" element={
+              <ProductionWorkflowDashboard
+                currentStaff={currentStaff}
+                onNavigateToCRE={() => navigate('/orders')}
+              />
+            } />
             <Route path="*" element={<Navigate to="orders" replace />} />
           </Routes>
         </main>
@@ -564,6 +591,12 @@ const AppContent: React.FC = () => {
         }}
         currentStaffId={currentStaff?.id}
         currentStaffName={currentStaff?.name}
+      />
+      <UserManagementModal
+        isOpen={isUserManagementOpen}
+        onClose={() => setIsUserManagementOpen(false)}
+        currentStaff={currentStaff}
+        onStaffListUpdated={fetchStaffsAPI}
       />
     </div>
   );

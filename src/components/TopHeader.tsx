@@ -15,7 +15,7 @@ import { StaffMember, AppSettings } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopHeaderProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales';
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow';
   currentStaff: StaffMember;
   settings: AppSettings;
   onOpenSettings: () => void;

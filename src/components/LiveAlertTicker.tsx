@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AlertTriangle, Clock, ShieldCheck, Flame, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Clock, ShieldCheck, Flame, Calendar, RefreshCw } from 'lucide-react';
 import { OrderRecord } from '../types';
 import { safeFetchJson } from '../utils/api';
+
+export type DispatchAlertCategory = 'OVERDUE' | 'DUE_TODAY' | 'DUE_TOMORROW';
 
 export interface LiveAlertItem {
   orderId: string;
   clientName: string;
   product: string;
   dispatchDate: string;
+  category: DispatchAlertCategory;
   isOverdue: boolean;
+  isDueToday: boolean;
+  isDueTomorrow: boolean;
   daysOverdue: number;
 }
 
@@ -23,6 +28,15 @@ function getTodayIsoString(): string {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTomorrowIsoString(): string {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const year = tomorrow.getFullYear();
+  const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const day = String(tomorrow.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -63,6 +77,7 @@ function normalizeDateStr(dateInput?: string | null): string | null {
 
 export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertItem[] {
   const todayIso = getTodayIsoString();
+  const tomorrowIso = getTomorrowIsoString();
   const todayMs = new Date(todayIso).getTime();
 
   const alertMap = new Map<string, LiveAlertItem>();
@@ -82,12 +97,29 @@ export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertI
     const orderMs = new Date(normalizedDate).getTime();
     if (isNaN(orderMs)) return;
 
-    // Ignore future dates
-    if (normalizedDate > todayIso) return;
+    // Ignore dates beyond tomorrow
+    if (normalizedDate > tomorrowIso) return;
 
-    const isOverdue = normalizedDate < todayIso;
-    const diffMs = todayMs - orderMs;
-    const daysOverdue = isOverdue ? Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))) : 0;
+    let category: DispatchAlertCategory;
+    let isOverdue = false;
+    let isDueToday = false;
+    let isDueTomorrow = false;
+    let daysOverdue = 0;
+
+    if (normalizedDate < todayIso) {
+      category = 'OVERDUE';
+      isOverdue = true;
+      const diffMs = todayMs - orderMs;
+      daysOverdue = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    } else if (normalizedDate === todayIso) {
+      category = 'DUE_TODAY';
+      isDueToday = true;
+    } else if (normalizedDate === tomorrowIso) {
+      category = 'DUE_TOMORROW';
+      isDueTomorrow = true;
+    } else {
+      return;
+    }
 
     const rawId = String(order.orderId || 'N/A').replace(/^#+/, '');
     const clientName = order.customerName || order.clientName || order.contactPerson || `Client #${rawId}`;
@@ -98,17 +130,27 @@ export function parseAlertItemsFromOrders(ordersList: OrderRecord[]): LiveAlertI
       clientName,
       product,
       dispatchDate: normalizedDate,
+      category,
       isOverdue,
+      isDueToday,
+      isDueTomorrow,
       daysOverdue
     });
   });
 
   const alertItems = Array.from(alertMap.values());
 
-  // Overdue orders FIRST, then Due Today
+  // Logical sorting: OVERDUE pills first, followed by DUE TODAY, and then DUE TOMORROW
+  const categoryOrder: Record<DispatchAlertCategory, number> = {
+    OVERDUE: 1,
+    DUE_TODAY: 2,
+    DUE_TOMORROW: 3
+  };
+
   alertItems.sort((a, b) => {
-    if (a.isOverdue && !b.isOverdue) return -1;
-    if (!a.isOverdue && b.isOverdue) return 1;
+    if (categoryOrder[a.category] !== categoryOrder[b.category]) {
+      return categoryOrder[a.category] - categoryOrder[b.category];
+    }
     if (a.dispatchDate !== b.dispatchDate) {
       return a.dispatchDate.localeCompare(b.dispatchDate);
     }
@@ -157,8 +199,23 @@ export const LiveAlertTicker: React.FC<LiveAlertTickerProps> = ({
     return parseAlertItemsFromOrders(currentOrders);
   }, [currentOrders]);
 
-  const overdueCount = useMemo(() => alertItems.filter(i => i.isOverdue).length, [alertItems]);
-  const dueTodayCount = useMemo(() => alertItems.filter(i => !i.isOverdue).length, [alertItems]);
+  const overdueCount = useMemo(() => alertItems.filter(i => i.category === 'OVERDUE').length, [alertItems]);
+  const dueTodayCount = useMemo(() => alertItems.filter(i => i.category === 'DUE_TODAY').length, [alertItems]);
+  const dueTomorrowCount = useMemo(() => alertItems.filter(i => i.category === 'DUE_TOMORROW').length, [alertItems]);
+
+  const headerCounters = useMemo(() => {
+    const list: { key: string; label: string; className: string }[] = [];
+    if (overdueCount > 0) {
+      list.push({ key: 'overdue', label: `${overdueCount} Overdue`, className: 'text-rose-400 font-black' });
+    }
+    if (dueTodayCount > 0) {
+      list.push({ key: 'today', label: `${dueTodayCount} Due Today`, className: 'text-amber-400 font-black' });
+    }
+    if (dueTomorrowCount > 0) {
+      list.push({ key: 'tomorrow', label: `${dueTomorrowCount} Due Tomorrow`, className: 'text-emerald-400 font-black' });
+    }
+    return list;
+  }, [overdueCount, dueTodayCount, dueTomorrowCount]);
 
   return (
     <div className={`w-full select-none z-30 ${className}`}>
@@ -166,7 +223,7 @@ export const LiveAlertTicker: React.FC<LiveAlertTickerProps> = ({
         /* Minimal, Modern & Attractive Slim Bar (Below Header) */
         <div className="bg-slate-950/95 backdrop-blur-md text-white border-b border-slate-800/80 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
           
-          {/* Left Title Label */}
+          {/* Left Title Label & Categorized Counters */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="relative flex items-center justify-center">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 block animate-ping opacity-75 absolute" />
@@ -176,45 +233,67 @@ export const LiveAlertTicker: React.FC<LiveAlertTickerProps> = ({
               <AlertTriangle className="w-4 h-4 text-rose-500" />
               <span>DISPATCH ATTENTION</span>
             </div>
-            <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
-            <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              {overdueCount > 0 && (
-                <span className="text-rose-400 font-black">{overdueCount} Overdue</span>
-              )}
-              {overdueCount > 0 && dueTodayCount > 0 && <span>•</span>}
-              {dueTodayCount > 0 && (
-                <span className="text-amber-400 font-black">{dueTodayCount} Due Today</span>
-              )}
-            </div>
+            
+            {headerCounters.length > 0 && (
+              <>
+                <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
+                <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  {headerCounters.map((counter, idx) => (
+                    <React.Fragment key={counter.key}>
+                      {idx > 0 && <span className="text-slate-600">•</span>}
+                      <span className={counter.className}>{counter.label}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Right Horizontal Minimal Order ID Pills */}
+          {/* Right Horizontal Minimal Order ID Pills (Sorted: OVERDUE -> DUE TODAY -> DUE TOMORROW) */}
           <div className="flex flex-wrap items-center gap-2 overflow-x-auto max-w-full">
-            {alertItems.map((item) => (
-              <div
-                key={item.orderId}
-                className={`flex items-center gap-2 px-3 py-1 rounded-xl border text-xs md:text-sm font-mono font-bold tracking-tight shadow-sm transition-all hover:scale-105 ${
-                  item.isOverdue
-                    ? 'bg-rose-950/80 border-rose-500/60 text-rose-200 shadow-rose-950/50'
-                    : 'bg-amber-950/80 border-amber-500/60 text-amber-200 shadow-amber-950/40'
-                }`}
-                title={`${item.clientName} (${item.product})`}
-              >
-                {item.isOverdue ? (
-                  <Flame className="w-3.5 h-3.5 text-rose-400 animate-pulse fill-rose-400" />
-                ) : (
-                  <Clock className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-                )}
+            {alertItems.map((item) => {
+              const isOverdue = item.category === 'OVERDUE';
+              const isToday = item.category === 'DUE_TODAY';
+              const isTomorrow = item.category === 'DUE_TOMORROW';
 
-                <span className="font-black font-mono text-sm md:text-base">#{item.orderId.replace(/^#+/, '')}</span>
+              return (
+                <div
+                  key={item.orderId}
+                  className={`flex items-center gap-2 px-3 py-1 rounded-xl border text-xs md:text-sm font-mono font-bold tracking-tight shadow-sm transition-all hover:scale-105 ${
+                    isOverdue
+                      ? 'bg-rose-950/80 border-rose-500/60 text-rose-200 shadow-rose-950/50'
+                      : isToday
+                      ? 'bg-amber-950/80 border-amber-500/60 text-amber-200 shadow-amber-950/40'
+                      : 'bg-emerald-950/80 border-emerald-500/60 text-emerald-200 shadow-emerald-950/40'
+                  }`}
+                  title={`${item.clientName} (${item.product}) • Due: ${item.dispatchDate}`}
+                >
+                  {isOverdue ? (
+                    <Flame className="w-3.5 h-3.5 text-rose-400 animate-pulse fill-rose-400 shrink-0" />
+                  ) : isToday ? (
+                    <Clock className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20 shrink-0" />
+                  ) : (
+                    <Calendar className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20 shrink-0" />
+                  )}
 
-                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
-                  item.isOverdue ? 'bg-rose-600 text-white' : 'bg-amber-500 text-slate-950'
-                }`}>
-                  {item.isOverdue ? `OVERDUE ${item.daysOverdue > 1 ? `${item.daysOverdue}D` : ''}` : 'DUE TODAY'}
-                </span>
-              </div>
-            ))}
+                  <span className="font-black font-mono text-sm md:text-base">#{item.orderId.replace(/^#+/, '')}</span>
+
+                  <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
+                    isOverdue
+                      ? 'bg-rose-600 text-white'
+                      : isToday
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'bg-emerald-600 text-white'
+                  }`}>
+                    {isOverdue
+                      ? `OVERDUE ${item.daysOverdue > 1 ? `${item.daysOverdue}D` : ''}`
+                      : isToday
+                      ? 'DUE TODAY'
+                      : 'DUE TOMORROW'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
         </div>

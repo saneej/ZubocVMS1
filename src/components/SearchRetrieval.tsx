@@ -1,7 +1,7 @@
 import { safeFetchJson } from "../utils/api";
 import React, { useState, useEffect } from 'react';
 import { formatIST, formatDateForInput } from '../utils/time';
-import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload, Save, Globe, ShoppingCart } from 'lucide-react';
+import { Search, ExternalLink, RefreshCw, Download, Trash2, Filter, X, Truck, Scale, Tag, FileText, Edit3, History, CheckCircle2, User, Calendar, PackagePlus, FileSpreadsheet, Eye, Video, Camera, Upload, Save, Globe, ShoppingCart, Palette, Sparkles } from 'lucide-react';
 import { OrderRecord, isAmazonOrder } from '../types';
 import { Link } from 'react-router-dom';
 import { exportOrdersToExcel, exportOrdersToCSV } from '../utils/excelExport';
@@ -10,6 +10,7 @@ import { uploadQueueManager } from '../utils/uploadQueue';
 import { StatusCell } from './StatusCell';
 import { watermarkPhoto } from '../utils/watermark';
 import { ImportShopifyCsvModal } from './ImportShopifyCsvModal';
+import { SendToDesignModal } from './SendToDesignModal';
 
 interface SearchRetrievalProps {
   orders: OrderRecord[];
@@ -53,6 +54,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [isShopifyCsvModalOpen, setIsShopifyCsvModalOpen] = useState(false);
+  const [designOrderModalTarget, setDesignOrderModalTarget] = useState<OrderRecord | null>(null);
   const [newOrderSource, setNewOrderSource] = useState<'website' | 'amazon'>('website');
   const [newOrderId, setNewOrderId] = useState("");
   const [newCustomer, setNewCustomer] = useState("");
@@ -744,6 +746,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                             TV DECK
                           </span>
                         )}
+                        {order.isDesignRequired && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border font-mono shrink-0 flex items-center gap-1 ${
+                            order.workflowStatus === 'DESIGN_SUBMITTED' || order.workflowStatus === 'PRODUCTION_PENDING' || order.workflowStatus === 'PRODUCTION_IN_PROGRESS'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : order.workflowStatus === 'PRODUCTION_COMPLETED'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-purple-50 text-purple-700 border-purple-200'
+                          }`}>
+                            <Palette className="w-2.5 h-2.5" />
+                            <span>{order.workflowStatus ? order.workflowStatus.replace(/_/g, ' ') : 'DESIGN REQ'}</span>
+                          </span>
+                        )}
                         {onStartPacking && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {/* Check if evidence exists in TG/system - check for non-empty values */}
@@ -875,6 +889,19 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                     </td>
 
                     <td className="p-3 text-right space-x-1.5 font-mono whitespace-nowrap">
+                      <button
+                        onClick={() => setDesignOrderModalTarget(order)}
+                        className={`inline-flex items-center gap-1 font-bold px-2 py-1 rounded-lg border cursor-pointer text-xs transition-colors ${
+                          order.isDesignRequired
+                            ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200'
+                        }`}
+                        title={order.isDesignRequired ? `Design Workflow: ${order.workflowStatus || 'Active'}` : 'Forward order to Design Department'}
+                      >
+                        <Palette className="w-3.5 h-3.5" />
+                        <span>{order.isDesignRequired ? 'In Design' : 'To Design'}</span>
+                      </button>
+
                       <button
                         onClick={() => exportSingleOrderPDF(order)}
                         className="inline-flex items-center gap-1 text-[#832f5e] hover:text-[#6c234b] font-bold px-2 py-1 bg-[#832f5e]/10 hover:bg-[#832f5e]/20 rounded-lg border border-[#832f5e]/20 cursor-pointer"
@@ -1265,6 +1292,19 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Send to Design Workflow Modal */}
+      <SendToDesignModal
+        isOpen={!!designOrderModalTarget}
+        onClose={() => setDesignOrderModalTarget(null)}
+        order={designOrderModalTarget}
+        onSuccess={() => {
+          setDesignOrderModalTarget(null);
+          onRefreshOrders();
+        }}
+        currentStaffId={currentStaffId}
+        currentStaffName={currentStaffName}
+      />
 
     </div>
   );

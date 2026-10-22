@@ -150,7 +150,24 @@ process.on('uncaughtException', (err) => {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+
+function getPort(): number {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const p = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(p) && p > 0) return p;
+  }
+  if (process.env.APP_PORT) {
+    const p = parseInt(process.env.APP_PORT, 10);
+    if (!isNaN(p) && p > 0) return p;
+  }
+  // In AI Studio / Cloud Run container environment, port 8080 is reserved by Nginx; the app must bind to port 3000
+  if (process.env.PORT === '8080' || process.env.NODE_ENV === 'development') {
+    return 3000;
+  }
+  return Number(process.env.PORT) || 3000;
+}
+const PORT = getPort();
 
 // Versioning for tracking deployment updates
 const APP_VERSION = '1.2.6-PROD-FIX';
@@ -400,21 +417,83 @@ let settings: AppSettings = {
   stationId: 'Packing-01'
 };
 
+export type StaffRole = 'ADMIN' | 'CRE' | 'DESIGNER' | 'PRODUCTION' | 'SUPERVISOR' | 'PACKER';
+
 interface StaffMember {
   id: string;
   name: string;
-  role: 'ADMIN' | 'SUPERVISOR' | 'PACKER';
+  role: StaffRole;
   stationId: string;
   password?: string;
   email?: string;
+  phone?: string;
+  isActive?: boolean;
   createdAt?: string;
+  lastLoginAt?: string;
+}
+
+export interface DepartmentWorkflow {
+  orderId: string;
+  isDesignRequired: boolean;
+  workflowStatus: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  designInstructions?: string;
+  assignedDesignerId?: string;
+  assignedDesignerName?: string;
+  assignedAt?: string;
+  currentRevisionNumber: number;
+  activeDesignFiles: any[];
+  creAttachments: any[];
+  forwardedToDesignAt?: string;
+  forwardedByStaffId?: string;
+  forwardedByStaffName?: string;
+  designSubmittedAt?: string;
+  productionStartedAt?: string;
+  productionStartedByStaffId?: string;
+  productionStartedByStaffName?: string;
+  productionCompletedAt?: string;
+  productionCompletedByStaffId?: string;
+  productionCompletedByStaffName?: string;
+  productionRemarks?: string;
+  clarificationRequest?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DesignRevision {
+  id: string;
+  orderId: string;
+  revisionNumber: number;
+  designerId: string;
+  designerName: string;
+  designNotes?: string;
+  files: any[];
+  status: string;
+  submittedAt?: string;
+  revisionRequestedBy?: string;
+  revisionReason?: string;
+  revisionRequestedAt?: string;
+  createdAt: string;
+}
+
+export interface WorkflowAuditLog {
+  id: string;
+  orderId: string;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  action: string;
+  fromStatus?: string;
+  toStatus?: string;
+  details: string;
+  timestamp: string;
 }
 
 const DEFAULT_STAFFS: StaffMember[] = INITIAL_STAFFS;
 
 let staffsStore: Record<string, StaffMember> = {};
 for (const s of INITIAL_STAFFS) {
-  staffsStore[s.id] = s;
+  staffsStore[s.id] = { ...s, isActive: s.isActive !== false };
 }
 
 let ordersStore: Record<string, OrderRecord> = {};
@@ -423,6 +502,20 @@ for (const ord of INITIAL_FALLBACK_ORDERS) {
     ordersStore[ord.orderId] = ord;
   }
 }
+
+let workflowsStore: Record<string, DepartmentWorkflow> = {};
+let designRevisionsStore: Record<string, DesignRevision[]> = {};
+let orderAttachmentsStore: Record<string, any[]> = {};
+let workflowAuditLogsStore: WorkflowAuditLog[] = [];
+
+// Ensure uploads folder exists
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch {}
+app.use('/uploads', express.static(uploadsDir));
 
 try {
   let activeDataPath = DATA_FILE;
@@ -452,6 +545,10 @@ try {
       }
     }
     if (parsed.staffs) staffsStore = { ...staffsStore, ...parsed.staffs };
+    if (parsed.workflows) workflowsStore = { ...workflowsStore, ...parsed.workflows };
+    if (parsed.revisions) designRevisionsStore = { ...designRevisionsStore, ...parsed.revisions };
+    if (parsed.attachments) orderAttachmentsStore = { ...orderAttachmentsStore, ...parsed.attachments };
+    if (parsed.auditLogs && Array.isArray(parsed.auditLogs)) workflowAuditLogsStore = [...parsed.auditLogs];
     if (parsed.settings) {
       settings = {
         ...settings,
@@ -466,7 +563,15 @@ try {
 }
 
 function saveLocalBackup() {
-  const payload = JSON.stringify({ orders: ordersStore, settings, staffs: staffsStore }, null, 2);
+  const payload = JSON.stringify({ 
+    orders: ordersStore, 
+    settings, 
+    staffs: staffsStore,
+    workflows: workflowsStore,
+    revisions: designRevisionsStore,
+    attachments: orderAttachmentsStore,
+    auditLogs: workflowAuditLogsStore
+  }, null, 2);
   try {
     fs.writeFileSync(DATA_FILE, payload);
   } catch (e: any) {
@@ -1412,12 +1517,17 @@ apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
     });
 
     if (matchedStaff) {
+      if (matchedStaff.isActive === false) {
+        return res.status(403).json({ error: 'This user account has been deactivated. Please contact an Administrator.' });
+      }
       authenticatedStaff = {
         id: matchedStaff.id,
         name: matchedStaff.name,
         role: matchedStaff.role || 'PACKER',
         stationId: matchedStaff.stationId || 'Packing-01',
-        email: matchedStaff.email
+        email: matchedStaff.email,
+        phone: matchedStaff.phone,
+        isActive: true
       };
     } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || 'zuboc2026').trim().toLowerCase()) {
       authenticatedStaff = {
@@ -1473,10 +1583,17 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   const staff = staffsStore[staffKey];
+  if (staff.isActive === false) {
+    return res.status(403).json({ error: 'This user account has been deactivated. Please contact an Administrator.' });
+  }
+
   const expectedPassword = staff.password || 'password123';
   if (expectedPassword !== password) {
     return res.status(401).json({ error: 'Incorrect password. Default password is password123' });
   }
+
+  staff.lastLoginAt = new Date().toISOString();
+  saveLocalBackup();
 
   res.json({
     success: true,
@@ -1485,10 +1602,661 @@ apiRouter.post('/auth/login', async (req, res) => {
       name: staff.name,
       role: staff.role,
       stationId: staff.stationId,
-      email: staff.email
+      email: staff.email,
+      phone: staff.phone,
+      isActive: (staff as any).isActive !== false
     }
   });
 });
+
+// -------------------------------------------------------------
+// WORKFLOW STATE & CONCURRENCY CONTROLS (CRE, DESIGNER, PRODUCTION)
+// -------------------------------------------------------------
+
+function logWorkflowAudit(orderId: string, actorId: string, actorName: string, actorRole: string, action: string, fromStatus?: string, toStatus?: string, details: string = '') {
+  const log: WorkflowAuditLog = {
+    id: `wal_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    orderId,
+    actorId,
+    actorName,
+    actorRole,
+    action,
+    fromStatus,
+    toStatus,
+    details,
+    timestamp: new Date().toISOString()
+  };
+  workflowAuditLogsStore.unshift(log);
+  if (workflowAuditLogsStore.length > 500) {
+    workflowAuditLogsStore = workflowAuditLogsStore.slice(0, 500);
+  }
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('workflow_audit_logs').insert(log).then(() => {}).catch(() => {});
+  }
+}
+
+// Get all orders enriched with workflow metadata
+apiRouter.get('/workflow/orders', async (req, res) => {
+  const { role, status, designerId, unassignedOnly } = req.query;
+  const now = new Date().toISOString();
+
+  // Ensure every order has a corresponding workflow entry
+  for (const [id, ord] of Object.entries(ordersStore)) {
+    if (ord && !workflowsStore[id]) {
+      workflowsStore[id] = {
+        orderId: id,
+        isDesignRequired: false,
+        workflowStatus: 'CRE_CREATED',
+        priority: 'NORMAL',
+        currentRevisionNumber: 1,
+        activeDesignFiles: [],
+        creAttachments: [],
+        createdAt: ord.createdAt || now,
+        updatedAt: ord.updatedAt || now
+      };
+    }
+  }
+
+  let results = Object.values(ordersStore).map(ord => {
+    const wf = workflowsStore[ord.orderId] || {
+      orderId: ord.orderId,
+      isDesignRequired: false,
+      workflowStatus: 'CRE_CREATED',
+      priority: 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: ord.createdAt || now,
+      updatedAt: ord.updatedAt || now
+    };
+    const revs = designRevisionsStore[ord.orderId] || [];
+    return {
+      ...ord,
+      workflow: wf,
+      revisionsCount: revs.length,
+      latestRevision: revs[revs.length - 1] || null
+    };
+  });
+
+  // Filter based on query
+  if (unassignedOnly === 'true') {
+    results = results.filter(r => r.workflow.isDesignRequired && r.workflow.workflowStatus === 'DESIGN_PENDING' && !r.workflow.assignedDesignerId);
+  } else if (designerId && typeof designerId === 'string') {
+    results = results.filter(r => r.workflow.assignedDesignerId === designerId);
+  }
+
+  if (status && typeof status === 'string' && status !== 'ALL') {
+    results = results.filter(r => r.workflow.workflowStatus === status);
+  }
+
+  res.json(results);
+});
+
+// Get workflow details for single order
+apiRouter.get('/workflow/order/:orderId', async (req, res) => {
+  const rawId = req.params.orderId || '';
+  const orderId = sanitizeString(decodeURIComponent(rawId));
+  const ord = ordersStore[orderId] || ordersStore[orderId.replace(/^#/, '')];
+
+  if (!ord) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  let wf = workflowsStore[ord.orderId];
+  if (!wf) {
+    wf = {
+      orderId: ord.orderId,
+      isDesignRequired: false,
+      workflowStatus: 'CRE_CREATED',
+      priority: 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: ord.createdAt || new Date().toISOString(),
+      updatedAt: ord.updatedAt || new Date().toISOString()
+    };
+    workflowsStore[ord.orderId] = wf;
+  }
+
+  const revisions = designRevisionsStore[ord.orderId] || [];
+  const attachments = orderAttachmentsStore[ord.orderId] || [];
+  const auditLogs = workflowAuditLogsStore.filter(l => l.orderId === ord.orderId);
+
+  res.json({
+    order: ord,
+    workflow: wf,
+    revisions,
+    attachments,
+    auditLogs
+  });
+});
+
+// CRE: Send custom order to Design department
+apiRouter.post('/workflow/send-to-design', async (req, res) => {
+  const { orderId, designInstructions, priority, creAttachments, staffId, staffName } = req.body;
+  if (!orderId) {
+    return res.status(400).json({ error: 'Order ID is required' });
+  }
+
+  const ord = ordersStore[orderId] || ordersStore[orderId.replace(/^#/, '')];
+  if (!ord) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  const now = new Date().toISOString();
+  let wf = workflowsStore[ord.orderId] || {
+    orderId: ord.orderId,
+    isDesignRequired: true,
+    workflowStatus: 'CRE_CREATED',
+    priority: priority || 'NORMAL',
+    currentRevisionNumber: 1,
+    activeDesignFiles: [],
+    creAttachments: [],
+    createdAt: now,
+    updatedAt: now
+  };
+
+  const fromStatus = wf.workflowStatus;
+  wf.isDesignRequired = true;
+  wf.workflowStatus = 'DESIGN_PENDING';
+  wf.priority = priority || wf.priority || 'NORMAL';
+  wf.designInstructions = designInstructions || wf.designInstructions || '';
+  if (Array.isArray(creAttachments)) {
+    wf.creAttachments = [...(wf.creAttachments || []), ...creAttachments];
+    orderAttachmentsStore[ord.orderId] = [...(orderAttachmentsStore[ord.orderId] || []), ...creAttachments];
+  }
+  wf.forwardedToDesignAt = now;
+  wf.forwardedByStaffId = staffId || 'CRE-Staff';
+  wf.forwardedByStaffName = staffName || 'CRE Specialist';
+  wf.updatedAt = now;
+
+  workflowsStore[ord.orderId] = wf;
+  saveLocalBackup();
+
+  logWorkflowAudit(ord.orderId, staffId || 'CRE', staffName || 'CRE Specialist', 'CRE', 'SEND_TO_DESIGN', fromStatus, 'DESIGN_PENDING', `Forwarded to Design department with ${wf.priority} priority`);
+
+  // Supabase Sync
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('department_order_workflow').upsert({
+      orderId: ord.orderId,
+      isDesignRequired: true,
+      workflowStatus: 'DESIGN_PENDING',
+      priority: wf.priority,
+      designInstructions: wf.designInstructions,
+      creAttachments: wf.creAttachments,
+      forwardedToDesignAt: now,
+      forwardedByStaffId: wf.forwardedByStaffId,
+      forwardedByStaffName: wf.forwardedByStaffName,
+      updatedAt: now
+    }).then(() => {}).catch(() => {});
+  }
+
+  res.json({ success: true, workflow: wf, message: `Order ${ord.orderId} successfully forwarded to Design department!` });
+});
+
+// DESIGNER: Accept unassigned design order (ATOMIC CONCURRENCY CONTROL)
+apiRouter.post('/workflow/accept-order', async (req, res) => {
+  const { orderId, designerId, designerName } = req.body;
+  if (!orderId || !designerId) {
+    return res.status(400).json({ error: 'Order ID and Designer ID are required' });
+  }
+
+  const ord = ordersStore[orderId] || ordersStore[orderId.replace(/^#/, '')];
+  if (!ord) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  const wf = workflowsStore[ord.orderId];
+  if (!wf) {
+    return res.status(404).json({ error: 'Order workflow record not initialized' });
+  }
+
+  // Critical Concurrency Requirement: Conditional Check
+  if (wf.assignedDesignerId && wf.assignedDesignerId !== designerId) {
+    return res.status(409).json({
+      error: 'This order has already been assigned to another Designer.',
+      assignedTo: wf.assignedDesignerName || wf.assignedDesignerId
+    });
+  }
+
+  // Attempt atomic database-level lock/update if Supabase is active
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('department_order_workflow')
+        .update({
+          workflowStatus: 'DESIGN_ASSIGNED',
+          assignedDesignerId: designerId,
+          assignedDesignerName: designerName || designerId,
+          assignedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+        .eq('orderId', ord.orderId)
+        .or(`assignedDesignerId.is.null,assignedDesignerId.eq.${designerId}`);
+      
+      if (error && error.code !== 'PGRST205') {
+        console.warn('Supabase atomic assign notice:', error.message);
+      }
+    } catch (dbErr) {
+      console.warn('Database atomic accept exception:', dbErr);
+    }
+  }
+
+  const now = new Date().toISOString();
+  const fromStatus = wf.workflowStatus;
+  wf.workflowStatus = 'DESIGN_ASSIGNED';
+  wf.assignedDesignerId = designerId;
+  wf.assignedDesignerName = designerName || designerId;
+  wf.assignedAt = now;
+  wf.updatedAt = now;
+
+  workflowsStore[ord.orderId] = wf;
+  saveLocalBackup();
+
+  logWorkflowAudit(ord.orderId, designerId, designerName || designerId, 'DESIGNER', 'ACCEPT_ORDER', fromStatus, 'DESIGN_ASSIGNED', `Order accepted by ${designerName || designerId}`);
+
+  res.json({
+    success: true,
+    workflow: wf,
+    message: `Order ${ord.orderId} accepted successfully and assigned to ${designerName || designerId}`
+  });
+});
+
+// DESIGNER: Save Draft Design Progress
+apiRouter.post('/workflow/save-draft', async (req, res) => {
+  const { orderId, designerId, designerName, designNotes, files } = req.body;
+  if (!orderId) return res.status(400).json({ error: 'Order ID is required' });
+
+  const wf = workflowsStore[orderId];
+  if (!wf) return res.status(404).json({ error: 'Workflow not found' });
+
+  const now = new Date().toISOString();
+  wf.workflowStatus = 'DESIGN_IN_PROGRESS';
+  wf.designInstructions = designNotes || wf.designInstructions;
+  if (Array.isArray(files)) {
+    wf.activeDesignFiles = files;
+  }
+  wf.updatedAt = now;
+  workflowsStore[orderId] = wf;
+  saveLocalBackup();
+
+  logWorkflowAudit(orderId, designerId || wf.assignedDesignerId || 'Designer', designerName || wf.assignedDesignerName || 'Designer', 'DESIGNER', 'SAVE_DRAFT', wf.workflowStatus, 'DESIGN_IN_PROGRESS', 'Design work in progress saved');
+
+  res.json({ success: true, workflow: wf });
+});
+
+// DESIGNER: Submit completed design to Production
+apiRouter.post('/workflow/design-submit', async (req, res) => {
+  const { orderId, designerId, designerName, designNotes, files } = req.body;
+  if (!orderId) return res.status(400).json({ error: 'Order ID is required' });
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: 'Please upload at least one completed design file before submitting to Production' });
+  }
+
+  const wf = workflowsStore[orderId];
+  if (!wf) return res.status(404).json({ error: 'Workflow not found' });
+
+  const now = new Date().toISOString();
+  const nextRevNum = (wf.currentRevisionNumber || 0) + 1;
+
+  const newRevision: DesignRevision = {
+    id: `rev_${orderId.replace(/[^a-zA-Z0-9]/g, '_')}_${nextRevNum}_${Date.now()}`,
+    orderId,
+    revisionNumber: nextRevNum,
+    designerId: designerId || wf.assignedDesignerId || 'Designer-01',
+    designerName: designerName || wf.assignedDesignerName || 'Designer',
+    designNotes: designNotes || 'Submitted for production',
+    files: files,
+    status: 'APPROVED_FOR_PRODUCTION',
+    submittedAt: now,
+    createdAt: now
+  };
+
+  if (!designRevisionsStore[orderId]) designRevisionsStore[orderId] = [];
+  designRevisionsStore[orderId].push(newRevision);
+
+  const fromStatus = wf.workflowStatus;
+  wf.workflowStatus = 'DESIGN_SUBMITTED';
+  wf.currentRevisionNumber = nextRevNum;
+  wf.activeDesignFiles = files;
+  wf.designSubmittedAt = now;
+  wf.clarificationRequest = undefined; // clear pending clarifications
+  wf.updatedAt = now;
+
+  workflowsStore[orderId] = wf;
+  saveLocalBackup();
+
+  logWorkflowAudit(orderId, designerId || 'Designer', designerName || 'Designer', 'DESIGNER', 'SUBMIT_DESIGN_TO_PRODUCTION', fromStatus, 'DESIGN_SUBMITTED', `Revision #${nextRevNum} submitted to Production with ${files.length} design file(s)`);
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('department_order_workflow').upsert({
+      orderId,
+      workflowStatus: 'DESIGN_SUBMITTED',
+      currentRevisionNumber: nextRevNum,
+      activeDesignFiles: files,
+      designSubmittedAt: now,
+      updatedAt: now
+    }).then(() => {}).catch(() => {});
+
+    client.from('design_revisions').insert(newRevision).then(() => {}).catch(() => {});
+  }
+
+  res.json({
+    success: true,
+    workflow: wf,
+    revision: newRevision,
+    message: `Design Revision #${nextRevNum} submitted to Production department!`
+  });
+});
+
+// CRE or PRODUCTION: Request Design Revision
+apiRouter.post('/workflow/revision-request', async (req, res) => {
+  const { orderId, requesterRole, requesterId, requesterName, reason, instructions, attachments } = req.body;
+  if (!orderId || !reason) {
+    return res.status(400).json({ error: 'Order ID and revision reason are required' });
+  }
+
+  const wf = workflowsStore[orderId];
+  if (!wf) return res.status(404).json({ error: 'Workflow not found' });
+
+  const now = new Date().toISOString();
+  const fromStatus = wf.workflowStatus;
+  const isFromProduction = requesterRole === 'PRODUCTION';
+  const targetStatus = isFromProduction ? 'PRODUCTION_REVISION_REQUESTED' : 'DESIGN_REVISION_REQUESTED';
+
+  wf.workflowStatus = targetStatus;
+  wf.clarificationRequest = {
+    fromDepartment: isFromProduction ? 'PRODUCTION' : 'DESIGN',
+    problemDescription: reason,
+    affectedComponent: instructions,
+    requestedBy: requesterName || requesterId || 'Reviewer',
+    requestedAt: now,
+    urgency: wf.priority || 'HIGH',
+    attachments: attachments || []
+  };
+  wf.updatedAt = now;
+
+  // Mark latest revision as revision requested
+  const revs = designRevisionsStore[orderId];
+  if (revs && revs.length > 0) {
+    const latest = revs[revs.length - 1];
+    latest.status = 'REVISION_REQUESTED';
+    latest.revisionRequestedBy = requesterName || requesterId;
+    latest.revisionReason = reason;
+    latest.revisionRequestedAt = now;
+  }
+
+  workflowsStore[orderId] = wf;
+  saveLocalBackup();
+
+  const auditDetails = `Revision requested by ${requesterRole} (${requesterName || requesterId}): "${reason}". Instructions: "${instructions || 'None'}"`;
+  logWorkflowAudit(orderId, requesterId || 'Reviewer', requesterName || 'Reviewer', requesterRole || 'CRE', 'REQUEST_REVISION', fromStatus, targetStatus, auditDetails);
+
+  res.json({
+    success: true,
+    workflow: wf,
+    message: `Design revision request logged and routed to Design department.`
+  });
+});
+
+// PRODUCTION: Update Production Status (Start, Notes, Complete)
+apiRouter.post('/workflow/production-status', async (req, res) => {
+  const { orderId, staffId, staffName, action, remarks, evidenceFiles } = req.body;
+  if (!orderId || !action) {
+    return res.status(400).json({ error: 'Order ID and action are required' });
+  }
+
+  const wf = workflowsStore[orderId];
+  if (!wf) return res.status(404).json({ error: 'Workflow not found' });
+
+  const now = new Date().toISOString();
+  const fromStatus = wf.workflowStatus;
+
+  if (action === 'START') {
+    wf.workflowStatus = 'PRODUCTION_IN_PROGRESS';
+    wf.productionStartedAt = now;
+    wf.productionStartedByStaffId = staffId || 'Prod-Staff';
+    wf.productionStartedByStaffName = staffName || 'Production Specialist';
+    if (remarks) wf.productionRemarks = remarks;
+    wf.updatedAt = now;
+
+    logWorkflowAudit(orderId, staffId || 'Production', staffName || 'Production Specialist', 'PRODUCTION', 'START_PRODUCTION', fromStatus, 'PRODUCTION_IN_PROGRESS', `Manufacturing started by ${staffName || staffId}`);
+  } else if (action === 'REMARKS') {
+    wf.productionRemarks = remarks || wf.productionRemarks;
+    wf.updatedAt = now;
+    logWorkflowAudit(orderId, staffId || 'Production', staffName || 'Production Specialist', 'PRODUCTION', 'UPDATE_PRODUCTION_REMARKS', fromStatus, wf.workflowStatus, `Production notes updated: ${remarks}`);
+  } else if (action === 'COMPLETE') {
+    wf.workflowStatus = 'PRODUCTION_COMPLETED';
+    wf.productionCompletedAt = now;
+    wf.productionCompletedByStaffId = staffId || 'Prod-Staff';
+    wf.productionCompletedByStaffName = staffName || 'Production Specialist';
+    if (remarks) wf.productionRemarks = remarks;
+    wf.updatedAt = now;
+
+    // Attach production evidence if provided
+    if (Array.isArray(evidenceFiles) && evidenceFiles.length > 0) {
+      orderAttachmentsStore[orderId] = [...(orderAttachmentsStore[orderId] || []), ...evidenceFiles];
+    }
+
+    logWorkflowAudit(orderId, staffId || 'Production', staffName || 'Production Specialist', 'PRODUCTION', 'COMPLETE_PRODUCTION', fromStatus, 'PRODUCTION_COMPLETED', `Manufacturing completed by ${staffName || staffId}. Order returned to CRE workflow for packing and dispatch.`);
+  }
+
+  workflowsStore[orderId] = wf;
+  saveLocalBackup();
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('department_order_workflow').upsert({
+      orderId,
+      workflowStatus: wf.workflowStatus,
+      productionStartedAt: wf.productionStartedAt,
+      productionStartedByStaffId: wf.productionStartedByStaffId,
+      productionStartedByStaffName: wf.productionStartedByStaffName,
+      productionCompletedAt: wf.productionCompletedAt,
+      productionCompletedByStaffId: wf.productionCompletedByStaffId,
+      productionCompletedByStaffName: wf.productionCompletedByStaffName,
+      productionRemarks: wf.productionRemarks,
+      updatedAt: now
+    }).then(() => {}).catch(() => {});
+  }
+
+  res.json({
+    success: true,
+    workflow: wf,
+    message: action === 'COMPLETE' 
+      ? `Production marked as completed! Order is now ready for packing and dispatch.` 
+      : `Production status updated to ${wf.workflowStatus}`
+  });
+});
+
+// File Upload endpoint for Design & Workflow Attachments (CAD, DWG, DXF, STEP, PDF, JPG, PNG, etc.)
+apiRouter.post('/workflow/upload', upload.array('files', 10), (req, res) => {
+  const uploadedFiles = req.files as Express.Multer.File[];
+  if (!uploadedFiles || uploadedFiles.length === 0) {
+    return res.status(400).json({ error: 'No files uploaded' });
+  }
+
+  const { orderId, category, staffId, staffName } = req.body;
+  const now = new Date().toISOString();
+
+  const results = uploadedFiles.map(file => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const uniqueFileName = `${safeBase}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
+    const destinationPath = path.join(uploadsDir, uniqueFileName);
+
+    fs.writeFileSync(destinationPath, file.buffer);
+
+    const attachment = {
+      id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      orderId: orderId || 'GENERAL',
+      fileName: file.originalname,
+      fileType: ext.replace('.', '').toUpperCase() || 'FILE',
+      fileSize: file.size,
+      fileUrl: `/uploads/${uniqueFileName}`,
+      category: category || 'DESIGN_FILE',
+      uploadedByStaffId: staffId || 'Operator',
+      uploadedByStaffName: staffName || 'Operator',
+      uploadedAt: now
+    };
+
+    if (orderId) {
+      if (!orderAttachmentsStore[orderId]) orderAttachmentsStore[orderId] = [];
+      orderAttachmentsStore[orderId].push(attachment);
+    }
+
+    return attachment;
+  });
+
+  saveLocalBackup();
+  res.json({ success: true, files: results });
+});
+
+// Direct file download endpoint with proper attachment header
+apiRouter.get('/workflow/download/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(uploadsDir, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send('File not found');
+  }
+  res.download(filePath, filename);
+});
+
+// -------------------------------------------------------------
+// ADMIN USER MANAGEMENT APIS
+// -------------------------------------------------------------
+
+apiRouter.get('/admin/users', (req, res) => {
+  const users = Object.values(staffsStore).map(s => ({
+    id: s.id,
+    name: s.name,
+    role: s.role,
+    stationId: s.stationId,
+    email: s.email,
+    phone: s.phone,
+    isActive: s.isActive !== false,
+    createdAt: s.createdAt,
+    lastLoginAt: s.lastLoginAt
+  }));
+  res.json(users);
+});
+
+apiRouter.post('/admin/users', (req, res) => {
+  const { id, name, role, stationId, password, email, phone } = req.body;
+  if (!id || !name || !role) {
+    return res.status(400).json({ error: 'User ID, Full Name, and Role are required' });
+  }
+
+  const cleanId = sanitizeString(id);
+  if (staffsStore[cleanId]) {
+    return res.status(400).json({ error: `User with ID "${cleanId}" already exists` });
+  }
+
+  const validRoles = ['ADMIN', 'CRE', 'DESIGNER', 'PRODUCTION', 'SUPERVISOR', 'PACKER'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: `Invalid role. Allowed roles: ${validRoles.join(', ')}` });
+  }
+
+  const newUser: StaffMember = {
+    id: cleanId,
+    name: sanitizeString(name),
+    role: role as StaffRole,
+    stationId: sanitizeString(stationId || 'HQ'),
+    password: password ? String(password).trim() : 'password123',
+    email: email ? sanitizeString(email) : undefined,
+    phone: phone ? sanitizeString(phone) : undefined,
+    isActive: true,
+    createdAt: new Date().toISOString()
+  };
+
+  staffsStore[cleanId] = newUser;
+  saveLocalBackup();
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('staffs').upsert(newUser).then(() => {}).catch(() => {});
+  }
+
+  res.json({ success: true, user: newUser, message: `Account created for ${newUser.name} with role ${newUser.role}` });
+});
+
+apiRouter.put('/admin/users/:id', (req, res) => {
+  const targetId = sanitizeString(req.params.id);
+  const staff = staffsStore[targetId];
+  if (!staff) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const { name, role, stationId, email, phone, isActive } = req.body;
+  if (name) staff.name = sanitizeString(name);
+  if (role) {
+    const validRoles = ['ADMIN', 'CRE', 'DESIGNER', 'PRODUCTION', 'SUPERVISOR', 'PACKER'];
+    if (validRoles.includes(role)) staff.role = role as StaffRole;
+  }
+  if (stationId) staff.stationId = sanitizeString(stationId);
+  if (email !== undefined) staff.email = sanitizeString(email);
+  if (phone !== undefined) staff.phone = sanitizeString(phone);
+  if (isActive !== undefined) staff.isActive = Boolean(isActive);
+
+  staffsStore[targetId] = staff;
+  saveLocalBackup();
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('staffs').upsert(staff).then(() => {}).catch(() => {});
+  }
+
+  res.json({ success: true, user: staff, message: `User ${staff.name} updated successfully` });
+});
+
+apiRouter.post('/admin/users/:id/reset-password', (req, res) => {
+  const targetId = sanitizeString(req.params.id);
+  const staff = staffsStore[targetId];
+  if (!staff) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const newPassword = req.body.password ? String(req.body.password).trim() : 'password123';
+  staff.password = newPassword;
+  staffsStore[targetId] = staff;
+  saveLocalBackup();
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('staffs').update({ password: newPassword }).eq('id', targetId).then(() => {}).catch(() => {});
+  }
+
+  res.json({ success: true, message: `Password for ${staff.name} has been reset successfully` });
+});
+
+apiRouter.post('/admin/users/:id/toggle-active', (req, res) => {
+  const targetId = sanitizeString(req.params.id);
+  const staff = staffsStore[targetId];
+  if (!staff) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  staff.isActive = !staff.isActive;
+  staffsStore[targetId] = staff;
+  saveLocalBackup();
+
+  const client = getSupabaseClient();
+  if (client) {
+    client.from('staffs').update({ isActive: staff.isActive }).eq('id', targetId).then(() => {}).catch(() => {});
+  }
+
+  res.json({
+    success: true,
+    isActive: staff.isActive,
+    message: `Account for ${staff.name} is now ${staff.isActive ? 'Active' : 'Deactivated'}`
+  });
+});
+
 
 async function saveBatchToSupabase(records: OrderRecord[]): Promise<boolean> {
   const client = getSupabaseClient();

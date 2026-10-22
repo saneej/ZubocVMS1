@@ -39,6 +39,43 @@ export const INITIAL_STAFFS: StaffMember[] = [
     role: 'ADMIN',
     stationId: 'Packing-01',
     password: 'password123',
+    isActive: true,
     createdAt: '2026-10-16T10:00:00.000Z'
+  },
+  {
+    id: 'cre-01',
+    name: 'Chloe CRE',
+    role: 'CRE',
+    stationId: 'CRE-HQ',
+    password: 'password123',
+    isActive: true,
+    createdAt: '2026-10-22T10:00:00.000Z'
+  },
+  {
+    id: 'designer-01',
+    name: 'Dan Designer',
+    role: 'DESIGNER',
+    stationId: 'Design-Studio-1',
+    password: 'password123',
+    isActive: true,
+    createdAt: '2026-10-22T10:00:00.000Z'
+  },
+  {
+    id: 'designer-02',
+    name: 'Diana CAD',
+    role: 'DESIGNER',
+    stationId: 'Design-Studio-2',
+    password: 'password123',
+    isActive: true,
+    createdAt: '2026-10-22T10:00:00.000Z'
+  },
+  {
+    id: 'production-01',
+    name: 'Peter Production',
+    role: 'PRODUCTION',
+    stationId: 'Plant-Floor-1',
+    password: 'password123',
+    isActive: true,
+    createdAt: '2026-10-22T10:00:00.000Z'
   }
 ];

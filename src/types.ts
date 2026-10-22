@@ -171,6 +171,13 @@ export interface OrderRecord {
   isDispatched?: boolean;
   is_dispatched?: boolean;
 
+  // Department Workflow (CRE, Designer, Production)
+  isDesignRequired?: boolean;
+  workflowStatus?: WorkflowStatus | string;
+  assignedDesignerId?: string;
+  assignedDesignerName?: string;
+  activeRevisionNumber?: number;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -187,12 +194,116 @@ export interface AppSettings {
   tvScrollSpeed?: number;
 }
 
+export type StaffRole = 'ADMIN' | 'CRE' | 'DESIGNER' | 'PRODUCTION' | 'SUPERVISOR' | 'PACKER';
+
 export interface StaffMember {
   id: string;
   name: string;
-  role: 'ADMIN' | 'SUPERVISOR' | 'PACKER';
+  role: StaffRole;
   stationId: string;
   password?: string;
   email?: string;
+  phone?: string;
+  isActive?: boolean;
   createdAt?: string;
+  lastLoginAt?: string;
 }
+
+export type WorkflowStatus = 
+  | 'CRE_CREATED'
+  | 'DESIGN_PENDING'
+  | 'DESIGN_ASSIGNED'
+  | 'DESIGN_IN_PROGRESS'
+  | 'DESIGN_REVISION_REQUESTED'
+  | 'DESIGN_SUBMITTED'
+  | 'PRODUCTION_PENDING'
+  | 'PRODUCTION_IN_PROGRESS'
+  | 'PRODUCTION_REVISION_REQUESTED'
+  | 'PRODUCTION_COMPLETED';
+
+export type WorkflowPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
+export interface OrderAttachment {
+  id: string;
+  orderId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  fileUrl: string;
+  category: 'CRE_REFERENCE' | 'DESIGN_FILE' | 'PRODUCTION_EVIDENCE' | 'REVISION_MARKUP';
+  revisionNumber?: number;
+  uploadedByStaffId: string;
+  uploadedByStaffName: string;
+  uploadedAt: string;
+  notes?: string;
+}
+
+export interface DesignRevision {
+  id: string;
+  orderId: string;
+  revisionNumber: number;
+  designerId: string;
+  designerName: string;
+  designNotes?: string;
+  files: OrderAttachment[];
+  status: 'DRAFT' | 'SUBMITTED' | 'SUPERSEDED' | 'REVISION_REQUESTED' | 'APPROVED_FOR_PRODUCTION' | 'COMPLETED_IN_PRODUCTION';
+  submittedAt?: string;
+  revisionRequestedBy?: string;
+  revisionReason?: string;
+  revisionRequestedAt?: string;
+  createdAt: string;
+}
+
+export interface ClarificationRequest {
+  fromDepartment: 'DESIGN' | 'PRODUCTION';
+  problemDescription: string;
+  affectedComponent?: string;
+  requestedBy: string;
+  requestedAt: string;
+  urgency: WorkflowPriority;
+  attachments?: OrderAttachment[];
+  isResolved?: boolean;
+  resolutionNotes?: string;
+}
+
+export interface DepartmentWorkflow {
+  orderId: string;
+  isDesignRequired: boolean;
+  workflowStatus: WorkflowStatus;
+  priority: WorkflowPriority;
+  designInstructions?: string;
+  assignedDesignerId?: string;
+  assignedDesignerName?: string;
+  assignedAt?: string;
+  currentRevisionNumber: number;
+  activeDesignFiles: OrderAttachment[];
+  creAttachments: OrderAttachment[];
+  forwardedToDesignAt?: string;
+  forwardedByStaffId?: string;
+  forwardedByStaffName?: string;
+  designSubmittedAt?: string;
+  productionStartedAt?: string;
+  productionStartedByStaffId?: string;
+  productionStartedByStaffName?: string;
+  productionCompletedAt?: string;
+  productionCompletedByStaffId?: string;
+  productionCompletedByStaffName?: string;
+  productionRemarks?: string;
+  clarificationRequest?: ClarificationRequest;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkflowAuditLog {
+  id: string;
+  orderId: string;
+  actorId: string;
+  actorName: string;
+  actorRole: StaffRole;
+  action: string;
+  fromStatus?: WorkflowStatus;
+  toStatus?: WorkflowStatus;
+  details: string;
+  timestamp: string;
+}
+
