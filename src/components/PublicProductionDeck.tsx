@@ -231,14 +231,14 @@ export const PublicProductionDeck: React.FC = () => {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setOrders(parsed);
+            setOrders(parsed.filter((o: OrderRecord) => o.isProductionDeckOrder));
           }
         } catch {}
       }
 
       const res = await safeFetchJson('/api/orders');
       if (res && Array.isArray(res) && res.length > 0) {
-        setOrders(res);
+        setOrders(res.filter((o: OrderRecord) => o.isProductionDeckOrder));
         localStorage.setItem('zuboc_orders_cache', JSON.stringify(res));
       }
     } catch (e) {
@@ -286,7 +286,7 @@ export const PublicProductionDeck: React.FC = () => {
       DISPATCHED: []
     };
 
-    orders.forEach(ord => {
+    orders.filter(o => o.isProductionDeckOrder).forEach(ord => {
       const norm = normalizeOrder(ord);
       if (map[norm.stage]) {
         map[norm.stage].push({ raw: ord, norm });
