@@ -57,6 +57,30 @@ export function normalizeIsoDate(dateVal?: any): string | undefined {
   const str = String(dateVal).trim();
   if (!str) return undefined;
 
+  // DD/MM/YYYY or DD-MM-YYYY
+  const ddmmyyyyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const day = parseInt(ddmmyyyyMatch[1], 10);
+    const month = parseInt(ddmmyyyyMatch[2], 10) - 1;
+    const year = parseInt(ddmmyyyyMatch[3], 10);
+    const d = new Date(Date.UTC(year, month, day));
+    if (!isNaN(d.getTime())) {
+      return d.toISOString();
+    }
+  }
+
+  // YYYY-MM-DD
+  const yyyymmddMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (yyyymmddMatch) {
+    const year = parseInt(yyyymmddMatch[1], 10);
+    const month = parseInt(yyyymmddMatch[2], 10) - 1;
+    const day = parseInt(yyyymmddMatch[3], 10);
+    const d = new Date(Date.UTC(year, month, day));
+    if (!isNaN(d.getTime())) {
+      return d.toISOString();
+    }
+  }
+
   const num = typeof dateVal === 'number' ? dateVal : parseFloat(str);
   if (!isNaN(num) && /^\d+(\.\d+)?$/.test(str) && num > 10000 && num < 100000) {
     try {

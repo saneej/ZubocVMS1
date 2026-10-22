@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { OrderRecord } from '../types';
-import { formatIST } from '../utils/time';
+import { formatIST, formatDateForInput } from '../utils/time';
 import { 
   ArrowLeft, 
   Package, 
@@ -162,9 +162,9 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
         customerName: order.customerName || '',
         contactPerson: order.contactPerson || '',
         contactPhone: order.contactPhone || '',
-        orderReceivedDate: order.orderReceivedDate || '',
-        dispatchDate: order.dispatchDate || '',
-        deliveredDate: order.deliveredDate || '',
+        orderReceivedDate: formatDateForInput(order.orderReceivedDate),
+        dispatchDate: formatDateForInput(order.dispatchDate || order.promisedDeliveryDate || order.timeline?.dispatchingDate),
+        deliveredDate: formatDateForInput(order.deliveredDate),
         notes: order.notes || '',
         remarks: order.remarks || ''
       });
@@ -195,15 +195,41 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
       type: 'EDIT_LOG' as const
     };
 
+    const syncFields: Partial<OrderRecord> = { ...updatedFields };
+
+    if (updatedFields.dispatchDate !== undefined) {
+      syncFields.promisedDeliveryDate = updatedFields.dispatchDate;
+      syncFields.timeline = {
+        ...(order.timeline || {}),
+        dispatchingDate: updatedFields.dispatchDate
+      };
+      syncFields.stageDueDates = {
+        ...(order.stageDueDates || {}),
+        DISPATCH: updatedFields.dispatchDate
+      };
+    }
+
+    if (updatedFields.orderReceivedDate !== undefined) {
+      syncFields.timeline = {
+        ...(syncFields.timeline || order.timeline || {}),
+        orderConfirmationDate: updatedFields.orderReceivedDate
+      };
+      syncFields.stageDueDates = {
+        ...(order.stageDueDates || {}),
+        ORDER_CONFIRMATION: updatedFields.orderReceivedDate
+      };
+    }
+
     const updatedOrder: OrderRecord = {
       ...order,
-      ...updatedFields,
+      ...syncFields,
       auditLogs: [...existingLogs, newLog],
       updatedAt: nowIso
     };
 
     try {
       await onUpdateOrder(updatedOrder);
+      setFetchedOrder(updatedOrder); // Instantly update local state
       setIsSaving(false);
       setIsEditingAll(false);
       setEditingSection(null);
@@ -937,7 +963,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Order Received Date</label>
                         <input
                           type="date"
-                          value={formData.orderReceivedDate || ''}
+                          value={formatDateForInput(formData.orderReceivedDate)}
                           onChange={(e) => setFormData({ ...formData, orderReceivedDate: e.target.value })}
                           className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
                         />
@@ -947,7 +973,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Despatch Date</label>
                         <input
                           type="date"
-                          value={formData.dispatchDate || ''}
+                          value={formatDateForInput(formData.dispatchDate)}
                           onChange={(e) => setFormData({ ...formData, dispatchDate: e.target.value })}
                           className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
                         />
@@ -957,7 +983,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                         <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Delivered Date</label>
                         <input
                           type="date"
-                          value={formData.deliveredDate || ''}
+                          value={formatDateForInput(formData.deliveredDate)}
                           onChange={(e) => setFormData({ ...formData, deliveredDate: e.target.value })}
                           className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none"
                         />

@@ -104,7 +104,6 @@ export interface OrderRecord {
   fulfillFrom?: string;
   orderReceivedDate?: string;
   dispatchDate?: string;
-  riderNumber?: string;
   orderAmount?: string;
   shippingAmount?: string;
   orderTotal?: string;
@@ -153,6 +152,8 @@ export interface OrderRecord {
   stageDueDates?: Record<string, string>;
   productionNotes?: string;
   isProductionDeckOrder?: boolean;
+  isDispatched?: boolean;
+  is_dispatched?: boolean;
 
   createdAt: string;
   updatedAt: string;

@@ -60,6 +60,7 @@ import {
 import { safeFetchJson } from '../utils/api';
 import { getCurrentISTString } from '../utils/time';
 import { BrowserQRCodeSvgWriter } from '@zxing/library';
+import { LiveAlertTicker } from './LiveAlertTicker';
 
 interface ProductionDeckProps {
   orders: OrderRecord[];
@@ -781,6 +782,9 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
         </header>
       )}
 
+      {/* Live Read-Only Alert Banner for Android TV Display (Below Header) */}
+      <LiveAlertTicker orders={orders} />
+
       {/* Floating Exit TV Wall mode button */}
       {isTvWallMode && (
         <button
@@ -1176,8 +1180,6 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
   const [currentStage, setCurrentStage] = useState<ProductionStage>(norm.stage);
   const [timeline, setTimeline] = useState<ZubocTimeline>(norm.timeline);
   const [promisedDeliveryDate, setPromisedDeliveryDate] = useState<string>(norm.dueDate || '');
-  const [dispatchDate, setDispatchDate] = useState<string>(order.dispatchDate || order.promisedDeliveryDate || '');
-  const [riderNumber, setRiderNumber] = useState<string>(order.riderNumber || '');
   const [totalBillingAmount, setTotalBillingAmount] = useState<number>(norm.totalAmount);
   const [advanceReceived, setAdvanceReceived] = useState<number>(norm.advance);
   const [balanceAmount, setBalanceAmount] = useState<number>(norm.balance);
@@ -1228,8 +1230,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
       stageDueDates,
       timeline,
       promisedDeliveryDate,
-      dispatchDate,
-      riderNumber,
+      dispatchDate: promisedDeliveryDate,
       productionNotes: remarks,
       remarks,
       notes: remarks,
@@ -1292,8 +1293,7 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
       stageDueDates,
       timeline,
       promisedDeliveryDate,
-      dispatchDate,
-      riderNumber,
+      dispatchDate: promisedDeliveryDate,
       productionNotes: remarks,
       remarks,
       notes: remarks,
@@ -1523,28 +1523,6 @@ const OperatorUpdateDrawer: React.FC<OperatorUpdateDrawerProps> = ({
                   value={promisedDeliveryDate}
                   onChange={(e) => setPromisedDeliveryDate(e.target.value)}
                   className="w-full mt-1 px-3 py-1.5 rounded-lg bg-white border border-stone-300 font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-200 mt-2">
-              <div>
-                <label className="text-stone-500 font-medium">Despatch Date</label>
-                <input
-                  type="date"
-                  value={dispatchDate}
-                  onChange={(e) => setDispatchDate(e.target.value)}
-                  className="w-full mt-1 px-3 py-1.5 rounded-lg bg-white border border-stone-300 font-bold text-amber-800"
-                />
-              </div>
-              <div>
-                <label className="text-stone-500 font-medium">Rider Number / ID</label>
-                <input
-                  type="text"
-                  value={riderNumber}
-                  onChange={(e) => setRiderNumber(e.target.value)}
-                  placeholder="e.g. Rider #9842"
-                  className="w-full mt-1 px-3 py-1.5 rounded-lg bg-white border border-stone-300 font-bold text-emerald-800 font-mono"
                 />
               </div>
             </div>
