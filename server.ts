@@ -709,7 +709,7 @@ async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
     // Add timeout to upsert to prevent hanging the request
     const { error } = (await withTimeout(
       client.from('orders').upsert(payload, { onConflict: 'orderId' }),
-      6000
+      15000
     )) as { error: any };
     
     if (error) {
@@ -1528,7 +1528,7 @@ apiRouter.post('/admin/create-user', async (req, res) => {
   const { email, name, role, password } = req.body;
   if (!email || !name || !role) return res.status(400).json({ error: 'Missing fields' });
   const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-  const newStaff: StaffMember = { id, name, role, password, email, isActive: true, createdAt: new Date().toISOString() };
+  const newStaff: StaffMember = { id, name, role, password, email, isActive: true, createdAt: new Date().toISOString(), stationId: 'General' };
   staffsStore[id] = newStaff;
   saveLocalBackup();
   await saveStaffToSupabase(newStaff);
