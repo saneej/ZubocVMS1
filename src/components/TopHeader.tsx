@@ -93,7 +93,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           
           {/* Quick Actions Group */}
           <div className="flex items-center bg-slate-100/50 p-1 rounded-2xl gap-1.5">
-            {onOpenAddOrder && (
+            {onOpenAddOrder && currentStaff.role !== 'DESIGNER' && (
               <button
                 onClick={onOpenAddOrder}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white transition-all cursor-pointer shadow-lg shadow-slate-950/20 active:scale-95"
