@@ -81,6 +81,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   });
 
   const myAssignedOrders = ordersWithWorkflow.filter(item => {
+    if (currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') return false;
     const wf = item.workflow as DepartmentWorkflow | undefined;
     if (!wf?.isDesignRequired) return false;
     const isMine = wf?.assignedDesignerId === currentStaff.id;
@@ -404,21 +405,23 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
             </span>
           </button>
 
-          <button
-            onClick={() => { setActiveTab('MY_ORDERS'); setSelectedOrder(null); }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'MY_ORDERS'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <span>My Assigned Orders</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'MY_ORDERS' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {myAssignedOrders.length}
-            </span>
-          </button>
+          {!(currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') && (
+            <button
+              onClick={() => { setActiveTab('MY_ORDERS'); setSelectedOrder(null); }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'MY_ORDERS'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <span>My Assigned Orders</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                activeTab === 'MY_ORDERS' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {myAssignedOrders.length}
+              </span>
+            </button>
+          )}
           
           {(currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') && (
             <button
