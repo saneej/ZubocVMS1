@@ -755,6 +755,13 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     };
   }
 
+  if (cleanPath.endsWith('/workflow/design-submit')) {
+    return {
+      success: true,
+      message: 'Design submitted to production (client fallback)'
+    };
+  }
+
   return undefined;
 }
 

@@ -12,30 +12,107 @@ import {
   Factory, 
   FileText, 
   Sparkles,
-  User
+  User,
+  Mail,
+  Shield
 } from 'lucide-react';
 import { StaffMember, StaffRole } from '../types';
 import { safeFetchJson } from '../utils/api';
+import { supabase } from '../supabase';
 
 interface LoginPageProps {
   onLoginSuccess: (staff: StaffMember) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+  const [loginMode, setLoginMode] = useState<'supaAuth' | 'pin'>('supaAuth');
   const [selectedPortal, setSelectedPortal] = useState<'CRE' | 'DESIGNER' | 'PRODUCTION' | 'ADMIN'>('CRE');
+  
+  // Supabase Auth state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // PIN state
   const [accessCode, setAccessCode] = useState('');
-  const [showCode, setShowCode] = useState(false);
+  
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleVerifyAccess = async (overrideCode?: string) => {
-    const targetCode = (overrideCode || accessCode).trim();
+  const handleSupaAuthLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage('Please enter both Email and Password.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // 1. Authenticate with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
+      });
+
+      if (authError || !authData.user) {
+        throw new Error(authError?.message || 'Authentication failed. Please check your credentials.');
+      }
+
+      // 2. Fetch corresponding staff profile from public.staffs table
+      const { data: staffData, error: staffError } = await supabase
+        .from('staffs')
+        .select('*')
+        .eq('email', email.trim())
+        .maybeSingle();
+
+      let staffMember: StaffMember;
+
+      if (!staffError && staffData) {
+        staffMember = {
+          id: staffData.id,
+          name: staffData.name,
+          role: staffData.role || 'PACKER',
+          stationId: staffData.stationId || 'Packing-01',
+          email: staffData.email,
+          isActive: true
+        };
+      } else {
+        // Fallback staff member mapped from Supabase user
+        staffMember = {
+          id: authData.user.id.substring(0, 8),
+          name: authData.user.user_metadata?.name || email.split('@')[0],
+          role: authData.user.user_metadata?.role || 'CRE',
+          stationId: authData.user.user_metadata?.stationId || 'Packing-01',
+          email: authData.user.email,
+          isActive: true
+        };
+      }
+
+      setSuccessMessage('Supabase Auth Verified Successfully!');
+      setTimeout(() => {
+        onLoginSuccess(staffMember);
+      }, 300);
+
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Supabase Auth error. Please check email or password.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetCode = accessCode.trim();
     setErrorMessage(null);
     setSuccessMessage(null);
 
     if (!targetCode) {
-      setErrorMessage('Please enter your User ID or Access Phrase.');
+      setErrorMessage('Please enter your Access Phrase or PIN.');
       return;
     }
 
@@ -63,11 +140,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleVerifyAccess();
-  };
-
   const getPortalInfo = () => {
     switch (selectedPortal) {
       case 'DESIGNER':
@@ -75,46 +147,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           title: 'Design Studio Portal',
           subtitle: 'CAD Blueprints, 3D Assets & Custom Revisions',
           color: 'from-amber-600 to-amber-700',
-          badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-400/30',
-          icon: Palette,
-          demoUser: 'designer-01',
-          demoPass: 'password123'
+          demoEmail: 'designer@zuboc.com',
+          demoPass: 'password123',
+          demoPin: 'designer-01'
         };
       case 'PRODUCTION':
         return {
           title: 'Production Floor Terminal',
           subtitle: 'Manufacturing Queue & Blueprint Execution',
           color: 'from-blue-600 to-indigo-700',
-          badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-400/30',
-          icon: Factory,
-          demoUser: 'production-01',
-          demoPass: 'password123'
+          demoEmail: 'production@zuboc.com',
+          demoPass: 'password123',
+          demoPin: 'production-01'
         };
       case 'ADMIN':
         return {
           title: 'Admin Master Console',
           subtitle: 'Full System Oversight, Role Assignment & Security',
           color: 'from-purple-600 to-slate-900',
-          badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-400/30',
-          icon: ShieldCheck,
-          demoUser: 'saneej',
-          demoPass: 'saneej'
+          demoEmail: 'admin@zuboc.com',
+          demoPass: 'password123',
+          demoPin: 'Zuboc'
         };
       default:
         return {
           title: 'CRE Order Terminal',
           subtitle: 'Customer Relations, Orders, Packing & Dispatch',
           color: 'from-indigo-600 to-purple-800',
-          badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30',
-          icon: FileText,
-          demoUser: 'cre-01',
-          demoPass: 'password123'
+          demoEmail: 'cre@zuboc.com',
+          demoPass: 'password123',
+          demoPin: 'cre-01'
         };
     }
   };
 
   const portalInfo = getPortalInfo();
-  const PortalIcon = portalInfo.icon;
 
   return (
     <div className="min-h-screen bg-[#070408] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-sans selection:bg-purple-600 selection:text-white relative overflow-hidden">
@@ -130,7 +197,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <div className="inline-flex items-center gap-2 bg-white/5 px-5 py-2.5 rounded-full backdrop-blur-2xl border border-white/10 shadow-2xl">
             <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
             <span className="text-xs font-black uppercase tracking-[0.25em] text-white">
-              Zuboc Operations Suite
+              Zuboc Secure Auth
             </span>
           </div>
           <h2 className="text-white text-2xl font-black tracking-tight">{portalInfo.title}</h2>
@@ -192,102 +259,181 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </button>
         </div>
 
+        {/* Auth Method Toggle */}
+        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setLoginMode('supaAuth')}
+            className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              loginMode === 'supaAuth' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Supabase Auth (Secure)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginMode('pin')}
+            className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              loginMode === 'pin' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>Station PIN / Code</span>
+          </button>
+        </div>
+
         {/* Main Access Card */}
         <div className="bg-white/95 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-7 shadow-2xl shadow-black/80 space-y-5 relative overflow-hidden">
           
-          <form onSubmit={handleSubmit} className="space-y-5">
-            
-            {/* Feedback Messages */}
-            {errorMessage && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 animate-shake">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
+          {errorMessage && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 animate-shake">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
-            {successMessage && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{successMessage}</span>
-              </div>
-            )}
+          {successMessage && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
 
-            {/* Access Code Input */}
-            <div className="space-y-1.5 font-sans">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                Enter User ID, Station PIN or Passphrase
-              </label>
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                  <Lock className={`w-4 h-4 transition-colors duration-200 ${isLoading ? 'text-indigo-600' : 'text-slate-400 group-focus-within:text-indigo-600'}`} />
+          {loginMode === 'supaAuth' ? (
+            <form onSubmit={handleSupaAuthLogin} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                  Supabase User Email
+                </label>
+                <div className="relative group">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. admin@zuboc.com"
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-600 focus:bg-white text-slate-900 pl-11 pr-4 py-3.5 rounded-2xl text-xs font-bold placeholder:text-slate-400 outline-none transition-all font-mono"
+                  />
                 </div>
-                <input
-                  type={showCode ? "text" : "password"}
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="Enter User ID or password..."
-                  autoFocus
-                  required
-                  autoComplete="off"
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white text-slate-900 pl-11 pr-11 py-3.5 rounded-2xl text-sm font-bold placeholder:text-slate-400 outline-none transition-all shadow-inner font-mono"
-                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                  Secure Password
+                </label>
+                <div className="relative group">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter secure password..."
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-emerald-600 focus:bg-white text-slate-900 pl-11 pr-11 py-3.5 rounded-2xl text-xs font-bold placeholder:text-slate-400 outline-none transition-all font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-md shadow-emerald-600/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Authenticating via Supabase...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In with Supabase Auth</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Demo Supabase Login:</span>
                 <button
                   type="button"
-                  onClick={() => setShowCode(!showCode)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                  title={showCode ? "Hide passphrase" : "Show passphrase"}
+                  onClick={() => {
+                    setEmail(portalInfo.demoEmail);
+                    setPassword(portalInfo.demoPass);
+                  }}
+                  className="font-bold text-emerald-600 hover:underline cursor-pointer"
                 >
-                  {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  Fill {portalInfo.demoEmail}
                 </button>
               </div>
-            </div>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyPin} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                  Station PIN or Access Code
+                </label>
+                <div className="relative group">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    placeholder="Enter PIN or Code..."
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white text-slate-900 pl-11 pr-4 py-3.5 rounded-2xl text-xs font-bold placeholder:text-slate-400 outline-none transition-all font-mono"
+                  />
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={isLoading || !accessCode.trim()}
-              className={`
-                w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2.5 shadow-lg cursor-pointer
-                ${isLoading || !accessCode.trim()
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
-                  : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.99] shadow-slate-900/30'
-                }
-              `}
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Verifying Credentials...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In to {selectedPortal}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In with Access Code</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
 
-          {/* Quick Preset for convenience */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Quick test preset:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setAccessCode(portalInfo.demoPass);
-                handleVerifyAccess(portalInfo.demoPass);
-              }}
-              className="font-bold text-indigo-600 hover:underline cursor-pointer"
-            >
-              Use {portalInfo.demoUser} ({portalInfo.demoPass})
-            </button>
-          </div>
+              <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Quick test PIN:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccessCode(portalInfo.demoPin);
+                  }}
+                  className="font-bold text-indigo-600 hover:underline cursor-pointer"
+                >
+                  Use {portalInfo.demoPin}
+                </button>
+              </div>
+            </form>
+          )}
+
         </div>
 
         {/* Footer info */}
         <div className="flex justify-between items-center px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Supabase Sync Active</span>
+            <span>Supabase Auth Ready</span>
           </div>
           <span>Zuboc v3.0-ENTERPRISE</span>
         </div>

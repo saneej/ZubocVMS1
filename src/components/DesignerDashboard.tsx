@@ -112,10 +112,15 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 
       if (res && res.success) {
         setFeedback({ type: 'success', message: res.message || `Order ${orderItem.orderId} assigned to you!` });
-        await fetchWorkflowOrders();
+        
+        // Update local state immediately
+        setOrdersWithWorkflow(prev => prev.map(o => o.orderId === orderItem.orderId ? { ...o, workflow: res.workflow } : o));
+        
         // Automatically switch to my orders tab and open workspace
         setActiveTab('MY_ORDERS');
-        openWorkspace(orderItem);
+        openWorkspace({...orderItem, workflow: res.workflow});
+        
+        await fetchWorkflowOrders();
       } else {
         throw new Error(res?.error || 'Failed to accept order.');
       }
@@ -205,8 +210,10 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   };
 
   const handleSubmitToProduction = async () => {
+    console.log('handleSubmitToProduction called', { selectedOrder, designFiles });
     if (!selectedOrder) return;
     if (designFiles.length === 0) {
+      console.log('No design files');
       setFeedback({ type: 'error', message: 'Please upload at least one final design file before submitting to Production.' });
       return;
     }
@@ -219,6 +226,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
     setFeedback(null);
 
     try {
+      console.log('Sending API request');
       const res = await safeFetchJson('/api/workflow/design-submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,14 +238,19 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
           files: designFiles
         })
       });
+      console.log('API response', res);
 
       if (res && res.success) {
         setFeedback({ type: 'success', message: res.message || 'Design successfully submitted to Production!' });
         await fetchWorkflowOrders();
         setSelectedOrder(null);
         setActiveTab('SUBMITTED');
+      } else {
+        console.log('API call failed', res);
+        setFeedback({ type: 'error', message: res?.error || 'Failed to submit design to Production' });
       }
     } catch (err: any) {
+      console.error('Submit error', err);
       setFeedback({ type: 'error', message: err?.message || 'Failed to submit design to Production' });
     } finally {
       setIsSubmitting(false);
