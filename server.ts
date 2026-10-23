@@ -1848,18 +1848,25 @@ apiRouter.post('/workflow/send-to-design', async (req, res) => {
     // Supabase Sync
     const client = getSupabaseClient();
     if (client) {
-      client.from('department_order_workflow').upsert({
-        orderId: ord.orderId,
-        isDesignRequired: true,
-        workflowStatus: 'DESIGN_PENDING',
-        priority: wf.priority,
-        designInstructions: wf.designInstructions,
-        creAttachments: wf.creAttachments,
-        forwardedToDesignAt: now,
-        forwardedByStaffId: wf.forwardedByStaffId,
-        forwardedByStaffName: wf.forwardedByStaffName,
-        updatedAt: now
-      }).then(() => {}).catch(() => {});
+      withTimeout(
+        client.from('department_order_workflow').upsert({
+          orderId: ord.orderId,
+          isDesignRequired: true,
+          workflowStatus: 'DESIGN_PENDING',
+          priority: wf.priority,
+          designInstructions: wf.designInstructions,
+          creAttachments: wf.creAttachments,
+          forwardedToDesignAt: now,
+          forwardedByStaffId: wf.forwardedByStaffId,
+          forwardedByStaffName: wf.forwardedByStaffName,
+          updatedAt: now
+        }),
+        15000
+      ).then(() => {
+        console.log(`Successfully synced order ${ord.orderId} to department_order_workflow in Supabase`);
+      }).catch((err) => {
+        console.error(`Error syncing order ${ord.orderId} to department_order_workflow:`, err?.message);
+      });
     }
 
     res.json({ success: true, workflow: wf, message: `Order ${ord.orderId} successfully forwarded to Design department!` });
