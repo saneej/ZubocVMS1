@@ -777,10 +777,11 @@ async function syncFromSupabase() {
   try {
     console.log('Starting parallel initial sync from Supabase...');
     
-    const [ordersRes, staffsRes, settingsRes] = await Promise.allSettled([
+    const [ordersRes, staffsRes, settingsRes, workflowsRes] = await Promise.allSettled([
       withTimeout(client.from('orders').select('*').order('createdAt', { ascending: false }), 10000),
       withTimeout(client.from('staffs').select('*'), 8000),
-      withTimeout(client.from('settings').select('*').eq('id', 'config').maybeSingle(), 5000)
+      withTimeout(client.from('settings').select('*').eq('id', 'config').maybeSingle(), 5000),
+      withTimeout(client.from('department_order_workflow').select('*'), 10000)
     ]);
 
     if (ordersRes.status === 'fulfilled') {
@@ -796,6 +797,15 @@ async function syncFromSupabase() {
         ordersStore = freshOrdersMap;
         saveLocalBackup();
         console.log(`Synced ${ords.length} orders from Supabase.`);
+      }
+    }
+
+    if (workflowsRes.status === 'fulfilled') {
+      const { data: wfs, error: wfErr } = workflowsRes.value as any;
+      if (wfErr) console.error('Sync error (workflows):', wfErr.message);
+      else if (Array.isArray(wfs)) {
+        for (const w of wfs) if (w.orderId) workflowsStore[w.orderId] = w;
+        console.log(`Synced ${wfs.length} workflows from Supabase.`);
       }
     }
 
