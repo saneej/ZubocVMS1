@@ -33,9 +33,10 @@ const ProtectedRoute: React.FC<{
   children: React.ReactNode;
   allowedRoles: string[];
   currentStaff: StaffMember | null;
-}> = ({ children, allowedRoles, currentStaff }) => {
+  redirectTo?: string;
+}> = ({ children, allowedRoles, currentStaff, redirectTo = '/orders' }) => {
   if (!currentStaff || !allowedRoles.includes(currentStaff.role)) {
-    return <Navigate to="/orders" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
   return <>{children}</>;
 };
@@ -498,6 +499,7 @@ const AppContent: React.FC = () => {
               />
             } />
             <Route path="orders" element={
+              currentStaff?.role === 'DESIGNER' ? <Navigate to="/designer" replace /> :
               <SearchRetrieval
                 orders={orders}
                 onRefreshOrders={fetchOrdersAPI}
@@ -513,6 +515,7 @@ const AppContent: React.FC = () => {
               />
             } />
             <Route path="order/:orderId" element={
+              currentStaff?.role === 'DESIGNER' ? <Navigate to="/designer" replace /> :
               <OrderDetailsPage
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
@@ -521,6 +524,7 @@ const AppContent: React.FC = () => {
               />
             } />
             <Route path="orders/:orderId" element={
+              currentStaff?.role === 'DESIGNER' ? <Navigate to="/designer" replace /> :
               <OrderDetailsPage
                 orders={orders}
                 onUpdateOrder={handleUpdateOrder}
