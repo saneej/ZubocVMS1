@@ -472,7 +472,9 @@ const AppContent: React.FC = () => {
           onOpenAddOrder={() => setIsAddOrderOpen(true)}
           onOpenDeck={() => navigate('/production-deck')}
         />
-        {!location.pathname.includes('/production-deck') && (
+        {(location.pathname.includes('/orders') || 
+           location.pathname.includes('/production-deck') || 
+           location.pathname.includes('/public-deck')) && (
           <LiveAlertTicker orders={orders} />
         )}
         {isFirestoreQuotaExceeded && (
