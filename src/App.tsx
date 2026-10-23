@@ -18,7 +18,7 @@ import { DiagnosePage } from './components/DiagnosePage';
 import { SalesReports } from './components/SalesReports';
 import { DesignerDashboard } from './components/DesignerDashboard';
 import { ProductionWorkflowDashboard } from './components/ProductionWorkflowDashboard';
-import { UserManagementModal } from './components/UserManagementModal';
+import { UsersPage } from './components/UsersPage';
 import { LiveAlertTicker } from './components/LiveAlertTicker';
 import { OrderRecord, StaffMember, AppSettings, isAmazonOrder } from './types';
 import { collection, query, doc, setDoc, deleteDoc, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -27,7 +27,6 @@ import { safeFetchJson } from './utils/api';
 import { supabase, cleanForSupabase } from './supabase';
 import { cleanForFirestore } from './utils/firestoreHelper';
 import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
-import { INITIAL_STAFFS } from './utils/initialStaffs';
 
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow'>('station');
@@ -39,6 +38,7 @@ const AppContent: React.FC = () => {
     if (path.includes('/production-deck')) setActiveTab('deck');
     else if (path.includes('/designer')) setActiveTab('designer');
     else if (path.includes('/production-workflow')) setActiveTab('production-workflow');
+    else if (path.includes('/users')) setActiveTab('users');
     else if (path.includes('/station')) setActiveTab('station');
     else if (path.includes('/calculator')) setActiveTab('calculator');
     else if (path.includes('/admin') || path.includes('/insights')) setActiveTab('admin');
@@ -65,14 +65,13 @@ const AppContent: React.FC = () => {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return INITIAL_STAFFS;
+    return [];
   });
-  const [currentStaff, setCurrentStaff] = useState<StaffMember>(INITIAL_STAFFS[0]);
+  const [currentStaff, setCurrentStaff] = useState<StaffMember | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false); // Instant render without blocking loader
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddOrderOpen, setIsAddOrderOpen] = useState<boolean>(false);
-  const [isUserManagementOpen, setIsUserManagementOpen] = useState<boolean>(false);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
   const [selectedOrderForPacking, setSelectedOrderForPacking] = useState<OrderRecord | null>(null);
   const [isFirestoreQuotaExceeded, setIsFirestoreQuotaExceeded] = useState<boolean>(false);
@@ -295,6 +294,8 @@ const AppContent: React.FC = () => {
       navigate('/designer');
     } else if (staff.role === 'PRODUCTION') {
       navigate('/production-workflow');
+    } else if (staff.role === 'ADMIN') {
+      navigate('/admin');
     } else {
       navigate('/orders');
     }
@@ -434,7 +435,7 @@ const AppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={(tab) => navigate(tab === 'search' ? '/orders' : tab === 'deck' ? '/production-deck' : tab === 'designer' ? '/designer' : tab === 'production-workflow' ? '/production-workflow' : `/${tab}`)}
+        setActiveTab={(tab) => navigate(tab === 'search' ? '/orders' : tab === 'deck' ? '/production-deck' : tab === 'designer' ? '/designer' : tab === 'production-workflow' ? '/production-workflow' : tab === 'users' ? '/users' : `/${tab}`)}
         currentStaff={currentStaff}
         setCurrentStaff={(st) => {
           setCurrentStaff(st);
@@ -442,7 +443,6 @@ const AppContent: React.FC = () => {
         }}
         settings={settings}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenUserManagement={() => setIsUserManagementOpen(true)}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
         staffList={staffList}
@@ -539,6 +539,9 @@ const AppContent: React.FC = () => {
                 currentStaffName={currentStaff?.name}
               />
             } />
+            <Route path="users" element={
+              <UsersPage />
+            } />
             <Route path="production-deck" element={
               <ProductionDeck
                 orders={orders}
@@ -600,12 +603,7 @@ const AppContent: React.FC = () => {
         currentStaffId={currentStaff?.id}
         currentStaffName={currentStaff?.name}
       />
-      <UserManagementModal
-        isOpen={isUserManagementOpen}
-        onClose={() => setIsUserManagementOpen(false)}
-        currentStaff={currentStaff}
-        onStaffListUpdated={fetchStaffsAPI}
-      />
+      {/* UserManagementModal removed */}
     </div>
   );
 };

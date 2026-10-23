@@ -500,175 +500,11 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
     return { success: true, record, telegramResponse: tgData };
   }
 
-  // 6. Staffs & Auth GET / POST / DELETE / Reset Password
+  // Staffs & Auth GET / POST / DELETE / Reset Password
   if (cleanPath.includes('/staffs') || cleanPath.includes('/auth/login') || cleanPath.includes('/auth/reset-password') || cleanPath.includes('/reset-password')) {
-    let staffs: Record<string, any> = {
-      'Admin-01': {
-        id: 'Admin-01',
-        name: 'David Admin',
-        role: 'ADMIN',
-        stationId: 'Packing-HQ',
-        password: 'password123',
-        createdAt: new Date().toISOString()
-      }
-    };
-    const localStaffs = localStorage.getItem('zuboc_staffs_store');
-    if (localStaffs) {
-      try { staffs = JSON.parse(localStaffs); } catch {}
-    }
-
-    // Only query Firestore if local cache is empty
-    if (!localStaffs && db) {
-      try {
-        const snap = await getDocs(collection(db, 'staffs'));
-        if (!snap.empty) {
-          snap.forEach(d => {
-            staffs[d.id] = d.data();
-          });
-          localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
-        }
-      } catch {}
-    }
-
-    if (cleanPath.endsWith('/auth/login') && method === 'POST') {
-      const userId = (body.userId || body.id || body.username || '').trim();
-      const password = (body.password || '').trim();
-      if (!userId) {
-        throw new Error('Please enter User ID');
-      }
-      const staffKey = Object.keys(staffs).find(
-        k => k.toLowerCase() === userId.toLowerCase() ||
-             staffs[k].name?.toLowerCase() === userId.toLowerCase() ||
-             (staffs[k].email && staffs[k].email.toLowerCase() === userId.toLowerCase())
-      );
-      if (!staffKey) {
-        throw new Error('Staff account not found with this User ID');
-      }
-      const staff = staffs[staffKey];
-      const expectedPassword = staff.password || 'password123';
-      if (expectedPassword !== password) {
-        throw new Error('Incorrect password. Default password is password123');
-      }
-      return {
-        success: true,
-        staff: {
-          id: staff.id,
-          name: staff.name,
-          role: staff.role,
-          stationId: staff.stationId,
-          email: staff.email
-        }
-      };
-    }
-
-    if ((cleanPath.endsWith('/auth/reset-password') || cleanPath.endsWith('/reset-password')) && method === 'POST') {
-      const userId = (body.userId || body.id || '').trim();
-      const newPassword = (body.newPassword || '').trim();
-      if (!userId || !newPassword) {
-        throw new Error('User ID and New Password are required');
-      }
-      if (newPassword.length < 4) {
-        throw new Error('Password must be at least 4 characters');
-      }
-      const staffKey = Object.keys(staffs).find(
-        k => k.toLowerCase() === userId.toLowerCase() ||
-             staffs[k].name?.toLowerCase() === userId.toLowerCase() ||
-             (staffs[k].email && staffs[k].email.toLowerCase() === userId.toLowerCase())
-      );
-      if (!staffKey) {
-        throw new Error(`Staff user '${userId}' not found`);
-      }
-      staffs[staffKey].password = newPassword;
-      localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
-      if (db) {
-        try {
-          await setDoc(doc(db, 'staffs', staffKey), cleanForFirestore({ password: newPassword }), { merge: true });
-        } catch {}
-      }
-      return { success: true, message: `Password for ${staffs[staffKey].name} has been reset successfully!` };
-    }
-
-    if (cleanPath.endsWith('/staffs') && method === 'GET') {
-      return Object.values(staffs).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        role: s.role,
-        stationId: s.stationId,
-        email: s.email,
-        createdAt: s.createdAt,
-        hasPassword: Boolean(s.password)
-      }));
-    }
-
-    if (cleanPath.endsWith('/staffs') && method === 'POST') {
-      const id = (body.id || '').trim();
-      const name = (body.name || '').trim();
-      const role = body.role || 'PACKER';
-      const stationId = body.stationId || 'Packing-01';
-      const password = body.password ? String(body.password).trim() : undefined;
-      const email = body.email ? String(body.email).trim() : undefined;
-
-      if (!id || !name) {
-        throw new Error('Staff ID and Name are required');
-      }
-
-      const existing = staffs[id];
-      const updatedStaff = {
-        id,
-        name,
-        role: ['ADMIN', 'SUPERVISOR', 'PACKER'].includes(role) ? role : 'PACKER',
-        stationId,
-        password: password || existing?.password || 'password123',
-        email: email || existing?.email,
-        createdAt: existing?.createdAt || new Date().toISOString()
-      };
-
-      staffs[id] = updatedStaff;
-      localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
-      if (db) {
-        try {
-          await setDoc(doc(db, 'staffs', id), cleanForFirestore(updatedStaff), { merge: true });
-        } catch {}
-      }
-
-      return {
-        success: true,
-        staff: {
-          id: updatedStaff.id,
-          name: updatedStaff.name,
-          role: updatedStaff.role,
-          stationId: updatedStaff.stationId,
-          email: updatedStaff.email,
-          hasPassword: Boolean(updatedStaff.password)
-        }
-      };
-    }
-
-    if (cleanPath.includes('/staffs/') && method === 'DELETE') {
-      const parts = cleanPath.split('/');
-      const id = parts[parts.length - 1];
-      if (!id) throw new Error('Staff ID is required');
-
-      const existing = staffs[id];
-      if (!existing) throw new Error('Staff member not found');
-
-      if (existing.role === 'ADMIN') {
-        const adminCount = Object.values(staffs).filter((s: any) => s.role === 'ADMIN').length;
-        if (adminCount <= 1) {
-          throw new Error('Cannot delete the only remaining Admin account');
-        }
-      }
-
-      delete staffs[id];
-      localStorage.setItem('zuboc_staffs_store', JSON.stringify(staffs));
-      if (db) {
-        try {
-          await deleteDoc(doc(db, 'staffs', id));
-        } catch {}
-      }
-      return { success: true, message: `Staff member ${id} removed successfully` };
-    }
-
+    // Staff management via local database has been disabled to rely on Supabase Auth exclusively.
+    return { success: false, error: 'Staff management disabled. Please use Supabase Auth.' };
+  }
     if (cleanPath.includes('/ifm/chat')) {
       const messages = body.messages;
       if (!Array.isArray(messages) || messages.length === 0) {
@@ -698,7 +534,6 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       }
       return { success: true, data };
     }
-  }
 
   if (cleanPath.includes('/workflow/send-to-design') || cleanPath.includes('/workflow/send-to-production')) {
     const isProd = cleanPath.includes('send-to-production');

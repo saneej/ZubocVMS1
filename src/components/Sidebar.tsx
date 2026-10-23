@@ -19,13 +19,12 @@ import {
 import { StaffMember, AppSettings } from '../types';
 
 interface SidebarProps {
-  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow';
-  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow') => void;
+  activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow' | 'users';
+  setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow' | 'users') => void;
   currentStaff: StaffMember;
   setCurrentStaff: (staff: StaffMember) => void;
   settings: AppSettings;
   onOpenSettings: () => void;
-  onOpenUserManagement?: () => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
   pendingCount?: number;
@@ -44,7 +43,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setCurrentStaff,
   settings,
   onOpenSettings,
-  onOpenUserManagement,
   isMobileOpen,
   setIsMobileOpen,
   pendingCount = 0,
@@ -78,6 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'calculator', label: 'Rate Calculator', icon: Calculator },
       { id: 'history', label: 'Recording History', icon: History },
       ...(currentStaff.role === 'ADMIN' ? [{ id: 'admin', label: 'Insights', icon: BarChart3 }] : []),
+      ...(currentStaff.role === 'ADMIN' ? [{ id: 'users', label: 'Users', icon: Users }] : []),
       { id: 'sales', label: 'Sales Reports', icon: TrendingUp },
     ];
   }
@@ -185,22 +184,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Section: Operator Account & Settings */}
         <div className="p-4 bg-slate-50/80 border-t border-slate-100/80 space-y-2">
           
-          {/* Admin User Management Button */}
-          {currentStaff.role === 'ADMIN' && onOpenUserManagement && (
-            <button
-              onClick={onOpenUserManagement}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200/60 text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-xs active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-1 rounded-lg bg-purple-100 text-purple-700">
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-                <span>User Management</span>
-              </div>
-              <span className="text-[10px] text-purple-600 font-black">ROLES</span>
-            </button>
-          )}
-
           {/* Quick Settings - Admin Only */}
           {currentStaff.role === 'ADMIN' && (
             <button

@@ -10,7 +10,6 @@ import { createClient } from '@supabase/supabase-js';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { INITIAL_FALLBACK_ORDERS } from './src/utils/initialOrders';
-import { INITIAL_STAFFS } from './src/utils/initialStaffs';
 
 import { exec } from 'child_process';
 import util from 'util';
@@ -492,12 +491,9 @@ export interface WorkflowAuditLog {
   timestamp: string;
 }
 
-const DEFAULT_STAFFS: StaffMember[] = INITIAL_STAFFS;
 
 let staffsStore: Record<string, StaffMember> = {};
-for (const s of INITIAL_STAFFS) {
-  staffsStore[s.id] = { ...s, isActive: s.isActive !== false };
-}
+
 
 let ordersStore: Record<string, OrderRecord> = {};
 for (const ord of INITIAL_FALLBACK_ORDERS) {
@@ -1361,7 +1357,7 @@ apiRouter.get('/staffs', async (req, res) => {
   if (client) {
     try {
       // If we haven't synced yet (common in serverless), do it now
-      if (!hasPerformedInitialSync || Object.keys(staffsStore).length <= INITIAL_STAFFS.length) {
+      if (!hasPerformedInitialSync) {
         await syncFromSupabase();
       }
 
@@ -1520,115 +1516,6 @@ apiRouter.post(['/staffs/reset-password', '/auth/reset-password'], async (req, r
 // Rate limiting tracker for failed access code attempts
 const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
 
-// Secure Access Code / PIN Verification Endpoint
-apiRouter.post(['/auth/verify-pin', '/auth/access-code'], async (req, res) => {
-  const ip = req.ip || req.headers['x-forwarded-for'] || 'client';
-  const ipKey = String(ip);
-
-  const attempts = loginAttempts.get(ipKey);
-  if (attempts && attempts.lockUntil > Date.now()) {
-    const remainingSecs = Math.ceil((attempts.lockUntil - Date.now()) / 1000);
-    return res.status(429).json({ 
-      error: `Security Lock Active: Too many failed attempts. Please wait ${remainingSecs} seconds.` 
-    });
-  }
-
-  const rawCode = req.body?.accessCode || req.body?.code || req.body?.pin || '';
-  const cleanCode = String(rawCode).trim().toLowerCase();
-
-  if (!cleanCode) {
-    return res.status(400).json({ error: 'Please enter Access Code' });
-  }
-
-  const envMasterCode = (process.env.MASTER_ACCESS_CODE || '889900').trim().toLowerCase();
-  const envPackingCode = (process.env.PACKING_ACCESS_CODE || '123456').trim().toLowerCase();
-  const masterWord = (process.env.MASTER_WORD || 'zuboc').trim().toLowerCase();
-
-  let authenticatedStaff: StaffMember | null = null;
-
-  // 1. Direct Supabase Query (Prioritize DB-managed Access Codes)
-  const client = getSupabaseClient();
-  if (client) {
-    try {
-      const { data: matchedStaffs, error } = await withTimeout(
-        client.from('staffs').select('*').or(`password.eq.${cleanCode},id.eq.${cleanCode}`).limit(1),
-        5000
-      ) as { data: any[]; error: any };
-
-      if (!error && matchedStaffs && matchedStaffs.length > 0) {
-        const matchedStaff = matchedStaffs[0];
-        authenticatedStaff = {
-          id: matchedStaff.id,
-          name: matchedStaff.name,
-          role: matchedStaff.role || 'PACKER',
-          stationId: matchedStaff.stationId || 'Packing-01',
-          email: matchedStaff.email
-        };
-      }
-    } catch (supaErr) {
-      console.warn('Supabase Auth Query error:', supaErr);
-    }
-  }
-
-  // 2. Fallback to in-memory/Firestore (if Supabase query didn't find anyone or failed)
-  if (!authenticatedStaff) {
-    // Refresh memory store if needed
-    if (Object.keys(staffsStore).length <= INITIAL_STAFFS.length) {
-      await syncStaffsFromFirestore();
-    }
-
-    const matchedStaff = Object.values(staffsStore).find(s => {
-      const p = String(s.password || '').trim().toLowerCase();
-      const id = String(s.id || '').trim().toLowerCase();
-      return (p && p === cleanCode) || (id && id === cleanCode);
-    });
-
-    if (matchedStaff) {
-      if (matchedStaff.isActive === false) {
-        return res.status(403).json({ error: 'This user account has been deactivated. Please contact an Administrator.' });
-      }
-      authenticatedStaff = {
-        id: matchedStaff.id,
-        name: matchedStaff.name,
-        role: matchedStaff.role || 'PACKER',
-        stationId: matchedStaff.stationId || 'Packing-01',
-        email: matchedStaff.email,
-        phone: matchedStaff.phone,
-        isActive: true
-      };
-    } else if (cleanCode === (process.env.MASTER_ACCESS_CODE || 'zuboc2026').trim().toLowerCase()) {
-      authenticatedStaff = {
-        id: 'Zuboc',
-        name: 'Zuboc (ADMIN)',
-        role: 'ADMIN',
-        stationId: 'Packing-01',
-        email: 'admin@zuboc.com'
-      };
-    }
-  }
-
-  if (authenticatedStaff) {
-    loginAttempts.delete(ipKey);
-    return res.json({
-      success: true,
-      token: `zuboc_sec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      staff: authenticatedStaff,
-      message: `Access granted as ${authenticatedStaff.name}`
-    });
-  }
-
-  // Record failed attempt for brute-force protection
-  const currentCount = (attempts?.count || 0) + 1;
-  const lockTime = currentCount >= 5 ? Date.now() + 60000 : 0;
-  loginAttempts.set(ipKey, { count: currentCount, lockUntil: lockTime });
-
-  return res.status(401).json({
-    error: currentCount >= 5 
-      ? 'Security alert: 5 failed attempts. Access locked for 60 seconds.' 
-      : `Invalid Access Code. (${5 - currentCount} attempts remaining)`
-  });
-});
-
 // Auth Login
 apiRouter.post('/auth/login', async (req, res) => {
   await syncStaffsFromFirestore();
@@ -1700,6 +1587,37 @@ apiRouter.post('/auth/login', async (req, res) => {
       isActive: (resolvedStaff as any).isActive !== false
     }
   });
+});
+
+apiRouter.post('/admin/create-user', async (req, res) => {
+  const { email, name, role, password } = req.body;
+  const client = getSupabaseClient();
+  if (!client) return res.status(500).json({ error: 'Supabase client not initialized' });
+
+  try {
+    const { data, error } = await client.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { name, role },
+      email_confirm: true
+    });
+    if (error) throw error;
+
+    const { error: staffError } = await client.from('staffs').insert({
+      id: data.user.id,
+      name,
+      email,
+      role,
+      stationId: 'Packing-01',
+      isActive: true
+    });
+    if (staffError) throw staffError;
+
+    res.json({ success: true, user: data.user });
+  } catch (err: any) {
+    console.error('Create user error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // -------------------------------------------------------------
