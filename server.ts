@@ -1523,6 +1523,29 @@ apiRouter.post(['/staffs/reset-password', '/auth/reset-password'], async (req, r
   res.json({ success: true, message: `Password for ${staffsStore[staffKey].name} has been reset successfully!` });
 });
 
+// Admin User Management
+apiRouter.post('/admin/create-user', async (req, res) => {
+  const { email, name, role, password } = req.body;
+  if (!email || !name || !role) return res.status(400).json({ error: 'Missing fields' });
+  const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  const newStaff: StaffMember = { id, name, role, password, email, isActive: true, createdAt: new Date().toISOString() };
+  staffsStore[id] = newStaff;
+  saveLocalBackup();
+  await saveStaffToSupabase(newStaff);
+  res.json({ success: true, staff: newStaff });
+});
+
+apiRouter.post('/admin/update-user', async (req, res) => {
+  const { id, name, role, password } = req.body;
+  if (!id || !staffsStore[id]) return res.status(404).json({ error: 'User not found' });
+  const updatedStaff = { ...staffsStore[id], name, role };
+  if (password) updatedStaff.password = password;
+  staffsStore[id] = updatedStaff;
+  saveLocalBackup();
+  await saveStaffToSupabase(updatedStaff);
+  res.json({ success: true, staff: updatedStaff });
+});
+
 // Rate limiting tracker for failed access code attempts
 const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
 
