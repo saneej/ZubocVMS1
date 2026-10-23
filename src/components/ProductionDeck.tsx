@@ -791,8 +791,6 @@ export const ProductionDeck: React.FC<ProductionDeckProps> = ({
         </header>
       )}
 
-      {/* Live Read-Only Alert Banner for Android TV Display (Below Header) */}
-      <LiveAlertTicker orders={orders} />
 
       {/* Floating Exit TV Wall mode button */}
       {isTvWallMode && (

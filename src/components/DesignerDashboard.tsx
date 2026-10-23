@@ -39,7 +39,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   currentStaff,
   onOpenOrderDetails
 }) => {
-  const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'SUBMITTED'>('UNASSIGNED');
+  const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'SUBMITTED' | 'ALL_DESIGN_PROJECTS'>('UNASSIGNED');
   const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,15 +83,20 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   const myAssignedOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
     if (!wf?.isDesignRequired) return false;
-    const isMine = wf?.assignedDesignerId === currentStaff.id || currentStaff.role === 'ADMIN';
+    const isMine = wf?.assignedDesignerId === currentStaff.id;
     return isMine && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(wf?.workflowStatus || '');
   });
 
   const submittedOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
     if (!wf?.isDesignRequired) return false;
-    const isMine = wf?.assignedDesignerId === currentStaff.id || currentStaff.role === 'ADMIN';
+    const isMine = wf?.assignedDesignerId === currentStaff.id;
     return isMine && ['DESIGN_SUBMITTED', 'PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wf?.workflowStatus || '');
+  });
+  
+  const allDesignProjects = ordersWithWorkflow.filter(item => {
+    const wf = item.workflow as DepartmentWorkflow | undefined;
+    return wf?.isDesignRequired && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED', 'DESIGN_SUBMITTED', 'PRODUCTION_PENDING'].includes(wf?.workflowStatus || '');
   });
 
   // Concurrency-Safe Order Acceptance
@@ -262,7 +267,9 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
     ? unassignedOrders 
     : activeTab === 'MY_ORDERS' 
       ? myAssignedOrders 
-      : submittedOrders;
+      : activeTab === 'ALL_DESIGN_PROJECTS'
+        ? allDesignProjects
+        : submittedOrders;
 
   const filteredItems = currentList.filter(item => {
     const q = searchQuery.toLowerCase().trim();
@@ -412,6 +419,24 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
               {myAssignedOrders.length}
             </span>
           </button>
+          
+          {(currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') && (
+            <button
+              onClick={() => { setActiveTab('ALL_DESIGN_PROJECTS'); setSelectedOrder(null); }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'ALL_DESIGN_PROJECTS'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <span>All Design Projects</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                activeTab === 'ALL_DESIGN_PROJECTS' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {allDesignProjects.length}
+              </span>
+            </button>
+          )}
 
           <button
             onClick={() => { setActiveTab('SUBMITTED'); setSelectedOrder(null); }}
@@ -503,6 +528,9 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                       <p className="text-xs font-bold text-slate-700">
                         {item.customerName || 'Direct Client'} • <span className="text-slate-500 font-normal">{item.productSku || 'Custom Product'}</span>
                       </p>
+                      {wf?.assignedDesignerName && (
+                        <p className="text-[10px] font-bold text-indigo-700">Designer: {wf.assignedDesignerName}</p>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -576,9 +604,6 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px]">Rev #{wf?.currentRevisionNumber || 1}</span>
-                      {wf?.assignedDesignerName && (
-                        <span className="font-medium text-slate-600">Assigned: {wf.assignedDesignerName}</span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -603,6 +628,9 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                 <p className="text-xs text-slate-500 font-medium">
                   {selectedOrder.customerName} • Revision #{selectedOrder.workflow?.currentRevisionNumber || 1}
                 </p>
+                {selectedOrder.workflow?.assignedDesignerName && (
+                  <p className="text-xs text-indigo-700 font-bold mt-1">Designer: {selectedOrder.workflow.assignedDesignerName}</p>
+                )}
               </div>
 
               <button
