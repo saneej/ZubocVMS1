@@ -1620,6 +1620,28 @@ apiRouter.post('/admin/create-user', async (req, res) => {
   }
 });
 
+apiRouter.post('/admin/update-user', async (req, res) => {
+  const { id, name, role, password } = req.body;
+  const client = getSupabaseClient();
+  if (!client) return res.status(500).json({ error: 'Supabase client not initialized' });
+
+  try {
+    const updatePayload: any = { user_metadata: { name, role } };
+    if (password) updatePayload.password = password;
+
+    const { error } = await client.auth.admin.updateUserById(id, updatePayload);
+    if (error) throw error;
+
+    const { error: staffError } = await client.from('staffs').update({ name, role }).eq('id', id);
+    if (staffError) throw staffError;
+
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Update user error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -------------------------------------------------------------
 // WORKFLOW STATE & CONCURRENCY CONTROLS (CRE, DESIGNER, PRODUCTION)
 // -------------------------------------------------------------
