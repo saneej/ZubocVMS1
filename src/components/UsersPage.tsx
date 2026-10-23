@@ -57,6 +57,19 @@ export const UsersPage: React.FC = () => {
     }
   };
 
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    try {
+      await safeFetchJson(`/api/admin/users/${id}`, {
+        method: 'DELETE'
+      });
+      fetchUsers();
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      alert('Error deleting user. Check server logs.');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -100,7 +113,7 @@ export const UsersPage: React.FC = () => {
                   </td>
                   <td className="p-4 text-right flex items-center justify-end gap-2">
                     <button onClick={() => setEditingUser(user)} className="text-blue-500 hover:text-blue-700"><Edit className="w-4 h-4" /></button>
-                    <button className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDeleteUser(user.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}

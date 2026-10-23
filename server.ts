@@ -2490,6 +2490,36 @@ apiRouter.post('/admin/users/:id/toggle-active', (req, res) => {
   });
 });
 
+apiRouter.delete('/admin/users/:id', async (req, res) => {
+  const targetId = sanitizeString(req.params.id);
+  const staff = staffsStore[targetId];
+  if (!staff) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const client = getSupabaseClient();
+  if (!client) return res.status(500).json({ error: 'Supabase client not initialized' });
+
+  try {
+    // 1. Delete from Supabase Auth
+    const { error: authError } = await client.auth.admin.deleteUser(targetId);
+    if (authError) throw authError;
+
+    // 2. Delete from Supabase staffs table
+    const { error: staffError } = await client.from('staffs').delete().eq('id', targetId);
+    if (staffError) throw staffError;
+
+    // 3. Delete from local store
+    delete staffsStore[targetId];
+    saveLocalBackup();
+
+    res.json({ success: true, message: `User ${staff.name} deleted successfully` });
+  } catch (err: any) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 async function saveBatchToSupabase(records: OrderRecord[]): Promise<boolean> {
   const client = getSupabaseClient();

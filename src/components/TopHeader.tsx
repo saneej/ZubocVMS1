@@ -103,7 +103,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </button>
             )}
 
-            {onOpenDeck && (
+            {onOpenDeck && currentStaff.role !== 'DESIGNER' && (
               <button
                 onClick={onOpenDeck}
                 className={`p-2.5 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-sm ${

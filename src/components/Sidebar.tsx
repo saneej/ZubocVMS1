@@ -21,7 +21,7 @@ import { StaffMember, AppSettings } from '../types';
 interface SidebarProps {
   activeTab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow' | 'users';
   setActiveTab: (tab: 'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow' | 'users') => void;
-  currentStaff: StaffMember;
+  currentStaff: StaffMember | null;
   setCurrentStaff: (staff: StaffMember) => void;
   settings: AppSettings;
   onOpenSettings: () => void;
@@ -49,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   staffList,
   onLogout
 }) => {
+  if (!currentStaff) return null;
   const effectiveStaffList = staffList && staffList.length > 0 ? staffList : DEFAULT_STAFF_LIST;
 
   // Build role-tailored navigation items

@@ -28,8 +28,20 @@ import { supabase, cleanForSupabase } from './supabase';
 import { cleanForFirestore } from './utils/firestoreHelper';
 import { INITIAL_FALLBACK_ORDERS } from './utils/initialOrders';
 
+
+const ProtectedRoute: React.FC<{
+  children: React.ReactNode;
+  allowedRoles: string[];
+  currentStaff: StaffMember | null;
+}> = ({ children, allowedRoles, currentStaff }) => {
+  if (!currentStaff || !allowedRoles.includes(currentStaff.role)) {
+    return <Navigate to="/orders" replace />;
+  }
+  return <>{children}</>;
+};
+
 const AppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow'>('station');
+  const [activeTab, setActiveTab] = useState<'station' | 'search' | 'history' | 'admin' | 'calculator' | 'deck' | 'sales' | 'designer' | 'production-workflow' | 'users'>('station');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -69,7 +81,7 @@ const AppContent: React.FC = () => {
   });
   const [currentStaff, setCurrentStaff] = useState<StaffMember | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false); // Instant render without blocking loader
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Fixed: should be true initially
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAddOrderOpen, setIsAddOrderOpen] = useState<boolean>(false);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
@@ -530,17 +542,23 @@ const AppContent: React.FC = () => {
               />
             } />
             <Route path="admin" element={
-              <AdminDashboard
-                orders={orders}
-                settings={settings}
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                onUpdateOrder={handleUpdateOrder}
-                currentStaffId={currentStaff?.id}
-                currentStaffName={currentStaff?.name}
-              />
+              <ProtectedRoute allowedRoles={['ADMIN']} currentStaff={currentStaff}>
+                {currentStaff && (
+                  <AdminDashboard
+                    orders={orders}
+                    settings={settings}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
+                    onUpdateOrder={handleUpdateOrder}
+                    currentStaffId={currentStaff.id}
+                    currentStaffName={currentStaff.name}
+                  />
+                )}
+              </ProtectedRoute>
             } />
             <Route path="users" element={
-              <UsersPage />
+              <ProtectedRoute allowedRoles={['ADMIN']} currentStaff={currentStaff}>
+                <UsersPage />
+              </ProtectedRoute>
             } />
             <Route path="production-deck" element={
               <ProductionDeck
