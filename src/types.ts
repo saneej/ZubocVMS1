@@ -215,8 +215,9 @@ export type WorkflowStatus =
   | 'DESIGN_ASSIGNED'
   | 'DESIGN_IN_PROGRESS'
   | 'DESIGN_REVISION_REQUESTED'
-  | 'DESIGN_SUBMITTED'
-  | 'PRODUCTION_PENDING'
+  | 'DESIGN_SUBMITTED' // Submitted by Designer, Awaiting CRE Review
+  | 'CRE_REVIEW_PENDING' // Alias for Awaiting CRE Review
+  | 'PRODUCTION_PENDING' // Approved by CRE, Sent to Production
   | 'PRODUCTION_IN_PROGRESS'
   | 'PRODUCTION_REVISION_REQUESTED'
   | 'PRODUCTION_COMPLETED';
@@ -246,7 +247,7 @@ export interface DesignRevision {
   designerName: string;
   designNotes?: string;
   files: OrderAttachment[];
-  status: 'DRAFT' | 'SUBMITTED' | 'SUPERSEDED' | 'REVISION_REQUESTED' | 'APPROVED_FOR_PRODUCTION' | 'COMPLETED_IN_PRODUCTION';
+  status: 'DRAFT' | 'SUBMITTED' | 'SUBMITTED_TO_CRE' | 'SUPERSEDED' | 'REVISION_REQUESTED' | 'APPROVED_FOR_PRODUCTION' | 'COMPLETED_IN_PRODUCTION';
   submittedAt?: string;
   revisionRequestedBy?: string;
   revisionReason?: string;
@@ -282,6 +283,10 @@ export interface DepartmentWorkflow {
   forwardedByStaffId?: string;
   forwardedByStaffName?: string;
   designSubmittedAt?: string;
+  creApprovedAt?: string;
+  creApprovedByStaffId?: string;
+  creApprovedByStaffName?: string;
+  creApprovalNotes?: string;
   productionStartedAt?: string;
   productionStartedByStaffId?: string;
   productionStartedByStaffName?: string;

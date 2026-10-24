@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_customisations ON public.orders USING gin 
 
 -- 5. Seed Initial Admin & Config
 INSERT INTO public.staffs ("id", "name", "role", "stationId", "password")
-VALUES ('Admin-01', 'David Admin', 'ADMIN', 'Packing-HQ', 'password123')
+VALUES ('795afba9-4494-4dde-a238-0f036b1aa726', 'Saneej', 'ADMIN', 'HQ', 'password123')
 ON CONFLICT ("id") DO NOTHING;
 
 INSERT INTO public.settings ("id", "autoUpload", "stationId", "maxDailyDispatches")

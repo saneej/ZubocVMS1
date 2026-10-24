@@ -24,11 +24,15 @@ import {
   Tag,
   ChevronRight,
   ExternalLink,
-  X
+  X,
+  Factory,
+  RefreshCcw,
+  Check
 } from 'lucide-react';
 import { OrderRecord, StaffMember, DepartmentWorkflow, OrderAttachment, DesignRevision, WorkflowPriority } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
+import { RequestRevisionModal } from './RequestRevisionModal';
 
 interface DesignerDashboardProps {
   currentStaff: StaffMember;
@@ -39,13 +43,16 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   currentStaff,
   onOpenOrderDetails
 }) => {
-  const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'SUBMITTED' | 'ALL_DESIGN_PROJECTS'>('UNASSIGNED');
+  const isCREOrAdmin = currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE';
+  const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'CRE_REVIEW' | 'SUBMITTED' | 'ALL_DESIGN_PROJECTS'>(
+    isCREOrAdmin ? 'CRE_REVIEW' : 'UNASSIGNED'
+  );
   const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   
-  // Active selected order for designer workspace drawer
+  // Active selected order for designer / CRE review workspace drawer
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [designNotes, setDesignNotes] = useState('');
   const [designFiles, setDesignFiles] = useState<OrderAttachment[]>([]);
@@ -53,6 +60,9 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Modal for CRE requesting revision from Designer
+  const [revisionModalTarget, setRevisionModalTarget] = useState<any | null>(null);
 
   const fetchWorkflowOrders = async () => {
     setIsLoading(true);
@@ -81,26 +91,36 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   });
 
   const myAssignedOrders = ordersWithWorkflow.filter(item => {
-    if (currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') return false;
+    if (isCREOrAdmin) return false;
     const wf = item.workflow as DepartmentWorkflow | undefined;
     if (!wf?.isDesignRequired) return false;
     const isMine = wf?.assignedDesignerId === currentStaff.id;
     return isMine && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(wf?.workflowStatus || '');
   });
 
+  // Submitted by Designer and awaiting CRE review
+  const creReviewOrders = ordersWithWorkflow.filter(item => {
+    const wf = item.workflow as DepartmentWorkflow | undefined;
+    return wf?.isDesignRequired && ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING'].includes(wf?.workflowStatus || '');
+  });
+
+  // Approved and sent to Production queue
   const submittedOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
     if (!wf?.isDesignRequired) return false;
-    const isMine = wf?.assignedDesignerId === currentStaff.id;
-    return isMine && ['DESIGN_SUBMITTED', 'PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wf?.workflowStatus || '');
+    if (currentStaff.role === 'DESIGNER') {
+      const isMine = wf?.assignedDesignerId === currentStaff.id;
+      return isMine && ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wf?.workflowStatus || '');
+    }
+    return ['PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wf?.workflowStatus || '');
   });
   
   const allDesignProjects = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    return wf?.isDesignRequired && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED', 'DESIGN_SUBMITTED', 'PRODUCTION_PENDING'].includes(wf?.workflowStatus || '');
+    return wf?.isDesignRequired && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED', 'DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS'].includes(wf?.workflowStatus || '');
   });
 
-  // Concurrency-Safe Order Acceptance
+  // Concurrency-Safe Order Acceptance for Designers
   const handleAcceptOrder = async (orderItem: any) => {
     setAcceptingOrderId(orderItem.orderId);
     setFeedback(null);
@@ -118,14 +138,9 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 
       if (res && res.success) {
         setFeedback({ type: 'success', message: res.message || `Order ${orderItem.orderId} assigned to you!` });
-        
-        // Update local state immediately
         setOrdersWithWorkflow(prev => prev.map(o => o.orderId === orderItem.orderId ? { ...o, workflow: res.workflow } : o));
-        
-        // Automatically switch to my orders tab and open workspace
         setActiveTab('MY_ORDERS');
-        openWorkspace({...orderItem, workflow: res.workflow});
-        
+        openWorkspace({ ...orderItem, workflow: res.workflow });
         await fetchWorkflowOrders();
       } else {
         throw new Error(res?.error || 'Failed to accept order.');
@@ -136,7 +151,6 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
         type: 'error', 
         message: err?.message || 'This order has already been assigned to another Designer.' 
       });
-      // Refresh to update unassigned list
       fetchWorkflowOrders();
     } finally {
       setAcceptingOrderId(null);
@@ -175,7 +189,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 
       if (res && res.success && Array.isArray(res.files)) {
         setDesignFiles(prev => [...prev, ...res.files]);
-        setFeedback({ type: 'success', message: `${res.files.length} design file(s) uploaded.` });
+        setFeedback({ type: 'success', message: `${res.files.length} design file(s) uploaded successfully.` });
       }
     } catch (err: any) {
       console.error('Upload design files error:', err);
@@ -205,7 +219,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
       });
 
       if (res && res.success) {
-        setFeedback({ type: 'success', message: 'Work in progress saved successfully!' });
+        setFeedback({ type: 'success', message: 'Design draft saved successfully!' });
         fetchWorkflowOrders();
       }
     } catch (err: any) {
@@ -215,16 +229,15 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
     }
   };
 
-  const handleSubmitToProduction = async () => {
-    console.log('handleSubmitToProduction called', { selectedOrder, designFiles });
+  // DESIGNER: Submit completed design to CRE for Review & Approval
+  const handleSubmitToCRE = async () => {
     if (!selectedOrder) return;
     if (designFiles.length === 0) {
-      console.log('No design files');
-      setFeedback({ type: 'error', message: 'Please upload at least one final design file before submitting to Production.' });
+      setFeedback({ type: 'error', message: 'Please upload at least one final CAD / Blueprint design file before submitting to CRE.' });
       return;
     }
 
-    if (!window.confirm(`Submit completed design with ${designFiles.length} file(s) to the Production department?`)) {
+    if (!window.confirm(`Submit completed design with ${designFiles.length} file(s) to the CRE team for review and approval?`)) {
       return;
     }
 
@@ -232,8 +245,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
     setFeedback(null);
 
     try {
-      console.log('Sending API request');
-      const res = await safeFetchJson('/api/workflow/design-submit', {
+      const res = await safeFetchJson('/api/workflow/submit-to-cre', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -244,20 +256,65 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
           files: designFiles
         })
       });
-      console.log('API response', res);
 
       if (res && res.success) {
-        setFeedback({ type: 'success', message: res.message || 'Design successfully submitted to Production!' });
+        setFeedback({ type: 'success', message: res.message || 'Design successfully submitted to CRE for review!' });
         await fetchWorkflowOrders();
         setSelectedOrder(null);
         setActiveTab('SUBMITTED');
       } else {
-        console.log('API call failed', res);
-        setFeedback({ type: 'error', message: res?.error || 'Failed to submit design to Production' });
+        setFeedback({ type: 'error', message: res?.error || 'Failed to submit design to CRE' });
       }
     } catch (err: any) {
-      console.error('Submit error', err);
-      setFeedback({ type: 'error', message: err?.message || 'Failed to submit design to Production' });
+      console.error('Submit to CRE error:', err);
+      setFeedback({ type: 'error', message: err?.message || 'Failed to submit design to CRE' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // CRE: Review & Approve Design -> Send to Production Department
+  const handleCREApproveToProduction = async (orderItem: any) => {
+    const targetOrder = orderItem || selectedOrder;
+    if (!targetOrder) return;
+
+    const remarks = window.prompt(
+      `Approve Design for Order ${targetOrder.orderId} and forward to Production department?\n\nEnter optional manufacturing remarks/notes for the production floor:`,
+      ''
+    );
+    if (remarks === null) return; // User cancelled prompt
+
+    setIsSubmitting(true);
+    setFeedback(null);
+
+    try {
+      const res = await safeFetchJson('/api/workflow/cre-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: targetOrder.orderId,
+          staffId: currentStaff.id,
+          staffName: currentStaff.name,
+          productionInstructions: remarks.trim() || undefined,
+          priority: targetOrder.workflow?.priority || 'NORMAL'
+        })
+      });
+
+      if (res && res.success) {
+        setFeedback({ 
+          type: 'success', 
+          message: res.message || `Order ${targetOrder.orderId} approved and sent to Production floor!` 
+        });
+        await fetchWorkflowOrders();
+        if (selectedOrder?.orderId === targetOrder.orderId) {
+          setSelectedOrder(null);
+        }
+      } else {
+        throw new Error(res?.error || 'Failed to approve design');
+      }
+    } catch (err: any) {
+      console.error('CRE approve error:', err);
+      setFeedback({ type: 'error', message: err?.message || 'Failed to approve design' });
     } finally {
       setIsSubmitting(false);
     }
@@ -266,11 +323,13 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   // Filter current active list
   const currentList = activeTab === 'UNASSIGNED' 
     ? unassignedOrders 
-    : activeTab === 'MY_ORDERS' 
-      ? myAssignedOrders 
-      : activeTab === 'ALL_DESIGN_PROJECTS'
-        ? allDesignProjects
-        : submittedOrders;
+    : activeTab === 'CRE_REVIEW'
+      ? creReviewOrders
+      : activeTab === 'MY_ORDERS' 
+        ? myAssignedOrders 
+        : activeTab === 'ALL_DESIGN_PROJECTS'
+          ? allDesignProjects
+          : submittedOrders;
 
   const filteredItems = currentList.filter(item => {
     const q = searchQuery.toLowerCase().trim();
@@ -279,7 +338,8 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
       item.orderId?.toLowerCase().includes(q) ||
       item.customerName?.toLowerCase().includes(q) ||
       item.productSku?.toLowerCase().includes(q) ||
-      wf?.designInstructions?.toLowerCase().includes(q);
+      wf?.designInstructions?.toLowerCase().includes(q) ||
+      wf?.assignedDesignerName?.toLowerCase().includes(q);
 
     const matchesPriority = priorityFilter === 'ALL' || wf?.priority === priorityFilter;
     return matchesSearch && matchesPriority;
@@ -309,7 +369,17 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
       case 'DESIGN_REVISION_REQUESTED':
         return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">Revision Requested</span>;
       case 'DESIGN_SUBMITTED':
-        return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-emerald-50 text-emerald-700 border border-emerald-200">Submitted to Prod</span>;
+      case 'CRE_REVIEW_PENDING':
+        return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-amber-100 text-amber-900 border border-amber-300 font-bold flex items-center gap-1">
+          <Clock className="w-3 h-3 text-amber-700" />
+          Awaiting CRE Review
+        </span>;
+      case 'PRODUCTION_PENDING':
+        return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold">Approved for Prod</span>;
+      case 'PRODUCTION_IN_PROGRESS':
+        return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-indigo-50 text-indigo-700 border border-indigo-200">Manufacturing</span>;
+      case 'PRODUCTION_COMPLETED':
+        return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-teal-50 text-teal-800 border border-teal-200">Prod Completed</span>;
       default:
         return <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-tight bg-slate-100 text-slate-700">{status || 'Created'}</span>;
     }
@@ -331,9 +401,11 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                 Operator: {currentStaff.name} ({currentStaff.role})
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Custom Order Design & Revision Hub</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Custom Order Design & Approval Hub</h1>
             <p className="text-xs text-indigo-200/80 max-w-xl font-medium">
-              Accept orders from CRE, create technical drawings, manage revisions, and submit approved designs to the Production floor.
+              {isCREOrAdmin 
+                ? 'Review submitted blueprints from designers, approve and send orders to Production, or request design adjustments.'
+                : 'Accept orders from CRE, create technical drawings & CAD assets, upload to Cloudflare R2, and submit back to CRE for approval.'}
             </p>
           </div>
 
@@ -349,21 +421,37 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/10">
           <div className="bg-white/5 rounded-2xl p-3.5 backdrop-blur-md border border-white/10">
             <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200/80">Unassigned Pool</div>
             <div className="text-2xl font-black mt-0.5 text-amber-300">{unassignedOrders.length}</div>
             <div className="text-[10px] text-indigo-300 mt-0.5">Awaiting Designer Acceptance</div>
           </div>
+
+          {isCREOrAdmin ? (
+            <div className="bg-white/5 rounded-2xl p-3.5 backdrop-blur-md border border-white/10">
+              <div className="text-[10px] font-black uppercase tracking-wider text-amber-200">Awaiting CRE Review</div>
+              <div className="text-2xl font-black mt-0.5 text-amber-400">{creReviewOrders.length}</div>
+              <div className="text-[10px] text-indigo-300 mt-0.5">Submitted by Designers for Approval</div>
+            </div>
+          ) : (
+            <div className="bg-white/5 rounded-2xl p-3.5 backdrop-blur-md border border-white/10">
+              <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200/80">My Active Work</div>
+              <div className="text-2xl font-black mt-0.5 text-indigo-300">{myAssignedOrders.length}</div>
+              <div className="text-[10px] text-indigo-300 mt-0.5">In Progress or Revisions</div>
+            </div>
+          )}
+
           <div className="bg-white/5 rounded-2xl p-3.5 backdrop-blur-md border border-white/10">
-            <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200/80">My Active Work</div>
-            <div className="text-2xl font-black mt-0.5 text-indigo-300">{myAssignedOrders.length}</div>
-            <div className="text-[10px] text-indigo-300 mt-0.5">In Progress or Revisions</div>
-          </div>
-          <div className="bg-white/5 rounded-2xl p-3.5 backdrop-blur-md border border-white/10">
-            <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200/80">Submitted to Prod</div>
-            <div className="text-2xl font-black mt-0.5 text-emerald-300">{submittedOrders.length}</div>
-            <div className="text-[10px] text-indigo-300 mt-0.5">Ready or In Manufacturing</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-indigo-200/80">
+              {isCREOrAdmin ? 'Production Floor' : 'Sent to CRE'}
+            </div>
+            <div className="text-2xl font-black mt-0.5 text-emerald-300">
+              {isCREOrAdmin ? submittedOrders.length : (creReviewOrders.length + submittedOrders.length)}
+            </div>
+            <div className="text-[10px] text-indigo-300 mt-0.5">
+              {isCREOrAdmin ? 'In Manufacturing or Completed' : 'Under Review or Approved'}
+            </div>
           </div>
         </div>
       </div>
@@ -389,23 +477,43 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
         
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+          
+          {/* CRE Review Tab for CRE & Admin */}
+          {isCREOrAdmin && (
+            <button
+              onClick={() => { setActiveTab('CRE_REVIEW'); setSelectedOrder(null); }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'CRE_REVIEW'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+              }`}
+            >
+              <span>Awaiting CRE Review</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                activeTab === 'CRE_REVIEW' ? 'bg-amber-700 text-white' : 'bg-amber-200 text-amber-900'
+              }`}>
+                {creReviewOrders.length}
+              </span>
+            </button>
+          )}
+
           <button
             onClick={() => { setActiveTab('UNASSIGNED'); setSelectedOrder(null); }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeTab === 'UNASSIGNED'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
             <span>Unassigned Pool</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              activeTab === 'UNASSIGNED' ? 'bg-amber-700 text-white' : 'bg-slate-200 text-slate-700'
+              activeTab === 'UNASSIGNED' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
               {unassignedOrders.length}
             </span>
           </button>
 
-          {!(currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') && (
+          {!isCREOrAdmin && (
             <button
               onClick={() => { setActiveTab('MY_ORDERS'); setSelectedOrder(null); }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
@@ -423,7 +531,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
             </button>
           )}
           
-          {(currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE') && (
+          {isCREOrAdmin && (
             <button
               onClick={() => { setActiveTab('ALL_DESIGN_PROJECTS'); setSelectedOrder(null); }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
@@ -449,7 +557,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <span>Production Queue</span>
+            <span>{isCREOrAdmin ? 'Production Queue' : 'Submitted to CRE'}</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               activeTab === 'SUBMITTED' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
@@ -466,7 +574,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search order ID, client..."
+              placeholder="Search order ID, client, designer..."
               className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
             />
           </div>
@@ -497,9 +605,11 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
               </div>
               <h3 className="text-sm font-black text-slate-800">No Orders in this View</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                {activeTab === 'UNASSIGNED' 
-                  ? 'There are currently no orders waiting for designer acceptance. New custom orders sent by CRE will appear here.'
-                  : 'No active orders assigned to you matching this filter.'}
+                {activeTab === 'CRE_REVIEW'
+                  ? 'There are currently no designs awaiting CRE review.'
+                  : activeTab === 'UNASSIGNED' 
+                    ? 'There are currently no orders waiting for designer acceptance. New custom orders sent by CRE will appear here.'
+                    : 'No orders matching this filter.'}
               </p>
             </div>
           ) : (
@@ -507,6 +617,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
               const wf = item.workflow as DepartmentWorkflow | undefined;
               const isSelected = selectedOrder?.orderId === item.orderId;
               const isRevisionRequested = wf?.workflowStatus === 'DESIGN_REVISION_REQUESTED';
+              const isAwaitingCREReview = wf?.workflowStatus === 'DESIGN_SUBMITTED' || wf?.workflowStatus === 'CRE_REVIEW_PENDING';
 
               return (
                 <div
@@ -514,9 +625,11 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                   className={`bg-white rounded-3xl p-5 border transition-all duration-200 shadow-xs hover:shadow-md ${
                     isSelected 
                       ? 'border-indigo-600 ring-2 ring-indigo-600/10' 
-                      : isRevisionRequested 
-                        ? 'border-rose-300 bg-rose-50/20' 
-                        : 'border-slate-200/80 hover:border-slate-300'
+                      : isAwaitingCREReview
+                        ? 'border-amber-300 bg-amber-50/20'
+                        : isRevisionRequested 
+                          ? 'border-rose-300 bg-rose-50/20' 
+                          : 'border-slate-200/80 hover:border-slate-300'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -532,43 +645,97 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                         {item.customerName || 'Direct Client'} • <span className="text-slate-500 font-normal">{item.productSku || 'Custom Product'}</span>
                       </p>
                       {wf?.assignedDesignerName && (
-                        <p className="text-[10px] font-bold text-indigo-700">Designer: {wf.assignedDesignerName}</p>
+                        <p className="text-[10px] font-bold text-indigo-700">
+                          Assigned Designer: {wf.assignedDesignerName}
+                        </p>
                       )}
                     </div>
 
                     {/* Actions */}
-                    {activeTab === 'UNASSIGNED' ? (
-                      <button
-                        onClick={() => handleAcceptOrder(item)}
-                        disabled={acceptingOrderId === item.orderId}
-                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-amber-600/20 transition-all cursor-pointer disabled:opacity-50 shrink-0"
-                      >
-                        {acceptingOrderId === item.orderId ? (
-                          <>
-                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Assigning...</span>
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span>Accept Order</span>
-                          </>
-                        )}
-                      </button>
-                    ) : (
+                    <div className="flex items-center gap-2">
+                      {activeTab === 'UNASSIGNED' && !isCREOrAdmin && (
+                        <button
+                          onClick={() => handleAcceptOrder(item)}
+                          disabled={acceptingOrderId === item.orderId}
+                          className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm shadow-amber-600/20 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                        >
+                          {acceptingOrderId === item.orderId ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Assigning...</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>Accept Order</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Quick CRE Approval & Revision Buttons directly on card */}
+                      {isCREOrAdmin && isAwaitingCREReview && (
+                        <>
+                          <button
+                            onClick={() => handleCREApproveToProduction(item)}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                            title="Approve Design and Send to Production"
+                          >
+                            <Factory className="w-3.5 h-3.5" />
+                            <span>Approve to Prod</span>
+                          </button>
+                          <button
+                            onClick={() => setRevisionModalTarget(item)}
+                            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                            title="Request Revision from Designer"
+                          >
+                            <RefreshCcw className="w-3.5 h-3.5" />
+                            <span>Revision</span>
+                          </button>
+                        </>
+                      )}
+
                       <button
                         onClick={() => openWorkspace(item)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
                           isSelected 
                             ? 'bg-indigo-600 text-white' 
                             : 'bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600'
                         }`}
                       >
-                        <span>Workspace</span>
+                        <span>{isCREOrAdmin ? 'Review' : 'Workspace'}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
-                    )}
+                    </div>
                   </div>
+
+                  {/* Submitted Design Files Preview on Card */}
+                  {wf?.activeDesignFiles && wf.activeDesignFiles.length > 0 && (
+                    <div className="mt-3 p-3 rounded-2xl bg-indigo-50/50 border border-indigo-100 text-xs">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-indigo-900 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                          <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+                          Submitted Design Assets ({wf.activeDesignFiles.length})
+                        </span>
+                        <span className="text-[10px] text-indigo-600 font-mono font-medium">Rev #{wf.currentRevisionNumber || 1}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {wf.activeDesignFiles.map((f: OrderAttachment, fIdx: number) => (
+                          <a
+                            key={f.id || fIdx}
+                            href={f.fileUrl}
+                            download={f.fileName}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-indigo-100 rounded-lg border border-indigo-200 text-indigo-700 text-[11px] font-bold transition-colors cursor-pointer"
+                          >
+                            <Download className="w-3 h-3 text-indigo-600" />
+                            <span className="truncate max-w-[140px]">{f.fileName}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* CRE Design Instructions */}
                   {wf?.designInstructions && (
@@ -615,7 +782,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
           )}
         </div>
 
-        {/* Right Column: Active Designer Workspace Drawer */}
+        {/* Right Column: Active Designer / CRE Review Workspace Drawer */}
         {selectedOrder && (
           <div className="lg:col-span-6 bg-white rounded-3xl p-6 border border-indigo-200 shadow-xl space-y-5 sticky top-6">
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">
@@ -627,12 +794,16 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                   {getPriorityBadge(selectedOrder.workflow?.priority)}
                   {getStatusBadge(selectedOrder.workflow?.workflowStatus)}
                 </div>
-                <h3 className="text-sm font-black text-slate-900 mt-1">Design Workspace & File Submissions</h3>
+                <h3 className="text-sm font-black text-slate-900 mt-1">
+                  {isCREOrAdmin ? 'CRE Design Review & Approval' : 'Design Workspace & Blueprint Submissions'}
+                </h3>
                 <p className="text-xs text-slate-500 font-medium">
                   {selectedOrder.customerName} • Revision #{selectedOrder.workflow?.currentRevisionNumber || 1}
                 </p>
                 {selectedOrder.workflow?.assignedDesignerName && (
-                  <p className="text-xs text-indigo-700 font-bold mt-1">Designer: {selectedOrder.workflow.assignedDesignerName}</p>
+                  <p className="text-xs text-indigo-700 font-bold mt-1">
+                    Designer: {selectedOrder.workflow.assignedDesignerName}
+                  </p>
                 )}
               </div>
 
@@ -643,6 +814,19 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* CRE Review Banner for CRE / Admin */}
+            {isCREOrAdmin && (
+              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2">
+                <div className="flex items-center gap-2 text-amber-900 font-black text-xs uppercase tracking-wider">
+                  <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>CRE Decision Center</span>
+                </div>
+                <p className="text-xs text-amber-800">
+                  Carefully review the submitted blueprints below. Once approved, you can send the order to Production, or request revisions from the designer.
+                </p>
+              </div>
+            )}
 
             {/* Original CRE Reference Attachments */}
             {selectedOrder.workflow?.creAttachments && selectedOrder.workflow.creAttachments.length > 0 && (
@@ -673,44 +857,47 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
               </div>
             )}
 
-            {/* Design Notes */}
+            {/* Design Notes & Instructions */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Designer Notes & Specifications
+                {isCREOrAdmin ? 'Designer Specifications & Notes' : 'Designer Notes & Specifications'}
               </label>
               <textarea
                 rows={3}
                 value={designNotes}
                 onChange={(e) => setDesignNotes(e.target.value)}
-                placeholder="Add drawing specifications, material codes, or notes for the production team..."
+                readOnly={isCREOrAdmin}
+                placeholder="Add drawing specifications, material codes, or notes..."
                 className="w-full px-4 py-2.5 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all font-medium"
               />
             </div>
 
-            {/* Uploaded Design Files */}
+            {/* Uploaded Design Files (Cloudflare R2 / Supabase) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Final Design Files (CAD / PDF / Images) <span className="text-rose-500">*</span>
+                  Submitted Design Files (CAD / PDF / Blueprints) <span className="text-rose-500">*</span>
                 </label>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Design File</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.dwg,.dxf,.step,.stp,.ai,.psd,.jpg,.jpeg,.png,.zip"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={isUploading}
-                  />
-                </label>
+                {!isCREOrAdmin && (
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload CAD / Blueprint</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.dwg,.dxf,.step,.stp,.ai,.psd,.jpg,.jpeg,.png,.zip"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      disabled={isUploading}
+                    />
+                  </label>
+                )}
               </div>
 
               {isUploading && (
                 <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl text-xs flex items-center gap-2">
                   <div className="w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                  <span>Uploading CAD and design assets...</span>
+                  <span>Uploading files to Cloudflare R2 storage...</span>
                 </div>
               )}
 
@@ -729,65 +916,123 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                           download={f.fileName}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1.5 text-slate-500 hover:text-indigo-600"
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center gap-1"
                           title="Download"
                         >
-                          <Download className="w-3.5 h-3.5" />
+                          <Download className="w-3 h-3" />
+                          <span>Download</span>
                         </a>
-                        <button
-                          type="button"
-                          onClick={() => setDesignFiles(prev => prev.filter((_, idx) => idx !== i))}
-                          className="p-1.5 text-slate-400 hover:text-rose-600"
-                          title="Remove"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        {!isCREOrAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setDesignFiles(prev => prev.filter((_, idx) => idx !== i))}
+                            className="p-1.5 text-slate-400 hover:text-rose-600"
+                            title="Remove"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center text-xs text-slate-400 space-y-1">
-                  <p className="font-bold text-slate-500">No design files attached yet</p>
-                  <p className="text-[11px]">Upload vector art, PDF proof, or 3D/CAD models (DWG, DXF, STEP)</p>
+                  <p className="font-bold text-slate-500">No blueprints attached yet</p>
+                  <p className="text-[11px]">Vector drawings, PDF proofs, or CAD models (DWG, DXF, STEP)</p>
                 </div>
               )}
             </div>
 
             {/* Action Buttons */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                disabled={isSubmitting || isUploading}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Progress</span>
-              </button>
+              {isCREOrAdmin ? (
+                // CRE Approval Actions
+                <div className="w-full flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRevisionModalTarget(selectedOrder)}
+                    className="px-4 py-2.5 rounded-xl border border-amber-300 hover:bg-amber-50 text-amber-800 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <RefreshCcw className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Request Revision</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleSubmitToProduction}
-                disabled={isSubmitting || isUploading || designFiles.length === 0}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Submitting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    <span>Submit to Production</span>
-                  </>
-                )}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCREApproveToProduction(selectedOrder)}
+                    disabled={isSubmitting}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Approving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Factory className="w-4 h-4" />
+                        <span>Approve & Send to Production</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                // Designer Submission Actions
+                <>
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting || isUploading}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Draft</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmitToCRE}
+                    disabled={isSubmitting || isUploading || designFiles.length === 0}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Submitting to CRE...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Submit to CRE for Review</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      {/* CRE Request Revision Modal */}
+      {revisionModalTarget && (
+        <RequestRevisionModal
+          isOpen={!!revisionModalTarget}
+          onClose={() => setRevisionModalTarget(null)}
+          order={revisionModalTarget}
+          workflowStatus={revisionModalTarget.workflow?.workflowStatus}
+          currentRevisionNumber={revisionModalTarget.workflow?.currentRevisionNumber || 1}
+          requesterRole="CRE"
+          onSuccess={() => {
+            setRevisionModalTarget(null);
+            fetchWorkflowOrders();
+            setFeedback({ type: 'success', message: 'Revision request successfully sent back to the designer!' });
+          }}
+          currentStaffId={currentStaff.id}
+          currentStaffName={currentStaff.name}
+        />
+      )}
     </div>
   );
 };

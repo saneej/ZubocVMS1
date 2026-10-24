@@ -401,6 +401,8 @@ interface OrderRecord {
   shippingPhone?: string;
   lineItems?: { name: string; price?: string | number; sku?: string; quantity?: number }[];
   isProductionDeckOrder?: boolean;
+  isDesignRequired?: boolean;
+  workflowStatus?: string;
   assignedDesignerId?: string;
   assignedDesignerName?: string;
 }
@@ -450,6 +452,10 @@ export interface DepartmentWorkflow {
   forwardedByStaffId?: string;
   forwardedByStaffName?: string;
   designSubmittedAt?: string;
+  creApprovedAt?: string;
+  creApprovedByStaffId?: string;
+  creApprovedByStaffName?: string;
+  creApprovalNotes?: string;
   productionStartedAt?: string;
   productionStartedByStaffId?: string;
   productionStartedByStaffName?: string;
@@ -1708,6 +1714,38 @@ apiRouter.get('/workflow/orders', async (req, res) => {
   const { role, status, designerId, unassignedOnly } = req.query;
   const now = new Date().toISOString();
 
+  // In production / Vercel serverless, ensure latest workflows & orders are synced from Supabase
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      if (!hasPerformedInitialSync) {
+        await syncFromSupabase();
+      }
+      const [workflowsRes, ordersRes] = await Promise.allSettled([
+        withTimeout(client.from('department_order_workflow').select('*'), 6000),
+        withTimeout(client.from('orders').select('*').order('createdAt', { ascending: false }), 6000)
+      ]);
+      if (workflowsRes.status === 'fulfilled') {
+        const { data: wfs, error: wfErr } = workflowsRes.value as any;
+        if (!wfErr && Array.isArray(wfs)) {
+          for (const w of wfs) {
+            if (w.orderId) workflowsStore[w.orderId] = { ...(workflowsStore[w.orderId] || {}), ...w };
+          }
+        }
+      }
+      if (ordersRes.status === 'fulfilled') {
+        const { data: ords, error: ordErr } = ordersRes.value as any;
+        if (!ordErr && Array.isArray(ords)) {
+          for (const o of ords) {
+            if (o.orderId) ordersStore[o.orderId] = { ...(ordersStore[o.orderId] || {}), ...o };
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('Supabase sync warning on /workflow/orders:', e?.message);
+    }
+  }
+
   // Ensure every order has a corresponding workflow entry
   for (const [id, ord] of Object.entries(ordersStore)) {
     if (ord && !workflowsStore[id]) {
@@ -2064,12 +2102,12 @@ apiRouter.post('/workflow/save-draft', async (req, res) => {
   res.json({ success: true, workflow: wf });
 });
 
-// DESIGNER: Submit completed design to Production
-apiRouter.post('/workflow/design-submit', async (req, res) => {
+// DESIGNER: Submit completed design to CRE for Review & Approval
+apiRouter.post(['/workflow/design-submit', '/workflow/submit-to-cre'], async (req, res) => {
   const { orderId, designerId, designerName, designNotes, files } = req.body;
   if (!orderId) return res.status(400).json({ error: 'Order ID is required' });
   if (!Array.isArray(files) || files.length === 0) {
-    return res.status(400).json({ error: 'Please upload at least one completed design file before submitting to Production' });
+    return res.status(400).json({ error: 'Please upload at least one completed design file before submitting to CRE for review.' });
   }
 
   const cleanId = decodeURIComponent(orderId).trim();
@@ -2101,9 +2139,9 @@ apiRouter.post('/workflow/design-submit', async (req, res) => {
     revisionNumber: nextRevNum,
     designerId: designerId || wf.assignedDesignerId || 'Designer-01',
     designerName: designerName || wf.assignedDesignerName || 'Designer',
-    designNotes: designNotes || 'Submitted for production',
+    designNotes: designNotes || 'Submitted for CRE review',
     files: files,
-    status: 'APPROVED_FOR_PRODUCTION',
+    status: 'SUBMITTED_TO_CRE',
     submittedAt: now,
     createdAt: now
   };
@@ -2125,33 +2163,143 @@ apiRouter.post('/workflow/design-submit', async (req, res) => {
   if (ord) {
     ord.assignedDesignerId = wf.assignedDesignerId;
     ord.assignedDesignerName = wf.assignedDesignerName;
+    ord.workflowStatus = 'DESIGN_SUBMITTED';
     ord.updatedAt = now;
     ordersStore[ord.orderId] = ord;
   }
   saveLocalBackup();
 
-  logWorkflowAudit(targetId, designerId || 'Designer', designerName || 'Designer', 'DESIGNER', 'SUBMIT_DESIGN_TO_PRODUCTION', fromStatus, 'DESIGN_SUBMITTED', `Revision #${nextRevNum} submitted to Production with ${files.length} design file(s)`);
+  logWorkflowAudit(
+    targetId,
+    designerId || 'Designer',
+    designerName || 'Designer',
+    'DESIGNER',
+    'SUBMIT_TO_CRE',
+    fromStatus,
+    'DESIGN_SUBMITTED',
+    `Design Revision #${nextRevNum} submitted to CRE for review with ${files.length} design file(s)`
+  );
 
   const client = getSupabaseClient();
   if (client) {
-    client.from('department_order_workflow').upsert({
-      orderId: targetId,
-      workflowStatus: 'DESIGN_SUBMITTED',
-      currentRevisionNumber: nextRevNum,
-      activeDesignFiles: files,
-      designSubmittedAt: now,
-      updatedAt: now
-    }).then(() => {}).catch(() => {});
-
-    client.from('design_revisions').insert(newRevision).then(() => {}).catch(() => {});
+    try {
+      await withTimeout(
+        client.from('department_order_workflow').upsert({
+          orderId: targetId,
+          workflowStatus: 'DESIGN_SUBMITTED',
+          assignedDesignerId: wf.assignedDesignerId,
+          assignedDesignerName: wf.assignedDesignerName,
+          currentRevisionNumber: nextRevNum,
+          activeDesignFiles: files,
+          designSubmittedAt: now,
+          updatedAt: now
+        }),
+        10000
+      );
+      await withTimeout(
+        client.from('design_revisions').insert(newRevision),
+        8000
+      ).catch(() => {});
+    } catch (dbErr: any) {
+      console.warn('Supabase submit-to-cre sync warning:', dbErr?.message);
+    }
   }
 
   res.json({
     success: true,
     workflow: wf,
     revision: newRevision,
-    message: `Design Revision #${nextRevNum} submitted to Production department!`
+    message: `Design Revision #${nextRevNum} submitted to CRE for review!`
   });
+});
+
+// CRE: Review and Approve design, then forward to Production department
+apiRouter.post('/workflow/cre-approve', async (req, res) => {
+  try {
+    const { orderId, staffId, staffName, productionInstructions, priority } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+
+    const cleanId = decodeURIComponent(orderId).trim();
+    const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
+    const targetId = ord ? ord.orderId : cleanId;
+
+    let wf = workflowsStore[targetId];
+    if (!wf) {
+      return res.status(404).json({ error: 'Workflow record not found for this order' });
+    }
+
+    const now = new Date().toISOString();
+    const fromStatus = wf.workflowStatus;
+
+    wf.workflowStatus = 'PRODUCTION_PENDING';
+    if (priority) wf.priority = priority;
+    if (productionInstructions) {
+      wf.productionRemarks = productionInstructions;
+    }
+    wf.creApprovedAt = now;
+    wf.creApprovedByStaffId = staffId || 'CRE-01';
+    wf.creApprovedByStaffName = staffName || 'CRE Specialist';
+    wf.creApprovalNotes = productionInstructions || 'Design approved by CRE. Forwarded to Production.';
+    wf.updatedAt = now;
+
+    // Update latest revision status to APPROVED_FOR_PRODUCTION
+    const revs = designRevisionsStore[targetId];
+    if (revs && revs.length > 0) {
+      revs[revs.length - 1].status = 'APPROVED_FOR_PRODUCTION';
+    }
+
+    workflowsStore[targetId] = wf;
+    if (ord) {
+      ord.workflowStatus = 'PRODUCTION_PENDING';
+      ord.updatedAt = now;
+      ordersStore[ord.orderId] = ord;
+    }
+    saveLocalBackup();
+
+    logWorkflowAudit(
+      targetId,
+      staffId || 'CRE',
+      staffName || 'CRE Specialist',
+      'CRE',
+      'CRE_APPROVE_TO_PRODUCTION',
+      fromStatus,
+      'PRODUCTION_PENDING',
+      `Design approved by CRE (${staffName || staffId}) and sent to Production department. Remarks: ${productionInstructions || 'None'}`
+    );
+
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        await withTimeout(
+          client.from('department_order_workflow').upsert({
+            orderId: targetId,
+            workflowStatus: 'PRODUCTION_PENDING',
+            priority: wf.priority,
+            productionRemarks: wf.productionRemarks,
+            creApprovedAt: now,
+            creApprovedByStaffId: wf.creApprovedByStaffId,
+            creApprovedByStaffName: wf.creApprovedByStaffName,
+            creApprovalNotes: wf.creApprovalNotes,
+            updatedAt: now
+          }),
+          10000
+        );
+      } catch (err: any) {
+        console.warn('Supabase CRE approve sync warning:', err?.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      workflow: wf,
+      message: `Design approved! Order ${targetId} successfully sent to Production department.`
+    });
+  } catch (err: any) {
+    console.error('CRE approve error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to approve design and forward to production' });
+  }
 });
 
 // CRE or PRODUCTION: Request Design Revision
@@ -2196,6 +2344,22 @@ apiRouter.post('/workflow/revision-request', async (req, res) => {
 
   const auditDetails = `Revision requested by ${requesterRole} (${requesterName || requesterId}): "${reason}". Instructions: "${instructions || 'None'}"`;
   logWorkflowAudit(orderId, requesterId || 'Reviewer', requesterName || 'Reviewer', requesterRole || 'CRE', 'REQUEST_REVISION', fromStatus, targetStatus, auditDetails);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      await withTimeout(
+        client.from('department_order_workflow').update({
+          workflowStatus: targetStatus,
+          clarificationRequest: wf.clarificationRequest,
+          updatedAt: now
+        }).eq('orderId', orderId),
+        8000
+      );
+    } catch (dbErr: any) {
+      console.warn('Supabase revision request sync warning:', dbErr?.message);
+    }
+  }
 
   res.json({
     success: true,
@@ -2276,19 +2440,25 @@ apiRouter.post('/workflow/production-status', async (req, res) => {
 
 // Cloudflare R2 Client Helper (S3-Compatible Object Storage)
 function getR2Client(): { client: S3Client; bucket: string; publicUrl: string } | null {
-  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
-  const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
-  const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'zuboc-attachments';
-  const publicUrl = (process.env.CLOUDFLARE_R2_PUBLIC_URL || '').replace(/\/+$/, '');
+  const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID || process.env.R2_ACCOUNT_ID;
+  const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY;
+  const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME || process.env.R2_BUCKET_NAME || 'zuboc-attachments';
+  const publicUrl = (process.env.CLOUDFLARE_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
+  const customEndpoint = process.env.CLOUDFLARE_R2_ENDPOINT || process.env.R2_ENDPOINT;
 
-  if (!accountId || !accessKeyId || !secretAccessKey) {
+  if (!accessKeyId || !secretAccessKey || (!accountId && !customEndpoint)) {
     return null;
+  }
+
+  let endpoint = customEndpoint ? customEndpoint.trim() : `https://${accountId}.r2.cloudflarestorage.com`;
+  if (!endpoint.startsWith('http')) {
+    endpoint = `https://${endpoint}`;
   }
 
   const client = new S3Client({
     region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint,
     credentials: {
       accessKeyId,
       secretAccessKey
@@ -2314,8 +2484,6 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), async (req, res) =
     const ext = path.extname(file.originalname).toLowerCase();
     const safeBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
     const uniqueFileName = `${safeBase}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
-    const destinationPath = path.join(uploadsDir, uniqueFileName);
-
     let fileUrl = `/uploads/${uniqueFileName}`;
 
     if (r2) {
@@ -2325,7 +2493,12 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), async (req, res) =
           Bucket: r2.bucket,
           Key: key,
           Body: file.buffer,
-          ContentType: file.mimetype || 'application/octet-stream'
+          ContentType: file.mimetype || 'application/octet-stream',
+          Metadata: {
+            orderId: String(orderId || 'GENERAL'),
+            staff: String(staffName || staffId || 'Operator'),
+            category: String(category || 'DESIGN_FILE')
+          }
         }));
 
         if (r2.publicUrl) {
@@ -2336,11 +2509,17 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), async (req, res) =
         console.log(`[R2] Uploaded ${file.originalname} to R2 bucket: ${r2.bucket}/${key}`);
       } catch (r2Err: any) {
         console.warn(`[R2] Upload failed for ${file.originalname}, falling back to local storage:`, r2Err?.message);
-        fs.writeFileSync(destinationPath, file.buffer);
-        fileUrl = `/uploads/${uniqueFileName}`;
+        try {
+          const destinationPath = path.join(uploadsDir, uniqueFileName);
+          fs.writeFileSync(destinationPath, file.buffer);
+          fileUrl = `/uploads/${uniqueFileName}`;
+        } catch {}
       }
     } else {
-      fs.writeFileSync(destinationPath, file.buffer);
+      try {
+        const destinationPath = path.join(uploadsDir, uniqueFileName);
+        fs.writeFileSync(destinationPath, file.buffer);
+      } catch {}
     }
 
     const attachment = {
@@ -2364,6 +2543,19 @@ apiRouter.post('/workflow/upload', upload.array('files', 10), async (req, res) =
     return attachment;
   }));
 
+  // Persist attachments metadata to Supabase order_attachments table
+  const client = getSupabaseClient();
+  if (client && results.length > 0) {
+    try {
+      await withTimeout(
+        client.from('order_attachments').insert(results),
+        8000
+      );
+    } catch (attErr: any) {
+      console.warn('Supabase order_attachments insert notice:', attErr?.message);
+    }
+  }
+
   saveLocalBackup();
   res.json({ success: true, files: results });
 });
@@ -2383,7 +2575,13 @@ apiRouter.get('/workflow/r2-file/:key(*)', async (req, res) => {
     if (s3Item.ContentType) res.setHeader('Content-Type', s3Item.ContentType);
     if (s3Item.ContentLength) res.setHeader('Content-Length', s3Item.ContentLength);
     res.setHeader('Content-Disposition', `inline; filename="${path.basename(key)}"`);
-    (s3Item.Body as any).pipe(res);
+    
+    if (typeof (s3Item.Body as any).pipe === 'function') {
+      (s3Item.Body as any).pipe(res);
+    } else {
+      const bytes = await (s3Item.Body as any).transformToByteArray();
+      res.send(Buffer.from(bytes));
+    }
   } catch (err: any) {
     console.warn('R2 file retrieval error:', err?.message);
     res.status(404).send('File not found in R2');
@@ -2400,116 +2598,270 @@ apiRouter.get('/workflow/download/:filename', (req, res) => {
   res.download(filePath, filename);
 });
 
-// -------------------------------------------------------------
-// ADMIN USER MANAGEMENT APIS
-// -------------------------------------------------------------
+// =============================================================
+// USER & STAFF MANAGEMENT ROUTES
+// Real Supabase Auth + staffs table integration
+// Filters out any legacy fake seed users
+// =============================================================
 
-apiRouter.get('/admin/users', (req, res) => {
-  const users = Object.values(staffsStore).map(s => ({
-    id: s.id,
-    name: s.name,
-    role: s.role,
-    stationId: s.stationId,
-    email: s.email,
-    phone: s.phone,
-    isActive: s.isActive !== false,
-    createdAt: s.createdAt,
-    lastLoginAt: s.lastLoginAt
-  }));
+const FAKE_STAFF_IDS = ['cre-01', 'designer-01', 'designer-02', 'production-01', 'admin-01', 'Operator-01', 'Staff-01', 'Staff-02', 'Zuboc', '<UUID_FROM_AUTH>'];
+
+// Get all staff / users
+apiRouter.get(['/admin/users', '/staffs'], async (req, res) => {
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data: supaStaffs, error } = await withTimeout(
+        client.from('staffs').select('*').order('createdAt', { ascending: false }),
+        6000
+      ) as any;
+      if (!error && Array.isArray(supaStaffs)) {
+        const freshMap: Record<string, StaffMember> = {};
+        for (const s of supaStaffs) {
+          if (s.id && !FAKE_STAFF_IDS.includes(s.id)) {
+            freshMap[s.id] = s;
+          }
+        }
+        staffsStore = freshMap;
+        saveLocalBackup();
+      }
+    } catch (err: any) {
+      console.warn('Supabase staffs sync warning:', err?.message);
+    }
+  }
+
+  const users = Object.values(staffsStore)
+    .filter(s => s && s.id && !FAKE_STAFF_IDS.includes(s.id))
+    .map(s => ({
+      id: s.id,
+      name: s.name,
+      role: s.role,
+      stationId: s.stationId,
+      email: s.email,
+      phone: s.phone,
+      isActive: s.isActive !== false,
+      createdAt: s.createdAt,
+      lastLoginAt: s.lastLoginAt,
+      password: s.password || s.id,
+      hasPassword: Boolean(s.password)
+    }));
+
   res.json(users);
 });
 
-apiRouter.post('/admin/users', (req, res) => {
-  const { id, name, role, stationId, password, email, phone } = req.body;
-  if (!id || !name || !role) {
-    return res.status(400).json({ error: 'User ID, Full Name, and Role are required' });
-  }
+// Create new user (both Supabase Auth and staffs table)
+apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, res) => {
+  try {
+    const email = (req.body.email || '').trim().toLowerCase();
+    const name = (req.body.name || '').trim();
+    const role = (req.body.role || 'CRE').trim().toUpperCase();
+    const password = (req.body.password || 'password123').trim();
+    const stationId = (req.body.stationId || 'HQ').trim();
 
-  const cleanId = sanitizeString(id);
-  if (staffsStore[cleanId]) {
-    return res.status(400).json({ error: `User with ID "${cleanId}" already exists` });
-  }
+    if (!name) {
+      return res.status(400).json({ error: 'Full Name is required' });
+    }
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
 
-  const validRoles = ['ADMIN', 'CRE', 'DESIGNER', 'PRODUCTION', 'SUPERVISOR', 'PACKER'];
-  if (!validRoles.includes(role)) {
-    return res.status(400).json({ error: `Invalid role. Allowed roles: ${validRoles.join(', ')}` });
-  }
-
-  const newUser: StaffMember = {
-    id: cleanId,
-    name: sanitizeString(name),
-    role: role as StaffRole,
-    stationId: sanitizeString(stationId || 'HQ'),
-    password: password ? String(password).trim() : 'password123',
-    email: email ? sanitizeString(email) : undefined,
-    phone: phone ? sanitizeString(phone) : undefined,
-    isActive: true,
-    createdAt: new Date().toISOString()
-  };
-
-  staffsStore[cleanId] = newUser;
-  saveLocalBackup();
-
-  const client = getSupabaseClient();
-  if (client) {
-    client.from('staffs').upsert(newUser).then(() => {}).catch(() => {});
-  }
-
-  res.json({ success: true, user: newUser, message: `Account created for ${newUser.name} with role ${newUser.role}` });
-});
-
-apiRouter.put('/admin/users/:id', (req, res) => {
-  const targetId = sanitizeString(req.params.id);
-  const staff = staffsStore[targetId];
-  if (!staff) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  const { name, role, stationId, email, phone, isActive } = req.body;
-  if (name) staff.name = sanitizeString(name);
-  if (role) {
     const validRoles = ['ADMIN', 'CRE', 'DESIGNER', 'PRODUCTION', 'SUPERVISOR', 'PACKER'];
-    if (validRoles.includes(role)) staff.role = role as StaffRole;
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: `Invalid role. Allowed roles: ${validRoles.join(', ')}` });
+    }
+
+    const client = getSupabaseClient();
+    let userId = req.body.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    // 1. Create in Supabase Auth if available
+    if (client && client.auth && client.auth.admin) {
+      try {
+        const { data: authUser, error: authErr } = await client.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            name,
+            role,
+            stationId
+          }
+        });
+
+        if (!authErr && authUser?.user?.id) {
+          userId = authUser.user.id;
+          console.log(`[AUTH] Created Supabase Auth user: ${email} (${userId})`);
+        } else if (authErr) {
+          console.warn(`[AUTH] Notice in admin.createUser for ${email}:`, authErr.message);
+          // If already registered, fetch ID and update metadata/password
+          if (authErr.message?.toLowerCase().includes('already') || authErr.status === 422) {
+            const { data: listData } = await client.auth.admin.listUsers();
+            const existing = listData?.users?.find((u: any) => u.email?.toLowerCase() === email);
+            if (existing) {
+              userId = existing.id;
+              await client.auth.admin.updateUserById(userId, {
+                password,
+                user_metadata: { name, role, stationId }
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (authException: any) {
+        console.warn('[AUTH] Exception in admin.createUser:', authException?.message);
+      }
+    }
+
+    const newUser: StaffMember = {
+      id: userId,
+      name,
+      role: role as StaffRole,
+      stationId,
+      password,
+      email,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    staffsStore[userId] = newUser;
+    saveLocalBackup();
+
+    // 2. Persist to Supabase public.staffs table
+    if (client) {
+      try {
+        const { error: dbErr } = (await withTimeout(
+          client.from('staffs').upsert({
+            id: newUser.id,
+            name: newUser.name,
+            role: newUser.role,
+            stationId: newUser.stationId,
+            password: newUser.password,
+            email: newUser.email,
+            isActive: true,
+            createdAt: newUser.createdAt
+          }),
+          8000
+        )) as any;
+        if (dbErr) {
+          console.error('Supabase staffs table upsert error:', dbErr.message);
+        }
+      } catch (dbEx: any) {
+        console.warn('Supabase staffs table upsert warning:', dbEx?.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      user: newUser,
+      message: `Account created successfully for ${newUser.name} (${newUser.role})`
+    });
+  } catch (err: any) {
+    console.error('Create user error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to create user' });
   }
-  if (stationId) staff.stationId = sanitizeString(stationId);
-  if (email !== undefined) staff.email = sanitizeString(email);
-  if (phone !== undefined) staff.phone = sanitizeString(phone);
-  if (isActive !== undefined) staff.isActive = Boolean(isActive);
-
-  staffsStore[targetId] = staff;
-  saveLocalBackup();
-
-  const client = getSupabaseClient();
-  if (client) {
-    client.from('staffs').upsert(staff).then(() => {}).catch(() => {});
-  }
-
-  res.json({ success: true, user: staff, message: `User ${staff.name} updated successfully` });
 });
 
-apiRouter.post('/admin/users/:id/reset-password', (req, res) => {
-  const targetId = sanitizeString(req.params.id);
-  const staff = staffsStore[targetId];
-  if (!staff) {
-    return res.status(404).json({ error: 'User not found' });
-  }
+// Update user details
+apiRouter.post(['/admin/update-user', '/admin/users/:id'], async (req, res) => {
+  try {
+    const id = req.params.id || req.body.id;
+    if (!id) return res.status(400).json({ error: 'User ID is required' });
 
+    const client = getSupabaseClient();
+    const { name, role, password, email, stationId, isActive } = req.body;
+
+    let staff = staffsStore[id];
+    if (!staff) {
+      staff = {
+        id,
+        name: name || 'Staff',
+        role: (role as StaffRole) || 'CRE',
+        stationId: stationId || 'HQ',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    if (name) staff.name = sanitizeString(name);
+    if (role) {
+      const validRoles = ['ADMIN', 'CRE', 'DESIGNER', 'PRODUCTION', 'SUPERVISOR', 'PACKER'];
+      if (validRoles.includes(role)) staff.role = role as StaffRole;
+    }
+    if (stationId) staff.stationId = sanitizeString(stationId);
+    if (email) staff.email = sanitizeString(email);
+    if (password) staff.password = String(password).trim();
+    if (isActive !== undefined) staff.isActive = Boolean(isActive);
+
+    staffsStore[id] = staff;
+    saveLocalBackup();
+
+    if (client) {
+      try {
+        const updatePayload: any = {
+          name: staff.name,
+          role: staff.role,
+          stationId: staff.stationId,
+          isActive: staff.isActive
+        };
+        if (staff.email) updatePayload.email = staff.email;
+        if (staff.password) updatePayload.password = staff.password;
+
+        await withTimeout(
+          client.from('staffs').update(updatePayload).eq('id', id),
+          8000
+        );
+
+        if (client.auth && client.auth.admin) {
+          const authUpdate: any = {
+            user_metadata: { name: staff.name, role: staff.role, stationId: staff.stationId }
+          };
+          if (password) authUpdate.password = password;
+          await client.auth.admin.updateUserById(id, authUpdate).catch(() => {});
+        }
+      } catch (dbErr: any) {
+        console.warn('Supabase update staff warning:', dbErr?.message);
+      }
+    }
+
+    res.json({ success: true, user: staff, message: `User ${staff.name} updated successfully` });
+  } catch (err: any) {
+    console.error('Update user error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to update user' });
+  }
+});
+
+// Reset password for user
+apiRouter.post('/admin/users/:id/reset-password', async (req, res) => {
+  const targetId = sanitizeString(req.params.id);
   const newPassword = req.body.password ? String(req.body.password).trim() : 'password123';
-  staff.password = newPassword;
-  staffsStore[targetId] = staff;
-  saveLocalBackup();
-
   const client = getSupabaseClient();
-  if (client) {
-    client.from('staffs').update({ password: newPassword }).eq('id', targetId).then(() => {}).catch(() => {});
+
+  let staff = staffsStore[targetId];
+  if (staff) {
+    staff.password = newPassword;
+    staffsStore[targetId] = staff;
+    saveLocalBackup();
   }
 
-  res.json({ success: true, message: `Password for ${staff.name} has been reset successfully` });
+  if (client) {
+    try {
+      await withTimeout(
+        client.from('staffs').update({ password: newPassword }).eq('id', targetId),
+        8000
+      );
+      if (client.auth && client.auth.admin) {
+        await client.auth.admin.updateUserById(targetId, { password: newPassword }).catch(() => {});
+      }
+    } catch (e: any) {
+      console.warn('Supabase reset password notice:', e?.message);
+    }
+  }
+
+  res.json({ success: true, message: `Password has been reset successfully` });
 });
 
-apiRouter.post('/admin/users/:id/toggle-active', (req, res) => {
+// Toggle active status
+apiRouter.post('/admin/users/:id/toggle-active', async (req, res) => {
   const targetId = sanitizeString(req.params.id);
-  const staff = staffsStore[targetId];
+  let staff = staffsStore[targetId];
   if (!staff) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -2520,7 +2872,14 @@ apiRouter.post('/admin/users/:id/toggle-active', (req, res) => {
 
   const client = getSupabaseClient();
   if (client) {
-    client.from('staffs').update({ isActive: staff.isActive }).eq('id', targetId).then(() => {}).catch(() => {});
+    try {
+      await withTimeout(
+        client.from('staffs').update({ isActive: staff.isActive }).eq('id', targetId),
+        8000
+      );
+    } catch (e: any) {
+      console.warn('Supabase toggle active notice:', e?.message);
+    }
   }
 
   res.json({
@@ -2530,34 +2889,31 @@ apiRouter.post('/admin/users/:id/toggle-active', (req, res) => {
   });
 });
 
-apiRouter.delete('/admin/users/:id', async (req, res) => {
+// Delete user cleanly from Supabase staffs and Auth
+apiRouter.delete(['/admin/users/:id', '/staffs/:id'], async (req, res) => {
   const targetId = sanitizeString(req.params.id);
-  const staff = staffsStore[targetId];
-  if (!staff) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
   const client = getSupabaseClient();
-  if (!client) return res.status(500).json({ error: 'Supabase client not initialized' });
 
-  try {
-    // 1. Delete from Supabase Auth
-    const { error: authError } = await client.auth.admin.deleteUser(targetId);
-    if (authError) throw authError;
-
-    // 2. Delete from Supabase staffs table
-    const { error: staffError } = await client.from('staffs').delete().eq('id', targetId);
-    if (staffError) throw staffError;
-
-    // 3. Delete from local store
-    delete staffsStore[targetId];
-    saveLocalBackup();
-
-    res.json({ success: true, message: `User ${staff.name} deleted successfully` });
-  } catch (err: any) {
-    console.error('Delete user error:', err);
-    res.status(500).json({ error: err.message });
+  if (client) {
+    try {
+      // 1. Delete from Supabase staffs table
+      await withTimeout(
+        client.from('staffs').delete().eq('id', targetId),
+        8000
+      );
+      // 2. Try to delete from Supabase Auth (safe ignore if user not in auth)
+      if (client.auth && client.auth.admin) {
+        await client.auth.admin.deleteUser(targetId).catch(() => {});
+      }
+    } catch (err: any) {
+      console.warn('Supabase delete user notice:', err?.message);
+    }
   }
+
+  delete staffsStore[targetId];
+  saveLocalBackup();
+
+  res.json({ success: true, message: `User deleted successfully` });
 });
 
 

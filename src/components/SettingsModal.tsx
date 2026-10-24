@@ -471,7 +471,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="text"
                   value={profileName}
                   onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="e.g. David Admin"
+                  placeholder="e.g. Saneej"
                   required
                   className="w-full bg-slate-50 border border-slate-300 focus:border-blue-600 focus:bg-white rounded-xl px-3.5 py-2.5 text-slate-900 focus:outline-none transition-all"
                 />

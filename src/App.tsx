@@ -440,7 +440,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn || !currentStaff) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
@@ -521,6 +521,7 @@ const AppContent: React.FC = () => {
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffId={currentStaff?.id}
                 currentStaffName={currentStaff?.name}
+                currentStaffRole={currentStaff?.role}
               />
             } />
             <Route path="orders/:orderId" element={
@@ -530,6 +531,7 @@ const AppContent: React.FC = () => {
                 onUpdateOrder={handleUpdateOrder}
                 currentStaffId={currentStaff?.id}
                 currentStaffName={currentStaff?.name}
+                currentStaffRole={currentStaff?.role}
               />
             } />
             <Route path="history" element={

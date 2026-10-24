@@ -75,7 +75,7 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
   // Filter queues
   const pendingOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    return wf?.isDesignRequired && ['DESIGN_SUBMITTED', 'PRODUCTION_PENDING'].includes(wf?.workflowStatus || '');
+    return wf?.isDesignRequired && wf?.workflowStatus === 'PRODUCTION_PENDING';
   });
 
   const inProgressOrders = ordersWithWorkflow.filter(item => {

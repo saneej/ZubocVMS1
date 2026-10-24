@@ -46,18 +46,21 @@ interface OrderDetailsPageProps {
   onUpdateOrder?: (updatedOrder: OrderRecord) => void;
   currentStaffId?: string;
   currentStaffName?: string;
+  currentStaffRole?: string;
 }
 
 export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({ 
   orders = [],
   onUpdateOrder, 
   currentStaffId = 'Operator-ID',
-  currentStaffName = 'Operator'
+  currentStaffName = 'Operator',
+  currentStaffRole = 'CRE'
 }) => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const [fetchedOrder, setFetchedOrder] = useState<OrderRecord | null>(null);
   const [isApiLoading, setIsApiLoading] = useState<boolean>(true);
+  const [isApproving, setIsApproving] = useState<boolean>(false);
   
   // Robust order lookup: 1) props, 2) localStorage cache, 3) fetched order
   const order = React.useMemo(() => {
@@ -211,6 +214,48 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
     setTimeout(() => {
       setSaveSuccessMsg(null);
     }, 3500);
+  };
+
+  const handleCreApprove = async () => {
+    if (!order) return;
+    const remarks = window.prompt(
+      `Approve Design for Order ${order.orderId} and forward to Production department?\n\nEnter optional manufacturing remarks/notes for the production floor:`,
+      ''
+    );
+    if (remarks === null) return; // cancelled
+
+    setIsApproving(true);
+    try {
+      const res = await safeFetchJson('/api/workflow/cre-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.orderId,
+          staffId: currentStaffId,
+          staffName: currentStaffName,
+          productionInstructions: remarks.trim() || undefined,
+          priority: workflowData?.workflow?.priority || 'NORMAL'
+        })
+      });
+
+      if (res && res.success) {
+        showSuccessFeedback(`Order ${order.orderId} approved and sent to Production Department!`);
+        if (onUpdateOrder) {
+          onUpdateOrder({
+            ...order,
+            workflowStatus: 'PRODUCTION_PENDING'
+          });
+        }
+        await fetchWorkflow();
+      } else {
+        alert(res?.error || 'Failed to approve design');
+      }
+    } catch (err: any) {
+      console.error('CRE approve error:', err);
+      alert(err?.message || 'Failed to approve design');
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   // Helper to save any updated fields
@@ -678,15 +723,84 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsRequestRevisionOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-                  >
-                    <RefreshCcw className="w-3.5 h-3.5" />
-                    <span>Request Revision</span>
-                  </button>
+                  {['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(order.workflowStatus || workflowData?.workflow?.status || '') ? (
+                    <>
+                      <button
+                        onClick={handleCreApprove}
+                        disabled={isApproving}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>{isApproving ? 'Approving...' : 'Approve & Send to Production'}</span>
+                      </button>
+                      <button
+                        onClick={() => setIsRequestRevisionOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      >
+                        <RefreshCcw className="w-3.5 h-3.5" />
+                        <span>Request Revision</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setIsRequestRevisionOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    >
+                      <RefreshCcw className="w-3.5 h-3.5" />
+                      <span>Request Revision</span>
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Awaiting CRE Review Banner */}
+              {['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(order.workflowStatus || workflowData?.workflow?.status || '') && (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-900 uppercase font-mono tracking-wide">
+                        Design Ready For CRE Review & Approval
+                      </h4>
+                      <p className="text-xs text-amber-800 font-sans mt-0.5 leading-relaxed">
+                        The designer has completed CAD/blueprint files. Review the files below. Once approved by CRE, this order will be dispatched to the Production department.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                    <button
+                      onClick={handleCreApprove}
+                      disabled={isApproving}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <Factory className="w-4 h-4" />
+                      <span>{isApproving ? 'Approving...' : 'Approve for Production'}</span>
+                    </button>
+                    <button
+                      onClick={() => setIsRequestRevisionOpen(true)}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    >
+                      <RefreshCcw className="w-3.5 h-3.5" />
+                      <span>Request Revision</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Production In Progress Notice */}
+              {(['PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS'].includes(order.workflowStatus || workflowData?.workflow?.status || '')) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3">
+                  <Factory className="w-6 h-6 text-blue-600 shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-black text-blue-900 uppercase font-mono">Approved by CRE • In Production</h4>
+                    <p className="text-xs text-blue-700 font-sans mt-0.5">
+                      This order was approved by CRE and is currently queued on the manufacturing floor.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Production completion notice if applicable */}
               {(order.workflowStatus === 'PRODUCTION_COMPLETED' || workflowData?.workflow?.status === 'PRODUCTION_COMPLETED') && (
@@ -1592,9 +1706,16 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
         order={order}
         workflowStatus={order.workflowStatus || workflowData?.workflow?.status}
         currentRevisionNumber={workflowData?.workflow?.activeRevisionNumber || 1}
-        requesterRole="CRE"
+        requesterRole={currentStaffRole === 'PRODUCTION' ? 'PRODUCTION' : 'CRE'}
         onSuccess={() => {
           setIsRequestRevisionOpen(false);
+          if (onUpdateOrder && order) {
+            onUpdateOrder({
+              ...order,
+              workflowStatus: 'DESIGN_REVISION_REQUESTED'
+            });
+          }
+          showSuccessFeedback('Revision request submitted to designer!');
           fetchWorkflow();
         }}
         currentStaffId={currentStaffId}

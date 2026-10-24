@@ -476,59 +476,32 @@
     "updatedAt": "2026-10-19T12:01:56.34887+00:00"
   },
   "staffs": {
-    "saneej": {
-      "id": "saneej",
-      "name": "saneej",
+    "795afba9-4494-4dde-a238-0f036b1aa726": {
+      "id": "795afba9-4494-4dde-a238-0f036b1aa726",
+      "name": "Saneej",
       "role": "ADMIN",
-      "stationId": "Packing-01",
-      "password": "saneej",
-      "email": null,
-      "createdAt": "2026-10-16T11:06:21.534+00:00"
+      "email": "msaneejk@gmail.com",
+      "stationId": "HQ",
+      "isActive": true,
+      "createdAt": "2026-10-24T07:35:57.531+00:00"
     },
-    "Operator-01": {
-      "id": "Operator-01",
-      "name": "Packing Operator",
-      "role": "PACKER",
-      "stationId": "Packing-01",
-      "password": "889900",
-      "email": null,
-      "createdAt": "2026-10-19T14:49:55.552327+00:00"
+    "saneeja": {
+      "id": "saneeja",
+      "name": "saneeja",
+      "role": "DESIGNER",
+      "email": "msaneejk4@gmail.com",
+      "stationId": "HQ",
+      "isActive": true,
+      "createdAt": "2026-10-23T07:00:04.776+00:00"
     },
-    "Admin-01": {
-      "id": "Admin-01",
-      "name": "Admin (Zuboc)",
-      "role": "ADMIN",
+    "8bca33e8-be0c-48c7-8405-1a2dca63ac6e": {
+      "id": "8bca33e8-be0c-48c7-8405-1a2dca63ac6e",
+      "name": "designer testing",
+      "role": "DESIGNER",
+      "email": "designer@zuboc.com",
       "stationId": "Packing-01",
-      "password": "889900",
-      "email": "admin@zuboc.com",
-      "createdAt": "2026-10-19T15:03:05.7851+00:00"
-    },
-    "Staff-01": {
-      "id": "Staff-01",
-      "name": "Packer Saneej",
-      "role": "PACKER",
-      "stationId": "Packing-01",
-      "password": "123456",
-      "email": "saneej@zuboc.com",
-      "createdAt": "2026-10-19T15:03:05.7851+00:00"
-    },
-    "Staff-02": {
-      "id": "Staff-02",
-      "name": "Packer Zuboc",
-      "role": "PACKER",
-      "stationId": "Packing-02",
-      "password": "654321",
-      "email": "zuboc@zuboc.com",
-      "createdAt": "2026-10-19T15:03:05.7851+00:00"
-    },
-    "Zuboc": {
-      "id": "Zuboc",
-      "name": "Zuboc Master",
-      "role": "ADMIN",
-      "stationId": "Packing-01",
-      "password": "zuboc2026",
-      "email": null,
-      "createdAt": "2026-10-16T10:00:00+00:00"
+      "isActive": true,
+      "createdAt": "2026-10-23T09:29:23.368301+00:00"
     }
   }
 }

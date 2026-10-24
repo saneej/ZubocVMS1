@@ -37,6 +37,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED' | 'PENDING'>('ALL');
   const [fulfillmentFilter, setFulfillmentFilter] = useState<string>('ALL');
+  const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
 
@@ -175,6 +176,11 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const websiteOrdersCount = orders.filter(o => !isAmazonOrder(o)).length;
   const amazonOrdersCount = orders.filter(o => isAmazonOrder(o)).length;
 
+  // Workflow counts
+  const creReviewCount = orders.filter(o => ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(o.workflowStatus || '')).length;
+  const inDesignCount = orders.filter(o => ['DESIGN_PENDING', 'DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(o.workflowStatus || '')).length;
+  const inProductionCount = orders.filter(o => ['PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(o.workflowStatus || '')).length;
+
   const filteredOrders = orders.filter(order => {
     if (!order) return false;
 
@@ -210,7 +216,15 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
       fulfillmentFilter === 'ALL' || 
       currentFulfillment === fulfillmentFilter;
 
-    return matchesSearch && matchesUploadStatus && matchesFulfillment;
+    const wfStatus = order.workflowStatus || '';
+    const matchesWorkflow =
+      workflowFilter === 'ALL' ||
+      (workflowFilter === 'CRE_REVIEW' && ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(wfStatus)) ||
+      (workflowFilter === 'DESIGN' && ['DESIGN_PENDING', 'DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(wfStatus)) ||
+      (workflowFilter === 'PRODUCTION' && ['PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wfStatus)) ||
+      (workflowFilter === 'NEEDS_DESIGN' && Boolean(order.isDesignRequired));
+
+    return matchesSearch && matchesUploadStatus && matchesFulfillment && matchesWorkflow;
   });
 
   // Sorting: Every newly added order is listed at the VERY TOP
@@ -671,6 +685,72 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
             </div>
           </div>
 
+          {/* Department & Design Workflow Row */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono flex items-center gap-1.5">
+                <Palette className="w-3 h-3 text-purple-600" />
+                Department Workflow
+              </span>
+              {workflowFilter !== 'ALL' && (
+                <button
+                  onClick={() => setWorkflowFilter('ALL')}
+                  className="text-[10px] text-[#832f5e] font-bold hover:underline cursor-pointer"
+                >
+                  Show All
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:flex-wrap">
+              <button
+                onClick={() => setWorkflowFilter('ALL')}
+                className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                  workflowFilter === 'ALL'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                ALL ORDERS ({orders.length})
+              </button>
+              
+              <button
+                onClick={() => setWorkflowFilter('CRE_REVIEW')}
+                className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  workflowFilter === 'CRE_REVIEW'
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                    : creReviewCount > 0
+                    ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 font-extrabold'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {creReviewCount > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />}
+                <span>AWAITING CRE REVIEW ({creReviewCount})</span>
+              </button>
+
+              <button
+                onClick={() => setWorkflowFilter('DESIGN')}
+                className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                  workflowFilter === 'DESIGN'
+                    ? 'bg-purple-700 text-white border-purple-700 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                IN DESIGN ({inDesignCount})
+              </button>
+
+              <button
+                onClick={() => setWorkflowFilter('PRODUCTION')}
+                className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
+                  workflowFilter === 'PRODUCTION'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                PRODUCTION ({inProductionCount})
+              </button>
+            </div>
+          </div>
+
           {/* Telegram Status Row */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between">
@@ -746,18 +826,41 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                             TV DECK
                           </span>
                         )}
-                        {order.isDesignRequired && (
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black border font-mono shrink-0 flex items-center gap-1 ${
-                            order.workflowStatus === 'DESIGN_SUBMITTED' || order.workflowStatus === 'PRODUCTION_PENDING' || order.workflowStatus === 'PRODUCTION_IN_PROGRESS'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : order.workflowStatus === 'PRODUCTION_COMPLETED'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-purple-50 text-purple-700 border-purple-200'
-                          }`}>
-                            <Palette className="w-2.5 h-2.5" />
-                            <span>{order.workflowStatus ? order.workflowStatus.replace(/_/g, ' ') : 'DESIGN REQ'}</span>
-                          </span>
-                        )}
+                        {order.isDesignRequired && (() => {
+                          const s = order.workflowStatus || 'DESIGN_PENDING';
+                          const isCreReview = ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(s);
+                          const isRevision = s === 'DESIGN_REVISION_REQUESTED';
+                          const isProdPending = s === 'PRODUCTION_PENDING';
+                          const isProdActive = s === 'PRODUCTION_IN_PROGRESS';
+                          const isProdDone = s === 'PRODUCTION_COMPLETED';
+
+                          let badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
+                          let label = s.replace(/_/g, ' ');
+
+                          if (isCreReview) {
+                            badgeClass = 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse font-black';
+                            label = 'AWAITING CRE REVIEW';
+                          } else if (isRevision) {
+                            badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                            label = 'REVISION REQUESTED';
+                          } else if (isProdPending) {
+                            badgeClass = 'bg-blue-50 text-blue-800 border-blue-200 font-bold';
+                            label = 'CRE APPROVED • PROD QUEUED';
+                          } else if (isProdActive) {
+                            badgeClass = 'bg-indigo-50 text-indigo-800 border-indigo-200 font-bold';
+                            label = 'IN PRODUCTION';
+                          } else if (isProdDone) {
+                            badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold';
+                            label = 'PRODUCTION READY';
+                          }
+
+                          return (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] border font-mono shrink-0 flex items-center gap-1 ${badgeClass}`}>
+                              <Palette className="w-2.5 h-2.5" />
+                              <span>{label}</span>
+                            </span>
+                          );
+                        })()}
                         {onStartPacking && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
                             {/* Check if evidence exists in TG/system - check for non-empty values */}

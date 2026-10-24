@@ -33,7 +33,7 @@ interface SidebarProps {
 }
 
 const DEFAULT_STAFF_LIST: StaffMember[] = [
-  { id: 'Admin-01', name: 'David Admin', role: 'ADMIN', stationId: 'Packing-HQ' },
+  { id: '795afba9-4494-4dde-a238-0f036b1aa726', name: 'Saneej', role: 'ADMIN', email: 'msaneejk@gmail.com', stationId: 'HQ' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
