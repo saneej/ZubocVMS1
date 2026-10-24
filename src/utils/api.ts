@@ -563,6 +563,8 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
       wf.productionRemarks = body.productionInstructions || '';
     } else {
       wf.designInstructions = body.designInstructions || '';
+      wf.assignedDesignerId = undefined;
+      wf.assignedDesignerName = undefined;
     }
     wf.updatedAt = now;
 

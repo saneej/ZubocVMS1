@@ -73,10 +73,16 @@ CREATE TABLE IF NOT EXISTS public.orders (
   "isDesignRequired" BOOLEAN DEFAULT FALSE,
   "workflowStatus" TEXT DEFAULT 'CRE_CREATED',
   "assignedDesignerId" TEXT,
-  "assignedDesignerName" TEXT,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure all workflow columns exist on orders table
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS "isDesignRequired" BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS "workflowStatus" TEXT DEFAULT 'CRE_CREATED',
+  ADD COLUMN IF NOT EXISTS "assignedDesignerId" TEXT,
+  ADD COLUMN IF NOT EXISTS "assignedDesignerName" TEXT;
 
 -- 4. Department Order Workflow Table
 CREATE TABLE IF NOT EXISTS public.department_order_workflow (

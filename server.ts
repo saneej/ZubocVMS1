@@ -712,9 +712,12 @@ async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
   }
   try {
     const payload = cleanForSupabase(record);
+    // Strip workflow-specific fields before inserting into orders table to prevent 42703 errors
+    const { isDesignRequired, workflowStatus, assignedDesignerId, assignedDesignerName, ...coreOrderPayload } = payload as any;
+    
     // Add timeout to upsert to prevent hanging the request
     const { error } = (await withTimeout(
-      client.from('orders').upsert(payload, { onConflict: 'orderId' }),
+      client.from('orders').upsert(coreOrderPayload, { onConflict: 'orderId' }),
       15000
     )) as { error: any };
     
@@ -722,14 +725,31 @@ async function saveOrderToSupabase(record: OrderRecord): Promise<boolean> {
       console.error(`Supabase save error for Order #${record.orderId}:`, error.message, error.code, error.details);
       if (error.code === '42P01') {
         console.error('HINT: Table "orders" does not exist in Supabase.');
-      } else if (error.code === '42703') {
-        console.error('HINT: One or more columns are missing from the Supabase table.');
       }
       return false;
-    } else {
-      isSupabaseReady = true;
-      return true;
     }
+
+    // Simultaneously ensure workflow state is synced to department_order_workflow
+    if (isDesignRequired !== undefined || workflowStatus) {
+      try {
+        await withTimeout(
+          client.from('department_order_workflow').upsert({
+            orderId: record.orderId,
+            isDesignRequired: Boolean(isDesignRequired || workflowStatus === 'DESIGN_PENDING'),
+            workflowStatus: workflowStatus || (isDesignRequired ? 'DESIGN_PENDING' : 'CRE_CREATED'),
+            assignedDesignerId: assignedDesignerId || null,
+            assignedDesignerName: assignedDesignerName || null,
+            updatedAt: new Date().toISOString()
+          }, { onConflict: 'orderId' }),
+          8000
+        );
+      } catch (wfSyncErr: any) {
+        console.warn('Supabase department_order_workflow sync notice:', wfSyncErr?.message);
+      }
+    }
+
+    isSupabaseReady = true;
+    return true;
   } catch (err: any) {
     console.error(`Supabase save exception for Order #${record.orderId}:`, err?.message);
     return false;
@@ -1746,13 +1766,73 @@ apiRouter.get('/workflow/orders', async (req, res) => {
     }
   }
 
-  // Ensure every order has a corresponding workflow entry
+  // Helper to find workflow by ID across all key variations
+  const findWorkflow = (orderId: string): DepartmentWorkflow | undefined => {
+    if (!orderId) return undefined;
+    const clean = orderId.trim().toLowerCase().replace(/^#/, '');
+    return workflowsStore[orderId] || 
+           workflowsStore[orderId.replace(/^#/, '')] || 
+           workflowsStore[`#${clean}`] ||
+           Object.values(workflowsStore).find(w => w.orderId?.trim().toLowerCase().replace(/^#/, '') === clean);
+  };
+
+  // Ensure every order has a corresponding workflow entry and sync design status
   for (const [id, ord] of Object.entries(ordersStore)) {
-    if (ord && !workflowsStore[id]) {
-      workflowsStore[id] = {
-        orderId: id,
-        isDesignRequired: false,
-        workflowStatus: 'CRE_CREATED',
+    if (!ord) continue;
+    const ordRequiresDesign = Boolean(
+      ord.isDesignRequired || 
+      ord.workflowStatus === 'DESIGN_PENDING' || 
+      (ord.workflowStatus && ord.workflowStatus.startsWith('DESIGN_'))
+    );
+    const ordWfStatus = ord.workflowStatus || (ordRequiresDesign ? 'DESIGN_PENDING' : 'CRE_CREATED');
+
+    let wf = findWorkflow(ord.orderId || id);
+    if (!wf) {
+      wf = {
+        orderId: ord.orderId || id,
+        isDesignRequired: ordRequiresDesign,
+        workflowStatus: ordWfStatus,
+        priority: (ord as any).priority || 'NORMAL',
+        currentRevisionNumber: 1,
+        activeDesignFiles: [],
+        creAttachments: [],
+        createdAt: ord.createdAt || now,
+        updatedAt: ord.updatedAt || now
+      };
+      workflowsStore[ord.orderId || id] = wf;
+    } else {
+      // Sync design requirement and status if order has it set
+      if (ordRequiresDesign) {
+        wf.isDesignRequired = true;
+      }
+      if (ord.workflowStatus && ord.workflowStatus !== 'CRE_CREATED' && (wf.workflowStatus === 'CRE_CREATED' || !wf.workflowStatus)) {
+        wf.workflowStatus = ord.workflowStatus;
+      }
+      if (wf.workflowStatus === 'DESIGN_PENDING') {
+        wf.isDesignRequired = true;
+        // Clean up stale assigned designer if that designer doesn't exist in active staff
+        if (wf.assignedDesignerId && !staffsStore[wf.assignedDesignerId]) {
+          wf.assignedDesignerId = undefined;
+          wf.assignedDesignerName = undefined;
+        }
+      }
+    }
+  }
+
+  let results = Object.values(ordersStore).map(ord => {
+    let wf = findWorkflow(ord.orderId);
+    const ordRequiresDesign = Boolean(
+      ord.isDesignRequired || 
+      ord.workflowStatus === 'DESIGN_PENDING' || 
+      (ord.workflowStatus && ord.workflowStatus.startsWith('DESIGN_'))
+    );
+    const ordWfStatus = ord.workflowStatus || (ordRequiresDesign ? 'DESIGN_PENDING' : 'CRE_CREATED');
+
+    if (!wf) {
+      wf = {
+        orderId: ord.orderId,
+        isDesignRequired: ordRequiresDesign,
+        workflowStatus: ordWfStatus,
         priority: 'NORMAL',
         currentRevisionNumber: 1,
         activeDesignFiles: [],
@@ -1760,24 +1840,18 @@ apiRouter.get('/workflow/orders', async (req, res) => {
         createdAt: ord.createdAt || now,
         updatedAt: ord.updatedAt || now
       };
+    } else {
+      if (ordRequiresDesign) wf.isDesignRequired = true;
+      if (ord.workflowStatus && ord.workflowStatus !== 'CRE_CREATED' && (wf.workflowStatus === 'CRE_CREATED' || !wf.workflowStatus)) {
+        wf.workflowStatus = ord.workflowStatus;
+      }
     }
-  }
 
-  let results = Object.values(ordersStore).map(ord => {
-    const wf = workflowsStore[ord.orderId] || {
-      orderId: ord.orderId,
-      isDesignRequired: false,
-      workflowStatus: 'CRE_CREATED',
-      priority: 'NORMAL',
-      currentRevisionNumber: 1,
-      activeDesignFiles: [],
-      creAttachments: [],
-      createdAt: ord.createdAt || now,
-      updatedAt: ord.updatedAt || now
-    };
-    const revs = designRevisionsStore[ord.orderId] || [];
+    const revs = designRevisionsStore[ord.orderId] || designRevisionsStore[ord.orderId?.replace(/^#/, '')] || [];
     return {
       ...ord,
+      isDesignRequired: ordRequiresDesign || wf.isDesignRequired,
+      workflowStatus: wf.workflowStatus || ord.workflowStatus,
       workflow: wf,
       revisionsCount: revs.length,
       latestRevision: revs[revs.length - 1] || null
@@ -1786,13 +1860,13 @@ apiRouter.get('/workflow/orders', async (req, res) => {
 
   // Filter based on query
   if (unassignedOnly === 'true') {
-    results = results.filter(r => r.workflow.isDesignRequired && r.workflow.workflowStatus === 'DESIGN_PENDING' && !r.workflow.assignedDesignerId);
+    results = results.filter(r => (r.workflow.isDesignRequired || r.isDesignRequired) && (r.workflow.workflowStatus === 'DESIGN_PENDING' || r.workflowStatus === 'DESIGN_PENDING') && !r.workflow.assignedDesignerId);
   } else if (designerId && typeof designerId === 'string') {
     results = results.filter(r => r.workflow.assignedDesignerId === designerId);
   }
 
   if (status && typeof status === 'string' && status !== 'ALL') {
-    results = results.filter(r => r.workflow.workflowStatus === status);
+    results = results.filter(r => r.workflow.workflowStatus === status || r.workflowStatus === status);
   }
 
   res.json(results);
@@ -1869,6 +1943,8 @@ apiRouter.post('/workflow/send-to-design', async (req, res) => {
     wf.workflowStatus = 'DESIGN_PENDING';
     wf.priority = priority || wf.priority || 'NORMAL';
     wf.designInstructions = designInstructions || wf.designInstructions || '';
+    wf.assignedDesignerId = undefined;
+    wf.assignedDesignerName = undefined;
     if (Array.isArray(creAttachments)) {
       wf.creAttachments = [...(wf.creAttachments || []), ...creAttachments];
       orderAttachmentsStore[ord.orderId] = [...(orderAttachmentsStore[ord.orderId] || []), ...creAttachments];
@@ -1879,11 +1955,21 @@ apiRouter.post('/workflow/send-to-design', async (req, res) => {
     wf.updatedAt = now;
 
     workflowsStore[ord.orderId] = wf;
+
+    // Synchronize to order in ordersStore so Orders page and Design Studio are 100% in sync
+    ord.isDesignRequired = true;
+    ord.workflowStatus = 'DESIGN_PENDING';
+    ord.updatedAt = now;
+    ordersStore[ord.orderId] = ord;
+    if (cleanId !== ord.orderId) {
+      ordersStore[cleanId] = ord;
+    }
+
     saveLocalBackup();
 
     logWorkflowAudit(ord.orderId, staffId || 'CRE', staffName || 'CRE Specialist', 'CRE', 'SEND_TO_DESIGN', fromStatus, 'DESIGN_PENDING', `Forwarded to Design department with ${wf.priority} priority`);
 
-    // Supabase Sync
+    // Supabase Sync to department_order_workflow and orders
     const client = getSupabaseClient();
     if (client) {
       withTimeout(
@@ -1891,6 +1977,8 @@ apiRouter.post('/workflow/send-to-design', async (req, res) => {
           orderId: ord.orderId,
           isDesignRequired: true,
           workflowStatus: 'DESIGN_PENDING',
+          assignedDesignerId: null,
+          assignedDesignerName: null,
           priority: wf.priority,
           designInstructions: wf.designInstructions,
           creAttachments: wf.creAttachments,
@@ -1905,6 +1993,8 @@ apiRouter.post('/workflow/send-to-design', async (req, res) => {
       }).catch((err) => {
         console.error(`Error syncing order ${ord.orderId} to department_order_workflow:`, err?.message);
       });
+
+      saveOrderToSupabase(ord).catch(() => {});
     }
 
     res.json({ success: true, workflow: wf, message: `Order ${ord.orderId} successfully forwarded to Design department!` });
@@ -2008,12 +2098,15 @@ apiRouter.post('/workflow/accept-order', async (req, res) => {
     workflowsStore[ord.orderId] = wf;
   }
 
-  // Critical Concurrency Requirement: Conditional Check
+  // Concurrency Check: Only block if order is assigned to an existing active designer AND is not in DESIGN_PENDING
   if (wf.assignedDesignerId && wf.assignedDesignerId !== designerId) {
-    return res.status(409).json({
-      error: 'This order has already been assigned to another Designer.',
-      assignedTo: wf.assignedDesignerName || wf.assignedDesignerId
-    });
+    const isOldStaffActive = Boolean(staffsStore[wf.assignedDesignerId]);
+    if (isOldStaffActive && wf.workflowStatus !== 'DESIGN_PENDING') {
+      return res.status(409).json({
+        error: 'This order has already been assigned to another Designer.',
+        assignedTo: wf.assignedDesignerName || wf.assignedDesignerId
+      });
+    }
   }
 
   // Attempt atomic database-level lock/update if Supabase is active
@@ -2029,8 +2122,7 @@ apiRouter.post('/workflow/accept-order', async (req, res) => {
           assignedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         })
-        .eq('orderId', ord.orderId)
-        .or(`assignedDesignerId.is.null,assignedDesignerId.eq.${designerId}`);
+        .eq('orderId', ord.orderId);
       
       if (error && error.code !== 'PGRST205') {
         console.warn('Supabase atomic assign notice:', error.message);
@@ -2059,6 +2151,71 @@ apiRouter.post('/workflow/accept-order', async (req, res) => {
     success: true,
     workflow: wf,
     message: `Order ${ord.orderId} accepted successfully and assigned to ${designerName || designerId}`
+  });
+});
+
+// CRE & ADMIN: Explicitly assign/reassign order to a specific designer
+apiRouter.post('/workflow/assign-order', async (req, res) => {
+  const { orderId, designerId, designerName, staffId, staffName } = req.body;
+  if (!orderId || !designerId) {
+    return res.status(400).json({ error: 'Order ID and Designer ID are required' });
+  }
+
+  const cleanId = decodeURIComponent(orderId).trim();
+  const ord = ordersStore[cleanId] || ordersStore[cleanId.replace(/^#/, '')] || Object.values(ordersStore).find(o => o.orderId?.toLowerCase() === cleanId.toLowerCase() || o.orderId?.replace(/^#/, '').toLowerCase() === cleanId.replace(/^#/, '').toLowerCase());
+  if (!ord) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  const now = new Date().toISOString();
+  let wf = workflowsStore[ord.orderId] || workflowsStore[cleanId] || workflowsStore[cleanId.replace(/^#/, '')];
+  if (!wf) {
+    wf = {
+      orderId: ord.orderId,
+      isDesignRequired: true,
+      workflowStatus: 'DESIGN_ASSIGNED',
+      priority: 'NORMAL',
+      currentRevisionNumber: 1,
+      activeDesignFiles: [],
+      creAttachments: [],
+      createdAt: ord.createdAt || now,
+      updatedAt: now
+    };
+  }
+
+  const fromStatus = wf.workflowStatus;
+  wf.isDesignRequired = true;
+  wf.workflowStatus = 'DESIGN_ASSIGNED';
+  wf.assignedDesignerId = designerId;
+  wf.assignedDesignerName = designerName || designerId;
+  wf.assignedAt = now;
+  wf.updatedAt = now;
+
+  workflowsStore[ord.orderId] = wf;
+  saveLocalBackup();
+
+  const client = getSupabaseClient();
+  if (client) {
+    await withTimeout(
+      client.from('department_order_workflow').upsert({
+        orderId: ord.orderId,
+        isDesignRequired: true,
+        workflowStatus: 'DESIGN_ASSIGNED',
+        assignedDesignerId: designerId,
+        assignedDesignerName: designerName || designerId,
+        assignedAt: now,
+        updatedAt: now
+      }),
+      8000
+    ).catch(e => console.warn('Supabase assign notice:', e?.message));
+  }
+
+  logWorkflowAudit(ord.orderId, staffId || 'CRE', staffName || 'CRE Specialist', 'CRE', 'ASSIGN_DESIGNER', fromStatus, 'DESIGN_ASSIGNED', `Order assigned to designer ${designerName || designerId}`);
+
+  res.json({
+    success: true,
+    workflow: wf,
+    message: `Order ${ord.orderId} assigned to ${designerName || designerId}`
   });
 });
 
@@ -3102,6 +3259,31 @@ const handleSaveOrderRequest = async (req: express.Request, res: express.Respons
   if (orderId !== finalId) {
     ordersStore[orderId] = record;
   }
+
+  // Synchronize workflowsStore entry if design requirement or workflowStatus is specified
+  if (record.isDesignRequired !== undefined || record.workflowStatus !== undefined) {
+    const cleanId = finalId.replace(/^#/, '').toLowerCase();
+    let wf = workflowsStore[finalId] || Object.values(workflowsStore).find(w => w.orderId?.replace(/^#/, '').toLowerCase() === cleanId);
+    if (!wf) {
+      wf = {
+        orderId: finalId,
+        isDesignRequired: Boolean(record.isDesignRequired || record.workflowStatus === 'DESIGN_PENDING'),
+        workflowStatus: record.workflowStatus || (record.isDesignRequired ? 'DESIGN_PENDING' : 'CRE_CREATED'),
+        priority: 'NORMAL',
+        currentRevisionNumber: 1,
+        activeDesignFiles: [],
+        creAttachments: [],
+        createdAt: now,
+        updatedAt: now
+      };
+    } else {
+      if (record.isDesignRequired !== undefined) wf.isDesignRequired = Boolean(record.isDesignRequired);
+      if (record.workflowStatus) wf.workflowStatus = record.workflowStatus;
+      wf.updatedAt = now;
+    }
+    workflowsStore[finalId] = wf;
+  }
+
   saveLocalBackup();
 
   if (fulfillmentChanged) {

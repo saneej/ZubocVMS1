@@ -44,10 +44,9 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   onOpenOrderDetails
 }) => {
   const isCREOrAdmin = currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE';
-  const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'CRE_REVIEW' | 'SUBMITTED' | 'ALL_DESIGN_PROJECTS'>(
-    isCREOrAdmin ? 'CRE_REVIEW' : 'UNASSIGNED'
-  );
+  const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'CRE_REVIEW' | 'SUBMITTED' | 'ALL_DESIGN_PROJECTS'>('UNASSIGNED');
   const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>([]);
+  const [designersList, setDesignersList] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
@@ -84,40 +83,79 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    safeFetchJson('/api/staffs').then(data => {
+      if (Array.isArray(data)) {
+        setDesignersList(data.filter((s: StaffMember) => s.role === 'DESIGNER' || s.role === 'ADMIN'));
+      }
+    }).catch(() => {});
+  }, []);
+
   // Filter queues
+  // 1. Orders Sent to Design / Unassigned Pool (Any order marked DESIGN_PENDING or requiring design without an active assigned designer)
   const unassignedOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    return wf?.isDesignRequired && wf?.workflowStatus === 'DESIGN_PENDING' && !wf?.assignedDesignerId;
+    const isDesignReq = Boolean(wf?.isDesignRequired || item.isDesignRequired || item.workflowStatus === 'DESIGN_PENDING' || wf?.workflowStatus === 'DESIGN_PENDING');
+    if (!isDesignReq) return false;
+    const status = wf?.workflowStatus || item.workflowStatus || '';
+    
+    // Status is explicitly DESIGN_PENDING -> Always shows in Unassigned / Orders Sent to Design!
+    if (status === 'DESIGN_PENDING') return true;
+    // Or no designer assigned and not submitted/in prod
+    if (!wf?.assignedDesignerId && ['CRE_CREATED', ''].includes(status)) return true;
+    return false;
   });
 
+  // 2. Orders In Progress with Designers (For designers: their assigned orders; For CRE/Admin: all active design work)
   const myAssignedOrders = ordersWithWorkflow.filter(item => {
-    if (isCREOrAdmin) return false;
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    if (!wf?.isDesignRequired) return false;
+    const isDesignReq = Boolean(wf?.isDesignRequired || item.isDesignRequired || item.workflowStatus === 'DESIGN_PENDING' || wf?.workflowStatus === 'DESIGN_PENDING');
+    if (!isDesignReq) return false;
+    const status = wf?.workflowStatus || item.workflowStatus || '';
+    
+    if (isCREOrAdmin) {
+      // For CRE & Admin, show all orders currently being designed
+      return ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(status);
+    }
     const isMine = wf?.assignedDesignerId === currentStaff.id;
-    return isMine && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(wf?.workflowStatus || '');
+    return isMine && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED'].includes(status);
   });
 
-  // Submitted by Designer and awaiting CRE review
+  // 3. Submitted by Designer and awaiting CRE review
   const creReviewOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    return wf?.isDesignRequired && ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING'].includes(wf?.workflowStatus || '');
+    const isDesignReq = Boolean(wf?.isDesignRequired || item.isDesignRequired || item.workflowStatus === 'DESIGN_PENDING' || wf?.workflowStatus === 'DESIGN_PENDING');
+    if (!isDesignReq) return false;
+    const status = wf?.workflowStatus || item.workflowStatus || '';
+    return ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(status);
   });
 
-  // Approved and sent to Production queue
+  // 4. Approved and sent to Production queue
   const submittedOrders = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    if (!wf?.isDesignRequired) return false;
-    if (currentStaff.role === 'DESIGNER') {
-      const isMine = wf?.assignedDesignerId === currentStaff.id;
-      return isMine && ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wf?.workflowStatus || '');
-    }
-    return ['PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(wf?.workflowStatus || '');
+    const isDesignReq = Boolean(wf?.isDesignRequired || item.isDesignRequired);
+    if (!isDesignReq) return false;
+    const status = wf?.workflowStatus || item.workflowStatus || '';
+    return ['PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS', 'PRODUCTION_COMPLETED'].includes(status);
   });
   
+  // 5. Complete Lifecycle Overview: Every order requiring design
   const allDesignProjects = ordersWithWorkflow.filter(item => {
     const wf = item.workflow as DepartmentWorkflow | undefined;
-    return wf?.isDesignRequired && ['DESIGN_ASSIGNED', 'DESIGN_IN_PROGRESS', 'DESIGN_REVISION_REQUESTED', 'DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'PRODUCTION_PENDING', 'PRODUCTION_IN_PROGRESS'].includes(wf?.workflowStatus || '');
+    const isDesignReq = Boolean(wf?.isDesignRequired || item.isDesignRequired || item.workflowStatus === 'DESIGN_PENDING' || wf?.workflowStatus === 'DESIGN_PENDING');
+    const status = wf?.workflowStatus || item.workflowStatus || '';
+    return isDesignReq && [
+      'DESIGN_PENDING',
+      'DESIGN_ASSIGNED',
+      'DESIGN_IN_PROGRESS',
+      'DESIGN_REVISION_REQUESTED',
+      'DESIGN_SUBMITTED',
+      'CRE_REVIEW_PENDING',
+      'SUBMITTED_TO_CRE',
+      'PRODUCTION_PENDING',
+      'PRODUCTION_IN_PROGRESS',
+      'PRODUCTION_COMPLETED'
+    ].includes(status);
   });
 
   // Concurrency-Safe Order Acceptance for Designers
@@ -152,6 +190,35 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
         message: err?.message || 'This order has already been assigned to another Designer.' 
       });
       fetchWorkflowOrders();
+    } finally {
+      setAcceptingOrderId(null);
+    }
+  };
+
+  // CRE & Admin: Assign an order directly to a specific designer
+  const handleAssignOrder = async (orderItem: any, designerId: string, designerName: string) => {
+    setAcceptingOrderId(orderItem.orderId);
+    setFeedback(null);
+    try {
+      const res = await safeFetchJson('/api/workflow/assign-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderItem.orderId,
+          designerId,
+          designerName,
+          staffId: currentStaff.id,
+          staffName: currentStaff.name
+        })
+      });
+      if (res && res.success) {
+        setFeedback({ type: 'success', message: res.message || `Order ${orderItem.orderId} assigned to ${designerName}!` });
+        await fetchWorkflowOrders();
+      } else {
+        throw new Error(res?.error || 'Failed to assign order');
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Failed to assign order' });
     } finally {
       setAcceptingOrderId(null);
     }
@@ -478,25 +545,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           
-          {/* CRE Review Tab for CRE & Admin */}
-          {isCREOrAdmin && (
-            <button
-              onClick={() => { setActiveTab('CRE_REVIEW'); setSelectedOrder(null); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                activeTab === 'CRE_REVIEW'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
-                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-              }`}
-            >
-              <span>Awaiting CRE Review</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                activeTab === 'CRE_REVIEW' ? 'bg-amber-700 text-white' : 'bg-amber-200 text-amber-900'
-              }`}>
-                {creReviewOrders.length}
-              </span>
-            </button>
-          )}
-
+          {/* 1. Orders Sent to Design / Unassigned Pool */}
           <button
             onClick={() => { setActiveTab('UNASSIGNED'); setSelectedOrder(null); }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
@@ -505,7 +554,8 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <span>Unassigned Pool</span>
+            <Palette className="w-4 h-4" />
+            <span>Orders Sent to Design</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               activeTab === 'UNASSIGNED' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
@@ -513,42 +563,58 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
             </span>
           </button>
 
-          {!isCREOrAdmin && (
-            <button
-              onClick={() => { setActiveTab('MY_ORDERS'); setSelectedOrder(null); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                activeTab === 'MY_ORDERS'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
-            >
-              <span>My Assigned Orders</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                activeTab === 'MY_ORDERS' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {myAssignedOrders.length}
-              </span>
-            </button>
-          )}
-          
-          {isCREOrAdmin && (
-            <button
-              onClick={() => { setActiveTab('ALL_DESIGN_PROJECTS'); setSelectedOrder(null); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                activeTab === 'ALL_DESIGN_PROJECTS'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
-            >
-              <span>All Design Projects</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                activeTab === 'ALL_DESIGN_PROJECTS' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {allDesignProjects.length}
-              </span>
-            </button>
-          )}
+          {/* 2. In Progress / Assigned */}
+          <button
+            onClick={() => { setActiveTab('MY_ORDERS'); setSelectedOrder(null); }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              activeTab === 'MY_ORDERS'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <span>{isCREOrAdmin ? 'In Progress with Designers' : 'My Assigned Orders'}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'MY_ORDERS' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {myAssignedOrders.length}
+            </span>
+          </button>
 
+          {/* 3. CRE Review Tab */}
+          <button
+            onClick={() => { setActiveTab('CRE_REVIEW'); setSelectedOrder(null); }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              activeTab === 'CRE_REVIEW'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <span>Awaiting CRE Review</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'CRE_REVIEW' ? 'bg-amber-700 text-white' : 'bg-amber-200 text-amber-900'
+            }`}>
+              {creReviewOrders.length}
+            </span>
+          </button>
+
+          {/* 4. All Design Projects */}
+          <button
+            onClick={() => { setActiveTab('ALL_DESIGN_PROJECTS'); setSelectedOrder(null); }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              activeTab === 'ALL_DESIGN_PROJECTS'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <span>All Design Projects</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              activeTab === 'ALL_DESIGN_PROJECTS' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {allDesignProjects.length}
+            </span>
+          </button>
+
+          {/* 5. Production Queue */}
           <button
             onClick={() => { setActiveTab('SUBMITTED'); setSelectedOrder(null); }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
@@ -557,7 +623,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                 : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <span>{isCREOrAdmin ? 'Production Queue' : 'Submitted to CRE'}</span>
+            <span>Production Floor</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               activeTab === 'SUBMITTED' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
@@ -653,7 +719,8 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {activeTab === 'UNASSIGNED' && !isCREOrAdmin && (
+                      {/* For Designers: Accept Order */}
+                      {!isCREOrAdmin && (wf?.workflowStatus === 'DESIGN_PENDING' || !wf?.assignedDesignerId) && (
                         <button
                           onClick={() => handleAcceptOrder(item)}
                           disabled={acceptingOrderId === item.orderId}
@@ -671,6 +738,30 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
                             </>
                           )}
                         </button>
+                      )}
+
+                      {/* For CRE & Admin: Quick Assign Designer Dropdown */}
+                      {isCREOrAdmin && (wf?.workflowStatus === 'DESIGN_PENDING' || !wf?.assignedDesignerId) && (
+                        <div className="flex items-center gap-1">
+                          <select
+                            onChange={(e) => {
+                              const selected = designersList.find(d => d.id === e.target.value);
+                              if (selected) {
+                                handleAssignOrder(item, selected.id, selected.name);
+                              }
+                            }}
+                            defaultValue=""
+                            disabled={acceptingOrderId === item.orderId}
+                            className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none cursor-pointer"
+                          >
+                            <option value="" disabled>Assign Designer...</option>
+                            {designersList.map(d => (
+                              <option key={d.id} value={d.id}>
+                                Assign: {d.name} ({d.role})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
 
                       {/* Quick CRE Approval & Revision Buttons directly on card */}

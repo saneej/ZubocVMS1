@@ -1401,7 +1401,15 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         isOpen={!!designOrderModalTarget}
         onClose={() => setDesignOrderModalTarget(null)}
         order={designOrderModalTarget}
-        onSuccess={() => {
+        onSuccess={(updatedOrder) => {
+          const target = updatedOrder || designOrderModalTarget;
+          if (target && onUpdateOrder) {
+            onUpdateOrder({
+              ...target,
+              isDesignRequired: true,
+              workflowStatus: 'DESIGN_PENDING'
+            });
+          }
           setDesignOrderModalTarget(null);
           onRefreshOrders();
         }}

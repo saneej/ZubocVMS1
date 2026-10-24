@@ -352,7 +352,18 @@ const AppContent: React.FC = () => {
     try {
       const supaPayload = cleanForSupabase(finalRecord);
       if (supaPayload && supaPayload.orderId) {
-        await supabase.from('orders').upsert(supaPayload, { onConflict: 'orderId' });
+        const { isDesignRequired, workflowStatus, assignedDesignerId, assignedDesignerName, ...corePayload } = supaPayload as any;
+        await supabase.from('orders').upsert(corePayload, { onConflict: 'orderId' });
+        if (isDesignRequired !== undefined || workflowStatus) {
+          await supabase.from('department_order_workflow').upsert({
+            orderId: finalRecord.orderId,
+            isDesignRequired: Boolean(isDesignRequired || workflowStatus === 'DESIGN_PENDING'),
+            workflowStatus: workflowStatus || (isDesignRequired ? 'DESIGN_PENDING' : 'CRE_CREATED'),
+            assignedDesignerId: assignedDesignerId || null,
+            assignedDesignerName: assignedDesignerName || null,
+            updatedAt: new Date().toISOString()
+          }, { onConflict: 'orderId' });
+        }
       }
     } catch {}
 
@@ -401,7 +412,18 @@ const AppContent: React.FC = () => {
     try {
       const supaPayload = cleanForSupabase(updatedOrder);
       if (supaPayload && supaPayload.orderId) {
-        await supabase.from('orders').upsert(supaPayload, { onConflict: 'orderId' });
+        const { isDesignRequired, workflowStatus, assignedDesignerId, assignedDesignerName, ...corePayload } = supaPayload as any;
+        await supabase.from('orders').upsert(corePayload, { onConflict: 'orderId' });
+        if (isDesignRequired !== undefined || workflowStatus) {
+          await supabase.from('department_order_workflow').upsert({
+            orderId: updatedOrder.orderId,
+            isDesignRequired: Boolean(isDesignRequired || workflowStatus === 'DESIGN_PENDING'),
+            workflowStatus: workflowStatus || (isDesignRequired ? 'DESIGN_PENDING' : 'CRE_CREATED'),
+            assignedDesignerId: assignedDesignerId || null,
+            assignedDesignerName: assignedDesignerName || null,
+            updatedAt: new Date().toISOString()
+          }, { onConflict: 'orderId' });
+        }
       }
     } catch (supaErr) {
       console.warn('Supabase client-side order update notice:', supaErr);
