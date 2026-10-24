@@ -109,20 +109,22 @@ const AppContent: React.FC = () => {
       }
     } catch {}
 
-    // 2. Fetch direct Supabase client-side orders
-    try {
-      const { data: supaOrders, error: supaErr } = await supabase
-        .from('orders')
-        .select('*')
-        .order('createdAt', { ascending: false });
-      if (!supaErr && Array.isArray(supaOrders)) {
-        for (const o of supaOrders) {
-          if (o && o.orderId) {
-            allOrdersMap[o.orderId] = { ...(allOrdersMap[o.orderId] || {}), ...o };
+    // 2. Fetch direct Supabase client-side orders only as fallback if backend is empty
+    if (Object.keys(allOrdersMap).length === 0) {
+      try {
+        const { data: supaOrders, error: supaErr } = await supabase
+          .from('orders')
+          .select('orderId, staffId, stationId, recordingStartedAt, recordingCompletedAt, durationSeconds, recordingStatus, uploadStatus, evidenceType, videoUrl, photoUrls, awbNumber, courier, deliveryMethod, weight, productSku, customerName, contactPerson, contactPhone, orderReceivedDate, dispatchDate, deliveredDate, orderAmount, shippingAmount, orderTotal, itemCount, fulfillmentStatus, notes, remarks, clientName, product, promisedDeliveryDate, productionStage, stageDueDates, productionNotes, isProductionDeckOrder, isDesignRequired, workflowStatus, assignedDesignerId, assignedDesignerName, createdAt, updatedAt, order_source, orderSource, order_number_num, email')
+          .order('createdAt', { ascending: false });
+        if (!supaErr && Array.isArray(supaOrders)) {
+          for (const o of supaOrders) {
+            if (o && o.orderId) {
+              allOrdersMap[o.orderId] = { ...(allOrdersMap[o.orderId] || {}), ...o };
+            }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     const mergedList = Object.values(allOrdersMap).map(o => {
       if (isAmazonOrder(o)) {
@@ -241,11 +243,11 @@ const AppContent: React.FC = () => {
       )
       .subscribe();
 
-    // Polling every 4 seconds guarantees cross-browser sync even if WebSocket drops
+    // Polling every 30 seconds as background fallback (realtime websockets handle live updates)
     const syncInterval = setInterval(() => {
       fetchOrdersAPI();
       fetchStaffsAPI();
-    }, 4000);
+    }, 30000);
 
     const handleFocus = () => {
       fetchOrdersAPI();

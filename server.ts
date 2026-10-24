@@ -806,7 +806,7 @@ async function syncFromSupabase() {
     console.log('Starting parallel initial sync from Supabase...');
     
     const [ordersRes, staffsRes, settingsRes, workflowsRes] = await Promise.allSettled([
-      withTimeout(client.from('orders').select('*').order('createdAt', { ascending: false }), 10000),
+      withTimeout(client.from('orders').select('orderId, staffId, stationId, recordingStartedAt, recordingCompletedAt, durationSeconds, recordingStatus, uploadStatus, evidenceType, videoUrl, photoUrls, awbNumber, courier, deliveryMethod, weight, productSku, customerName, contactPerson, contactPhone, fulfillFrom, orderReceivedDate, dispatchDate, riderNumber, deliveredDate, orderAmount, shippingAmount, orderTotal, itemCount, fulfillmentStatus, notes, remarks, clientName, product, formFillingDate, preparedBy, checkedBy, customisations, subAssemblyProgress, timeline, promisedDeliveryDate, paymentGate, productionStage, stageDueDates, productionNotes, isProductionDeckOrder, createdAt, updatedAt, order_source, orderSource, order_number_num, email, financialStatus, subtotal, shipping, taxes, total, discountCode, discountAmount, shippingMethod, shippingName, shippingStreet, shippingAddress1, shippingAddress2, shippingCompany, shippingCity, shippingZip, shippingProvince, shippingCountry, shippingPhone, lineItems').order('createdAt', { ascending: false }), 10000),
       withTimeout(client.from('staffs').select('*'), 8000),
       withTimeout(client.from('settings').select('*').eq('id', 'config').maybeSingle(), 5000),
       withTimeout(client.from('department_order_workflow').select('*'), 10000)
@@ -1551,29 +1551,6 @@ apiRouter.post(['/staffs/reset-password', '/auth/reset-password'], async (req, r
   res.json({ success: true, message: `Password for ${staffsStore[staffKey].name} has been reset successfully!` });
 });
 
-// Admin User Management
-apiRouter.post('/admin/create-user', async (req, res) => {
-  const { email, name, role, password } = req.body;
-  if (!email || !name || !role) return res.status(400).json({ error: 'Missing fields' });
-  const id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-  const newStaff: StaffMember = { id, name, role, password, email, isActive: true, createdAt: new Date().toISOString(), stationId: 'General' };
-  staffsStore[id] = newStaff;
-  saveLocalBackup();
-  await saveStaffToSupabase(newStaff);
-  res.json({ success: true, staff: newStaff });
-});
-
-apiRouter.post('/admin/update-user', async (req, res) => {
-  const { id, name, role, password } = req.body;
-  if (!id || !staffsStore[id]) return res.status(404).json({ error: 'User not found' });
-  const updatedStaff = { ...staffsStore[id], name, role };
-  if (password) updatedStaff.password = password;
-  staffsStore[id] = updatedStaff;
-  saveLocalBackup();
-  await saveStaffToSupabase(updatedStaff);
-  res.json({ success: true, staff: updatedStaff });
-});
-
 // Rate limiting tracker for failed access code attempts
 const loginAttempts = new Map<string, { count: number; lockUntil: number }>();
 
@@ -1648,59 +1625,6 @@ apiRouter.post('/auth/login', async (req, res) => {
       isActive: (resolvedStaff as any).isActive !== false
     }
   });
-});
-
-apiRouter.post('/admin/create-user', async (req, res) => {
-  const { email, name, role, password } = req.body;
-  const client = getSupabaseClient();
-  if (!client) return res.status(500).json({ error: 'Supabase client not initialized' });
-
-  try {
-    const { data, error } = await client.auth.admin.createUser({
-      email,
-      password,
-      user_metadata: { name, role },
-      email_confirm: true
-    });
-    if (error) throw error;
-
-    const { error: staffError } = await client.from('staffs').insert({
-      id: data.user.id,
-      name,
-      email,
-      role,
-      stationId: 'Packing-01',
-      isActive: true
-    });
-    if (staffError) throw staffError;
-
-    res.json({ success: true, user: data.user });
-  } catch (err: any) {
-    console.error('Create user error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-apiRouter.post('/admin/update-user', async (req, res) => {
-  const { id, name, role, password } = req.body;
-  const client = getSupabaseClient();
-  if (!client) return res.status(500).json({ error: 'Supabase client not initialized' });
-
-  try {
-    const updatePayload: any = { user_metadata: { name, role } };
-    if (password) updatePayload.password = password;
-
-    const { error } = await client.auth.admin.updateUserById(id, updatePayload);
-    if (error) throw error;
-
-    const { error: staffError } = await client.from('staffs').update({ name, role }).eq('id', id);
-    if (staffError) throw staffError;
-
-    res.json({ success: true });
-  } catch (err: any) {
-    console.error('Update user error:', err);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // -------------------------------------------------------------
@@ -3296,29 +3220,12 @@ async function saveBatchToSupabase(records: OrderRecord[]): Promise<boolean> {
 // Orders GET - Syncs latest orders from Supabase and serves them
 apiRouter.get('/orders', async (req, res) => {
   const client = getSupabaseClient();
-  if (client) {
+  if (client && (!hasPerformedInitialSync || Object.keys(ordersStore).length === 0)) {
     try {
-      // If we haven't synced yet or store is nearly empty, trigger sync
-      if (!hasPerformedInitialSync) {
-        await syncFromSupabase();
-      }
-
-      const { data: supaOrders, error } = (await withTimeout(
-        client.from('orders').select('*').order('createdAt', { ascending: false }),
-        8000
-      )) as { data: any[]; error: any };
-      
-      if (!error && Array.isArray(supaOrders)) {
-        const freshOrdersMap: Record<string, OrderRecord> = {};
-        for (const o of supaOrders) {
-          if (o.orderId) freshOrdersMap[o.orderId] = o;
-        }
-        // Safely merge Supabase orders with in-memory ordersStore (never delete local/imported orders)
-        ordersStore = { ...freshOrdersMap, ...ordersStore };
-        saveLocalBackup();
-      }
+      await syncFromSupabase();
+      hasPerformedInitialSync = true;
     } catch (e: any) {
-      console.warn('Supabase sync warning on GET /orders:', e?.message);
+      console.warn('Initial sync warning on GET /orders:', e?.message);
     }
   }
 
