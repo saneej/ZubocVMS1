@@ -3,6 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        var isWsError = function(msg) {
+          if (!msg) return false;
+          var str = typeof msg === 'string' ? msg : (msg.message || (msg.stack ? msg.stack : ''));
+          return str.includes('WebSocket closed without opened') || (str.includes('WebSocket') && str.includes('@vite/client'));
+        };
+        var origConsoleError = console.error;
+        console.error = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (isWsError(arguments[i])) {
+              return;
+            }
+          }
+          origConsoleError.apply(console, arguments);
+        };
+        window.addEventListener('error', function(e) {
+          if (isWsError(e.message) || (e.error && isWsError(e.error))) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return true;
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function(e) {
+          if (e.reason && isWsError(e.reason)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <link rel="icon" type="image/png" href="https://i.ibb.co/mdd2Yby/New-Project.png" />
     <link rel="apple-touch-icon" href="https://i.ibb.co/mdd2Yby/New-Project.png" />
     <meta name="theme-color" content="#2563eb" />
@@ -24,21 +56,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Suppress Vite HMR WebSocket connection close notices in iframe environments
-      window.addEventListener('error', function(e) {
-        if (e && e.message && (e.message.includes('WebSocket') || e.message.includes('@vite/client'))) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-        }
-      });
-      window.addEventListener('unhandledrejection', function(e) {
-        if (e && e.reason && e.reason.message && (e.reason.message.includes('WebSocket') || e.reason.message.includes('@vite/client'))) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-        }
-      });
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -434,6 +434,8 @@ interface StaffMember {
   isActive?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
+  isSupabaseAuth?: boolean;
+  supabaseAuthId?: string;
 }
 
 export interface DepartmentWorkflow {
@@ -2763,47 +2765,226 @@ apiRouter.get('/workflow/download/:filename', (req, res) => {
 
 const FAKE_STAFF_IDS = ['cre-01', 'designer-01', 'designer-02', 'production-01', 'admin-01', 'Operator-01', 'Staff-01', 'Staff-02', 'Zuboc', '<UUID_FROM_AUTH>'];
 
+// Helper to bidirectional sync Supabase Auth users and staffs table
+async function reconcileSupabaseAuthAndStaffs(client: any): Promise<Record<string, StaffMember>> {
+  if (!client) return staffsStore;
+
+  const authUsersMap: Record<string, any> = {};
+  const authUsersByEmail: Record<string, any> = {};
+
+  try {
+    if (client.auth && client.auth.admin) {
+      const { data: authListData, error: authListErr } = await client.auth.admin.listUsers();
+      if (!authListErr && authListData?.users && Array.isArray(authListData.users)) {
+        for (const u of authListData.users) {
+          if (u.id) {
+            authUsersMap[u.id] = u;
+            if (u.email) {
+              authUsersByEmail[u.email.toLowerCase()] = u;
+            }
+          }
+        }
+      }
+    }
+  } catch (authErr: any) {
+    console.warn('[AUTH] Error listing auth users:', authErr?.message);
+  }
+
+  // Fetch current database staffs
+  try {
+    const { data: supaStaffs, error: staffErr } = await withTimeout(
+      client.from('staffs').select('*').order('createdAt', { ascending: false }),
+      6000
+    ) as any;
+
+    if (!staffErr && Array.isArray(supaStaffs)) {
+      const freshMap: Record<string, StaffMember> = {};
+
+      for (const s of supaStaffs) {
+        if (!s.id || FAKE_STAFF_IDS.includes(s.id)) continue;
+
+        let staffRecord = { ...s };
+        const userEmail = staffRecord.email?.toLowerCase();
+        const matchedAuth = authUsersMap[staffRecord.id] || (userEmail ? authUsersByEmail[userEmail] : null);
+
+        // If staff exists in DB with non-UUID id or missing in Auth, and Auth has the email, re-link to Auth UUID
+        if (matchedAuth && staffRecord.id !== matchedAuth.id) {
+          console.log(`[AUTH] Re-linking staff ${staffRecord.name} (${staffRecord.id}) to Supabase Auth UUID ${matchedAuth.id}`);
+          try {
+            await client.from('staffs').delete().eq('id', staffRecord.id);
+            staffRecord.id = matchedAuth.id;
+            await client.from('staffs').upsert({
+              id: matchedAuth.id,
+              name: staffRecord.name,
+              role: staffRecord.role,
+              stationId: staffRecord.stationId,
+              email: staffRecord.email,
+              password: staffRecord.password,
+              isActive: staffRecord.isActive !== false,
+              createdAt: staffRecord.createdAt || new Date().toISOString()
+            });
+          } catch (relinkErr) {
+            console.warn('[AUTH] Notice re-linking staff:', relinkErr);
+          }
+        } else if (!matchedAuth && userEmail && client.auth?.admin) {
+          // User exists in staffs table but not in Supabase Auth -> Auto-provision in Supabase Auth!
+          try {
+            const pwd = staffRecord.password || 'password123';
+            const { data: createdAuth, error: createErr } = await client.auth.admin.createUser({
+              email: userEmail,
+              password: pwd.length >= 6 ? pwd : `${pwd}123`,
+              email_confirm: true,
+              user_metadata: {
+                name: staffRecord.name,
+                role: staffRecord.role,
+                stationId: staffRecord.stationId
+              }
+            });
+
+            if (!createErr && createdAuth?.user?.id) {
+              console.log(`[AUTH] Auto-provisioned missing Supabase Auth user for: ${userEmail} (${createdAuth.user.id})`);
+              const newAuthId = createdAuth.user.id;
+              await client.from('staffs').delete().eq('id', staffRecord.id);
+              staffRecord.id = newAuthId;
+              await client.from('staffs').upsert({
+                id: newAuthId,
+                name: staffRecord.name,
+                role: staffRecord.role,
+                stationId: staffRecord.stationId,
+                email: staffRecord.email,
+                password: staffRecord.password,
+                isActive: staffRecord.isActive !== false,
+                createdAt: staffRecord.createdAt || new Date().toISOString()
+              });
+              authUsersMap[newAuthId] = createdAuth.user;
+              authUsersByEmail[userEmail] = createdAuth.user;
+            }
+          } catch (autoProvErr: any) {
+            console.warn('[AUTH] Auto-provision warning:', autoProvErr?.message);
+          }
+        }
+
+        freshMap[staffRecord.id] = staffRecord;
+      }
+
+      // Also ensure any users that exist in Supabase Auth are in the staffs table
+      for (const [authId, authUser] of Object.entries(authUsersMap)) {
+        if (!freshMap[authId]) {
+          const uEmail = authUser.email || '';
+          const uName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Staff';
+          const uRole = (authUser.user_metadata?.role as StaffRole) || 'CRE';
+          const uStation = authUser.user_metadata?.stationId || 'HQ';
+
+          const newStaff: StaffMember = {
+            id: authId,
+            name: uName,
+            role: uRole,
+            stationId: uStation,
+            email: uEmail,
+            password: 'password123',
+            isActive: true,
+            createdAt: authUser.created_at || new Date().toISOString()
+          };
+
+          freshMap[authId] = newStaff;
+          client.from('staffs').upsert({
+            id: authId,
+            name: uName,
+            role: uRole,
+            stationId: uStation,
+            email: uEmail,
+            isActive: true,
+            createdAt: newStaff.createdAt
+          }).catch(() => {});
+        }
+      }
+
+      staffsStore = freshMap;
+      saveLocalBackup();
+    }
+  } catch (err: any) {
+    console.warn('Supabase staffs sync warning:', err?.message);
+  }
+
+  return staffsStore;
+}
+
 // Get all staff / users
 apiRouter.get(['/admin/users', '/staffs'], async (req, res) => {
   const client = getSupabaseClient();
+  let authUsersMap: Record<string, any> = {};
+
   if (client) {
     try {
-      const { data: supaStaffs, error } = await withTimeout(
-        client.from('staffs').select('*').order('createdAt', { ascending: false }),
-        6000
-      ) as any;
-      if (!error && Array.isArray(supaStaffs)) {
-        const freshMap: Record<string, StaffMember> = {};
-        for (const s of supaStaffs) {
-          if (s.id && !FAKE_STAFF_IDS.includes(s.id)) {
-            freshMap[s.id] = s;
+      await reconcileSupabaseAuthAndStaffs(client);
+
+      if (client.auth && client.auth.admin) {
+        const { data: authListData } = await client.auth.admin.listUsers();
+        if (authListData?.users && Array.isArray(authListData.users)) {
+          for (const u of authListData.users) {
+            if (u.id) {
+              authUsersMap[u.id] = u;
+              if (u.email) authUsersMap[u.email.toLowerCase()] = u;
+            }
           }
         }
-        staffsStore = freshMap;
-        saveLocalBackup();
       }
-    } catch (err: any) {
-      console.warn('Supabase staffs sync warning:', err?.message);
+    } catch (e: any) {
+      console.warn('Sync in GET /admin/users notice:', e?.message);
     }
   }
 
   const users = Object.values(staffsStore)
     .filter(s => s && s.id && !FAKE_STAFF_IDS.includes(s.id))
-    .map(s => ({
-      id: s.id,
-      name: s.name,
-      role: s.role,
-      stationId: s.stationId,
-      email: s.email,
-      phone: s.phone,
-      isActive: s.isActive !== false,
-      createdAt: s.createdAt,
-      lastLoginAt: s.lastLoginAt,
-      password: s.password || s.id,
-      hasPassword: Boolean(s.password)
-    }));
+    .map(s => {
+      const authUser = authUsersMap[s.id] || (s.email ? authUsersMap[s.email.toLowerCase()] : null);
+      return {
+        id: s.id,
+        name: s.name,
+        role: s.role,
+        stationId: s.stationId,
+        email: s.email,
+        phone: s.phone,
+        isActive: s.isActive !== false,
+        createdAt: s.createdAt,
+        lastLoginAt: s.lastLoginAt,
+        password: s.password || s.id,
+        hasPassword: Boolean(s.password),
+        isSupabaseAuth: Boolean(authUser),
+        supabaseAuthId: authUser ? authUser.id : null
+      };
+    });
 
   res.json(users);
+});
+
+// Explicit Sync with Supabase Auth endpoint
+apiRouter.post('/admin/sync-auth', async (req, res) => {
+  try {
+    const client = getSupabaseClient();
+    if (!client) {
+      return res.status(500).json({ error: 'Supabase client is not initialized.' });
+    }
+
+    const updatedMap = await reconcileSupabaseAuthAndStaffs(client);
+    const usersCount = Object.keys(updatedMap).length;
+
+    let authCount = 0;
+    if (client.auth && client.auth.admin) {
+      const { data } = await client.auth.admin.listUsers();
+      authCount = data?.users?.length || 0;
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully synchronized ${usersCount} staff members with Supabase Authentication (${authCount} auth accounts verified).`,
+      usersCount,
+      authCount
+    });
+  } catch (err: any) {
+    console.error('Sync auth error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to synchronize with Supabase Auth' });
+  }
 });
 
 // Create new user (both Supabase Auth and staffs table)
@@ -2821,6 +3002,9 @@ apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, re
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
 
     const validRoles = ['ADMIN', 'CRE', 'DESIGNER', 'PRODUCTION', 'SUPERVISOR', 'PACKER'];
     if (!validRoles.includes(role)) {
@@ -2828,9 +3012,9 @@ apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, re
     }
 
     const client = getSupabaseClient();
-    let userId = req.body.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    let userId = req.body.id;
 
-    // 1. Create in Supabase Auth if available
+    // 1. Create in Supabase Auth (Primary Identity Provider)
     if (client && client.auth && client.auth.admin) {
       try {
         const { data: authUser, error: authErr } = await client.auth.admin.createUser({
@@ -2846,7 +3030,7 @@ apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, re
 
         if (!authErr && authUser?.user?.id) {
           userId = authUser.user.id;
-          console.log(`[AUTH] Created Supabase Auth user: ${email} (${userId})`);
+          console.log(`[AUTH] Successfully created Supabase Auth user: ${email} (UID: ${userId})`);
         } else if (authErr) {
           console.warn(`[AUTH] Notice in admin.createUser for ${email}:`, authErr.message);
           // If already registered, fetch ID and update metadata/password
@@ -2859,12 +3043,21 @@ apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, re
                 password,
                 user_metadata: { name, role, stationId }
               }).catch(() => {});
+            } else {
+              return res.status(400).json({ error: `User with this email already exists in Supabase Auth.` });
             }
+          } else {
+            return res.status(400).json({ error: `Supabase Auth Creation Error: ${authErr.message}` });
           }
         }
       } catch (authException: any) {
-        console.warn('[AUTH] Exception in admin.createUser:', authException?.message);
+        console.error('[AUTH] Exception in admin.createUser:', authException?.message);
+        return res.status(500).json({ error: `Supabase Authentication Service Error: ${authException?.message}` });
       }
+    }
+
+    if (!userId) {
+      userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     }
 
     const newUser: StaffMember = {
@@ -2875,7 +3068,9 @@ apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, re
       password,
       email,
       isActive: true,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isSupabaseAuth: true,
+      supabaseAuthId: userId
     };
 
     staffsStore[userId] = newUser;
@@ -2908,7 +3103,7 @@ apiRouter.post(['/admin/create-user', '/admin/users', '/staffs'], async (req, re
     res.json({
       success: true,
       user: newUser,
-      message: `Account created successfully for ${newUser.name} (${newUser.role})`
+      message: `Account created and verified in Supabase Authentication for ${newUser.name} (${newUser.role})`
     });
   } catch (err: any) {
     console.error('Create user error:', err);

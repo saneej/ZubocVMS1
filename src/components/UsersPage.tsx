@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { StaffMember, StaffRole } from '../types';
-import { Trash2, Plus, Edit3, Shield, Mail, UserCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Trash2, Plus, Edit3, Shield, Mail, UserCheck, RefreshCw, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
 import { safeFetchJson } from '../utils/api';
@@ -11,6 +11,7 @@ const FAKE_USER_IDS = ['cre-01', 'designer-01', 'designer-02', 'production-01', 
 export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncingAuth, setSyncingAuth] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffMember | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -39,6 +40,28 @@ export const UsersPage: React.FC = () => {
     fetchUsers();
   }, []);
 
+  const handleSyncAuth = async () => {
+    setSyncingAuth(true);
+    try {
+      const res = await safeFetchJson('/api/admin/sync-auth', { method: 'POST' });
+      if (res && res.error) {
+        throw new Error(res.error);
+      }
+      setFeedback({
+        type: 'success',
+        message: res.message || 'All user accounts successfully synchronized with Supabase Authentication!'
+      });
+      await fetchUsers();
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to sync with Supabase Authentication.'
+      });
+    } finally {
+      setSyncingAuth(false);
+    }
+  };
+
   const handleAddUser = async (email: string, name: string, role: StaffRole, password: string) => {
     const res = await safeFetchJson('/api/admin/create-user', {
       method: 'POST',
@@ -52,7 +75,7 @@ export const UsersPage: React.FC = () => {
 
     setFeedback({
       type: 'success',
-      message: `User ${name} (${role}) created successfully!`
+      message: `User ${name} (${role}) created and synced with Supabase Authentication successfully!`
     });
     await fetchUsers();
   };
@@ -79,7 +102,7 @@ export const UsersPage: React.FC = () => {
   };
 
   const handleDeleteUser = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to permanently delete user "${name}"?`)) return;
+    if (!window.confirm(`Are you sure you want to permanently delete user "${name}" from Supabase?`)) return;
     try {
       const res = await safeFetchJson(`/api/admin/users/${encodeURIComponent(id)}`, {
         method: 'DELETE'
@@ -87,7 +110,7 @@ export const UsersPage: React.FC = () => {
       if (res && res.error) {
         throw new Error(res.error);
       }
-      setFeedback({ type: 'success', message: `User ${name} deleted successfully.` });
+      setFeedback({ type: 'success', message: `User ${name} deleted from Supabase Auth and database.` });
       await fetchUsers();
     } catch (err: any) {
       console.error('Error deleting user:', err);
@@ -126,11 +149,20 @@ export const UsersPage: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black text-slate-900 mt-1">User & Role Management</h1>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Manage staff login accounts, roles (CRE, Designer, Production, Admin), and permissions across Supabase.
+            Manage staff login accounts, roles (CRE, Designer, Production, Admin), and permissions synchronized across Supabase Authentication and database.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncAuth}
+            disabled={syncingAuth || loading}
+            className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl border border-emerald-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+            title="Synchronize all users with Supabase Authentication"
+          >
+            <ShieldCheck className={`w-4 h-4 text-emerald-600 ${syncingAuth ? 'animate-spin' : ''}`} />
+            <span>{syncingAuth ? 'Syncing...' : 'Sync Supabase Auth'}</span>
+          </button>
           <button
             onClick={fetchUsers}
             disabled={loading}
@@ -195,6 +227,7 @@ export const UsersPage: React.FC = () => {
                   <th className="p-4">Name & Email</th>
                   <th className="p-4">Assigned Role</th>
                   <th className="p-4">Station ID</th>
+                  <th className="p-4">Supabase Auth</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
@@ -214,6 +247,19 @@ export const UsersPage: React.FC = () => {
                     </td>
                     <td className="p-4 font-mono font-bold text-slate-600 text-xs">
                       {user.stationId || 'HQ'}
+                    </td>
+                    <td className="p-4">
+                      {user.isSupabaseAuth ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title={`Supabase UID: ${user.supabaseAuthId || user.id}`}>
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          Auth Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Click 'Sync Supabase Auth' to provision">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                          Pending Auth
+                        </span>
+                      )}
                     </td>
                     <td className="p-4">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">

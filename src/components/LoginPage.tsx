@@ -58,12 +58,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         if (error) throw error;
         
         const staffMember: StaffMember = {
-          id: data.user.id.substring(0, 8),
+          id: data.user.id,
           name: data.user.user_metadata?.name || email.split('@')[0],
           role: data.user.user_metadata?.role || 'CRE',
           stationId: data.user.user_metadata?.stationId || 'HQ',
           email: data.user.email || email.trim(),
-          isActive: true
+          isActive: true,
+          isSupabaseAuth: true,
+          supabaseAuthId: data.user.id
         };
         onLoginSuccess(staffMember);
       }

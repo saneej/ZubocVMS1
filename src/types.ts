@@ -207,6 +207,8 @@ export interface StaffMember {
   isActive?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
+  isSupabaseAuth?: boolean;
+  supabaseAuthId?: string;
 }
 
 export type WorkflowStatus = 
