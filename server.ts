@@ -822,9 +822,19 @@ async function syncFromSupabase() {
         for (const o of ords) {
           if (o.orderId) freshOrdersMap[o.orderId] = o;
         }
-        ordersStore = freshOrdersMap;
+        if (Object.keys(freshOrdersMap).length > 0) {
+          ordersStore = freshOrdersMap;
+          console.log(`Synced ${ords.length} orders from Supabase.`);
+        } else {
+          console.log('Supabase orders table is empty. Seeding initial fallback orders...');
+          for (const fallbackOrd of INITIAL_FALLBACK_ORDERS) {
+            if (fallbackOrd && fallbackOrd.orderId) {
+              ordersStore[fallbackOrd.orderId] = fallbackOrd;
+              client.from('orders').upsert(cleanForSupabase(fallbackOrd), { onConflict: 'orderId' }).then(() => {}).catch(() => {});
+            }
+          }
+        }
         saveLocalBackup();
-        console.log(`Synced ${ords.length} orders from Supabase.`);
       }
     }
 

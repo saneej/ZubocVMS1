@@ -136,10 +136,9 @@ const AppContent: React.FC = () => {
       const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
-    if (mergedList.length > 0) {
-      setOrders(mergedList);
-      try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(mergedList)); } catch {}
-    }
+    const finalOrders = mergedList.length > 0 ? mergedList : INITIAL_FALLBACK_ORDERS;
+    setOrders(finalOrders);
+    try { localStorage.setItem('zuboc_orders_cache', JSON.stringify(finalOrders)); } catch {}
   };
 
   const fetchStaffsAPI = async () => {
