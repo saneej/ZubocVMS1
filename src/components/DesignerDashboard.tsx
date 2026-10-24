@@ -304,10 +304,6 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
       return;
     }
 
-    if (!window.confirm(`Submit completed design with ${designFiles.length} file(s) to the CRE team for review and approval?`)) {
-      return;
-    }
-
     setIsSubmitting(true);
     setFeedback(null);
 

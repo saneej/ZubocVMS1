@@ -339,10 +339,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to remove staff member "${staffName}" (${staffId})?`)) {
-      return;
-    }
-
     setStaffActionError(null);
     setStaffActionSuccess(null);
 

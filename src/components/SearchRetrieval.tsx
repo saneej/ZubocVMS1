@@ -257,7 +257,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   });
 
   const handleDelete = async (orderId: string) => {
-    if (!window.confirm(`Delete recording for order ${orderId}?`)) return;
     setDeletingId(orderId);
     try {
       await onDeleteOrder(orderId);

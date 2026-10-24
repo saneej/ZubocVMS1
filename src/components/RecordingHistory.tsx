@@ -23,7 +23,6 @@ export const RecordingHistory: React.FC<RecordingHistoryProps> = ({ orders, onRe
   };
 
   const handleDelete = async (orderId: string) => {
-    if (!window.confirm(`Delete record for order ${orderId}?`)) return;
     setDeletingId(orderId);
     try {
       await onDeleteOrder(orderId);
