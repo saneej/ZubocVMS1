@@ -341,12 +341,6 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
     const targetOrder = orderItem || selectedOrder;
     if (!targetOrder) return;
 
-    const remarks = window.prompt(
-      `Approve Design for Order ${targetOrder.orderId} and forward to Production department?\n\nEnter optional manufacturing remarks/notes for the production floor:`,
-      ''
-    );
-    if (remarks === null) return; // User cancelled prompt
-
     setIsSubmitting(true);
     setFeedback(null);
 
@@ -358,7 +352,7 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
           orderId: targetOrder.orderId,
           staffId: currentStaff.id,
           staffName: currentStaff.name,
-          productionInstructions: remarks.trim() || undefined,
+          productionInstructions: 'Approved for Production',
           priority: targetOrder.workflow?.priority || 'NORMAL'
         })
       });

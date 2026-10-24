@@ -218,11 +218,6 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
 
   const handleCreApprove = async () => {
     if (!order) return;
-    const remarks = window.prompt(
-      `Approve Design for Order ${order.orderId} and forward to Production department?\n\nEnter optional manufacturing remarks/notes for the production floor:`,
-      ''
-    );
-    if (remarks === null) return; // cancelled
 
     setIsApproving(true);
     try {
@@ -233,7 +228,7 @@ export const OrderDetailsPage: React.FC<OrderDetailsPageProps> = ({
           orderId: order.orderId,
           staffId: currentStaffId,
           staffName: currentStaffName,
-          productionInstructions: remarks.trim() || undefined,
+          productionInstructions: 'Approved for Production',
           priority: workflowData?.workflow?.priority || 'NORMAL'
         })
       });

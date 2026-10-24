@@ -118,10 +118,6 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
   };
 
   const handleCompleteProduction = async (orderItem: any) => {
-    if (!window.confirm(`Mark manufacturing as completed for Order ${orderItem.orderId}? This will notify CRE and make the order ready for packing and dispatch.`)) {
-      return;
-    }
-
     setIsSubmitting(true);
     setFeedback(null);
 
