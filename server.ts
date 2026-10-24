@@ -3298,6 +3298,12 @@ apiRouter.get('/orders', async (req, res) => {
     }
   }
 
+  if (Object.keys(ordersStore).length === 0) {
+    for (const ord of INITIAL_FALLBACK_ORDERS) {
+      if (ord && ord.orderId) ordersStore[ord.orderId] = ord;
+    }
+  }
+
   const orders = Object.values(ordersStore).map(o => {
     if (!o || !o.orderId) return o;
     if (isAmazonOrder(o)) {
