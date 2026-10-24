@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { StaffMember, StaffRole } from '../types';
-import { Trash2, Plus, Edit3, Shield, Mail, UserCheck, RefreshCw, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Trash2, Plus, Edit3, Shield, Mail, UserCheck, RefreshCw, AlertCircle, CheckCircle2, ShieldCheck, RotateCcw } from 'lucide-react';
 import { CreateUserModal } from './CreateUserModal';
 import { EditUserModal } from './EditUserModal';
 import { safeFetchJson } from '../utils/api';
@@ -12,6 +12,7 @@ export const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncingAuth, setSyncingAuth] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffMember | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -59,6 +60,33 @@ export const UsersPage: React.FC = () => {
       });
     } finally {
       setSyncingAuth(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    try {
+      const res = await safeFetchJson('/api/admin/clear-cache', { method: 'POST' });
+      localStorage.clear();
+      sessionStorage.clear();
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      setFeedback({
+        type: 'success',
+        message: res?.message || 'All caches cleared successfully! Reloading application...'
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: err?.message || 'Failed to clear cache'
+      });
+    } finally {
+      setClearingCache(false);
     }
   };
 
@@ -154,6 +182,15 @@ export const UsersPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleClearCache}
+            disabled={clearingCache || loading}
+            className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl border border-rose-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+            title="Clear all server in-memory cache and browser storage"
+          >
+            <RotateCcw className={`w-4 h-4 text-rose-600 ${clearingCache ? 'animate-spin' : ''}`} />
+            <span>{clearingCache ? 'Clearing...' : 'Clear All Cache'}</span>
+          </button>
           <button
             onClick={handleSyncAuth}
             disabled={syncingAuth || loading}

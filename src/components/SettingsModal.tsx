@@ -50,7 +50,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onStaffChanged
 }) => {
   const isAdmin = currentStaff.role === 'ADMIN';
-  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'backup'>(isAdmin ? 'telegram' : 'profile');
+  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'cache'>(isAdmin ? 'telegram' : 'profile');
+
+  // Cache clearing state
+  const [isClearingCache, setIsClearingCache] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleClearAllCaches = async () => {
+    setIsClearingCache(true);
+    setCacheStatus(null);
+    try {
+      const res = await safeFetchJson('/api/admin/clear-cache', { method: 'POST' });
+      localStorage.clear();
+      sessionStorage.clear();
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      setCacheStatus({
+        type: 'success',
+        message: res?.message || 'All caches cleared successfully! Reloading in 1.5 seconds...'
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      setCacheStatus({
+        type: 'error',
+        message: err?.message || 'Failed to clear cache'
+      });
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
 
   // Telegram Config
   const [botToken, setBotToken] = useState(settings.telegramBotToken || '');
@@ -427,6 +459,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <Key className="w-3.5 h-3.5 text-blue-600" />
               <span>ACCESS CODES ({staffList.length})</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('cache')}
+              className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'cache'
+                  ? 'border-rose-600 text-rose-600 bg-white rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+              <span>CLEAR CACHE</span>
             </button>
           )}
         </div>
@@ -852,6 +899,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               )}
 
+            </div>
+          )}
+
+          {/* TAB 4: Clear Cache */}
+          {activeTab === 'cache' && (
+            <div className="space-y-4 font-mono">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-900 space-y-1">
+                <div className="font-bold flex items-center gap-2 text-xs">
+                  <RotateCcw className="w-4 h-4 text-amber-600" />
+                  <span>System Maintenance &amp; Cache Purge</span>
+                </div>
+                <div className="text-[11px] text-amber-800 leading-relaxed">
+                  Purges all temporary server in-memory buffers, clears browser localStorage/sessionStorage, unregisters offline Service Worker caches, and re-syncs fresh user data directly from Supabase.
+                </div>
+              </div>
+
+              {cacheStatus && (
+                <div className={`p-3 rounded-xl border font-mono text-xs flex items-center gap-2 ${
+                  cacheStatus.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}>
+                  {cacheStatus.type === 'success' ? <Check className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
+                  <span>{cacheStatus.message}</span>
+                </div>
+              )}
+
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="font-bold text-slate-800 text-xs uppercase tracking-wider">Automated Actions Performed:</div>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 text-[11px]">
+                  <li>Clear server temporary in-memory orders &amp; workflow cache</li>
+                  <li>Re-verify 1:1 user accounts in Supabase Authentication</li>
+                  <li>Clear browser localStorage, sessionStorage &amp; Service Worker cache</li>
+                  <li>Automatic application reload to load pristine bundle</li>
+                </ul>
+
+                <button
+                  type="button"
+                  disabled={isClearingCache}
+                  onClick={handleClearAllCaches}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all uppercase tracking-wider text-xs"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isClearingCache ? 'animate-spin' : ''}`} />
+                  <span>{isClearingCache ? 'CLEARING ALL CACHES...' : 'PURGE ALL CACHES & RELOAD'}</span>
+                </button>
+              </div>
             </div>
           )}
 
