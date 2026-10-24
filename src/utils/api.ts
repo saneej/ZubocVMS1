@@ -242,9 +242,22 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
   if (cleanPath.includes('/orders')) {
     if (method === 'GET') {
       let orders: any[] = [];
-      const localOrders = localStorage.getItem('zuboc_orders_cache') || localStorage.getItem('zuboc_orders_store');
-      if (localOrders) {
-        try { orders = JSON.parse(localOrders); } catch {}
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient('https://bdfgscjiuqccoidkeaqh.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoI5yb2xlIjoiYW5vbiIsImlhdCI6MTc5MjQwNzQ4OCwiZXhwIjoyMTA3OTgzNDg4fQ.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U', {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+        const { data, error } = await client.from('orders').select('*').order('createdAt', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          orders = data;
+        }
+      } catch {}
+
+      if (orders.length === 0) {
+        const localOrders = localStorage.getItem('zuboc_orders_cache') || localStorage.getItem('zuboc_orders_store');
+        if (localOrders) {
+          try { orders = JSON.parse(localOrders); } catch {}
+        }
       }
 
       // Check if path requested a specific single order (e.g. /api/orders/ZUB-123)
@@ -260,7 +273,7 @@ async function handleClientApiFallback(path: string, options: RequestInit): Prom
         if (singleOrder) return singleOrder;
       }
 
-      return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     } else if (method === 'POST') {
       const orderId = body.orderId || `ORD-${Date.now()}`;
       const now = new Date().toISOString();
