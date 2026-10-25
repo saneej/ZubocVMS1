@@ -389,6 +389,21 @@ for (const ord of INITIAL_FALLBACK_ORDERS) {
     ordersStore[ord.orderId] = ord;
   }
 }
+var apiCache = /* @__PURE__ */ new Map();
+var CACHE_TTL_MS = 45e3;
+function getCachedApiResponse(key) {
+  const cached = apiCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+  return null;
+}
+function setCachedApiResponse(key, data) {
+  apiCache.set(key, { data, timestamp: Date.now() });
+}
+function invalidateApiCache() {
+  apiCache.clear();
+}
 var workflowsStore = {};
 var designRevisionsStore = {};
 var orderAttachmentsStore = {};
@@ -446,6 +461,7 @@ try {
   console.error("Error loading local flow_data.json:", e);
 }
 function saveLocalBackup() {
+  invalidateApiCache();
   const payload = JSON.stringify({
     orders: ordersStore,
     settings,
@@ -1395,6 +1411,9 @@ function logWorkflowAudit(orderId, actorId, actorName, actorRole, action, fromSt
 }
 apiRouter.get("/workflow/orders", async (req, res) => {
   try {
+    const cacheKey = `workflow_orders_${JSON.stringify(req.query)}`;
+    const cached = getCachedApiResponse(cacheKey);
+    if (cached) return res.json(cached);
     const { role, status, designerId, unassignedOnly } = req.query;
     const now = (/* @__PURE__ */ new Date()).toISOString();
     if (Object.keys(ordersStore).length === 0) {
@@ -1491,6 +1510,7 @@ apiRouter.get("/workflow/orders", async (req, res) => {
     if (status && typeof status === "string" && status !== "ALL") {
       results = results.filter((r) => r.workflow.workflowStatus === status || r.workflowStatus === status);
     }
+    setCachedApiResponse(cacheKey, results);
     res.json(results);
   } catch (err) {
     console.error("Error in GET /workflow/orders:", err);
@@ -2753,6 +2773,8 @@ async function saveBatchToSupabase(records) {
   }
 }
 apiRouter.get("/orders", async (req, res) => {
+  const cached = getCachedApiResponse("api_orders");
+  if (cached) return res.json(cached);
   const client = getSupabaseClient();
   if (client && (!hasPerformedInitialSync || Object.keys(ordersStore).length === 0)) {
     try {
@@ -2778,6 +2800,7 @@ apiRouter.get("/orders", async (req, res) => {
     const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
     return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
   });
+  setCachedApiResponse("api_orders", orders);
   res.json(orders);
 });
 apiRouter.get("/orders/:orderId", async (req, res) => {

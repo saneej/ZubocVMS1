@@ -40,6 +40,12 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
   const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(15);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [channelFilter, searchTerm, statusFilter, fulfillmentFilter, workflowFilter]);
 
   // Listen for channel switch requests (e.g. when an Amazon order is created)
   useEffect(() => {
@@ -255,6 +261,8 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
     };
     return getNum(b) - getNum(a);
   });
+
+  const paginatedOrders = filteredOrders.slice(0, currentPage * itemsPerPage);
 
   const handleDelete = async (orderId: string) => {
     setDeletingId(orderId);
@@ -514,6 +522,18 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
 
   const handleExportCSV = () => {
     exportOrdersToCSV(filteredOrders, 'zuboc_order_packings');
+  };
+
+  const formatCleanDate = (d?: string) => {
+    if (!d) return '';
+    const str = String(d).trim();
+    try {
+      const dt = new Date(str);
+      if (!isNaN(dt.getTime())) {
+        return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
+    } catch {}
+    return str;
   };
 
   return (
@@ -792,9 +812,7 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[11px] uppercase tracking-wider">
                 <th className="p-3">Order ID & AWB</th>
-                <th className="p-3">Courier</th>
                 <th className="p-3">Amounts (₹)</th>
-                <th className="p-3">Item / SKU</th>
                 <th className="p-3">Customer & Dates</th>
                 <th className="p-3">Fulfillment</th>
                 <th className="p-3">Recorded By</th>
@@ -802,14 +820,14 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredOrders.length === 0 ? (
+              {paginatedOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400 font-mono">
+                  <td colSpan={6} className="p-8 text-center text-slate-400 font-mono">
                     No recordings match query
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
                       <div className="flex items-center gap-2">
@@ -905,17 +923,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                     </td>
 
                     <td className="p-3 font-mono text-xs">
-                      {order.courier ? (
-                        <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-200">
-                          {order.courier}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                      {order.weight && <div className="text-[10px] text-slate-500 mt-0.5">Wt: {order.weight}</div>}
-                    </td>
-
-                    <td className="p-3 font-mono text-xs">
                       {order.orderTotal ? (
                         <div className="font-bold text-slate-900">₹{order.orderTotal}</div>
                       ) : order.orderAmount ? (
@@ -926,26 +933,15 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                       {order.shippingAmount && <div className="text-[10px] text-slate-500">Ship: ₹{order.shippingAmount}</div>}
                     </td>
 
-                    <td className="p-3 font-mono text-xs">
-                      {order.productSku ? (
-                        <div>
-                          <div className="font-bold text-slate-800">{order.productSku}</div>
-                          {order.itemCount && <span className="text-[10px] text-slate-500">Qty: {order.itemCount}</span>}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-
-                    <td className="p-3 text-xs">
-                      <div className="text-slate-800 font-bold">{order.customerName || '—'}</div>
-                      <div className="text-[10px] text-slate-500 space-y-0.5 mt-0.5 font-mono">
-                        {order.orderReceivedDate && <div>Recv: {order.orderReceivedDate}</div>}
-                        {order.dispatchDate && <div>Desp: {order.dispatchDate}</div>}
+                    <td className="py-4 px-4 align-top text-xs">
+                      <div className="text-slate-900 font-bold">{order.customerName || '—'}</div>
+                      <div className="text-[11px] text-slate-500 space-y-1 mt-1 font-mono">
+                        {order.orderReceivedDate && <div>Recv: {formatCleanDate(order.orderReceivedDate)}</div>}
+                        {order.dispatchDate && <div>Desp: {formatCleanDate(order.dispatchDate)}</div>}
                         {order.deliveredDate ? (
-                          <div className="text-emerald-700 font-bold">Deliv: {order.deliveredDate}</div>
+                          <div className="text-emerald-700 font-bold">Deliv: {formatCleanDate(order.deliveredDate)}</div>
                         ) : (
-                          <div className="text-amber-600">Deliv: Pending</div>
+                          <div className="text-amber-600 font-medium">Deliv: Pending</div>
                         )}
                       </div>
                     </td>
@@ -1050,6 +1046,47 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Pagination & Page Size Controls */}
+      {filteredOrders.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3.5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-sans mt-4">
+          <div className="flex items-center gap-2 text-slate-600 font-medium">
+            <span>Showing</span>
+            <span className="font-bold font-mono text-slate-900">{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</span>
+            <span>of</span>
+            <span className="font-bold font-mono text-slate-900">{filteredOrders.length}</span>
+            <span>orders</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500 font-medium">Per Page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#832f5e]/20 cursor-pointer"
+              >
+                <option value={15}>15</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+
+            {currentPage * itemsPerPage < filteredOrders.length && (
+              <button
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                className="px-4 py-2 bg-[#832f5e] hover:bg-[#6c234b] text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <span>Load More ({filteredOrders.length - (currentPage * itemsPerPage)} remaining)</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* FULL EDIT ORDER & AUDIT LOGS MODAL */}
       {editingOrder && (

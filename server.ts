@@ -510,6 +510,26 @@ for (const ord of INITIAL_FALLBACK_ORDERS) {
   }
 }
 
+// API Response Caching with TTL to eliminate excessive Supabase PostgREST egress
+const apiCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL_MS = 45000; // 45 seconds
+
+function getCachedApiResponse(key: string): any | null {
+  const cached = apiCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedApiResponse(key: string, data: any) {
+  apiCache.set(key, { data, timestamp: Date.now() });
+}
+
+function invalidateApiCache() {
+  apiCache.clear();
+}
+
 let workflowsStore: Record<string, DepartmentWorkflow> = {};
 let designRevisionsStore: Record<string, DesignRevision[]> = {};
 let orderAttachmentsStore: Record<string, any[]> = {};
@@ -570,6 +590,7 @@ try {
 }
 
 function saveLocalBackup() {
+  invalidateApiCache();
   const payload = JSON.stringify({ 
     orders: ordersStore, 
     settings, 
@@ -1668,6 +1689,10 @@ function logWorkflowAudit(orderId: string, actorId: string, actorName: string, a
 // Get all orders enriched with workflow metadata
 apiRouter.get('/workflow/orders', async (req, res) => {
   try {
+    const cacheKey = `workflow_orders_${JSON.stringify(req.query)}`;
+    const cached = getCachedApiResponse(cacheKey);
+    if (cached) return res.json(cached);
+
     const { role, status, designerId, unassignedOnly } = req.query;
     const now = new Date().toISOString();
 
@@ -1788,6 +1813,7 @@ apiRouter.get('/workflow/orders', async (req, res) => {
       results = results.filter(r => r.workflow.workflowStatus === status || r.workflowStatus === status);
     }
 
+    setCachedApiResponse(cacheKey, results);
     res.json(results);
   } catch (err: any) {
     console.error('Error in GET /workflow/orders:', err);
@@ -3267,6 +3293,9 @@ async function saveBatchToSupabase(records: OrderRecord[]): Promise<boolean> {
 
 // Orders GET - Syncs latest orders from Supabase and serves them
 apiRouter.get('/orders', async (req, res) => {
+  const cached = getCachedApiResponse('api_orders');
+  if (cached) return res.json(cached);
+
   const client = getSupabaseClient();
   if (client && (!hasPerformedInitialSync || Object.keys(ordersStore).length === 0)) {
     try {
@@ -3294,6 +3323,8 @@ apiRouter.get('/orders', async (req, res) => {
     const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
     return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
   });
+
+  setCachedApiResponse('api_orders', orders);
   res.json(orders);
 });
 

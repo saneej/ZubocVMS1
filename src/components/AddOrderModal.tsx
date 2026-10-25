@@ -24,13 +24,17 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
 }) => {
   const [orderSource, setOrderSource] = useState<'website' | 'amazon'>('website');
   const [orderId, setOrderId] = useState('');
+  const [customer, setCustomer] = useState('');
+  const [amazonAddress, setAmazonAddress] = useState('');
+  const [amazonProduct, setAmazonProduct] = useState('');
+
+  // Website order fields
   const [courier, setCourier] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<string>('Normal');
   const [awb, setAwb] = useState('');
   const [weight, setWeight] = useState('');
   const [sku, setSku] = useState('');
   const [itemCount, setItemCount] = useState('1');
-  const [customer, setCustomer] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [orderReceivedDate, setOrderReceivedDate] = useState('');
@@ -85,20 +89,23 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       order_source: finalSource,
       orderSource: finalSource,
       order_number_num,
-      courier: courier.trim() || (finalSource === 'amazon' ? 'Amazon Shipping' : undefined),
-      deliveryMethod: deliveryMethod || 'Normal',
-      awbNumber: awb.trim() || undefined,
-      weight: weight.trim() || undefined,
-      productSku: sku.trim() || undefined,
-      itemCount: itemCount ? String(itemCount) : '1',
+      courier: isAmazon ? 'Amazon Shipping' : (courier.trim() || undefined),
+      deliveryMethod: isAmazon ? 'Normal' : (deliveryMethod || 'Normal'),
+      awbNumber: isAmazon ? undefined : (awb.trim() || undefined),
+      weight: isAmazon ? undefined : (weight.trim() || undefined),
+      productSku: isAmazon ? (amazonProduct.trim() || undefined) : (sku.trim() || undefined),
+      product: isAmazon ? (amazonProduct.trim() || undefined) : undefined,
+      itemCount: isAmazon ? '1' : (itemCount ? String(itemCount) : '1'),
       customerName: customer.trim() || undefined,
-      contactPerson: contactPerson.trim() || undefined,
-      contactPhone: contactPhone.trim() || undefined,
+      shippingAddress1: isAmazon ? (amazonAddress.trim() || undefined) : undefined,
+      shippingStreet: isAmazon ? (amazonAddress.trim() || undefined) : undefined,
+      contactPerson: isAmazon ? undefined : (contactPerson.trim() || undefined),
+      contactPhone: isAmazon ? undefined : (contactPhone.trim() || undefined),
       orderReceivedDate: orderReceivedDate || undefined,
       dispatchDate: dispatchDate || undefined,
-      orderAmount: orderAmount.trim() || undefined,
-      shippingAmount: shippingAmount.trim() || undefined,
-      orderTotal: orderTotal.trim() || undefined,
+      orderAmount: isAmazon ? undefined : (orderAmount.trim() || undefined),
+      shippingAmount: isAmazon ? undefined : (shippingAmount.trim() || undefined),
+      orderTotal: isAmazon ? undefined : (orderTotal.trim() || undefined),
       deliveredDate: deliveredDate || undefined,
       notes: finalNotes || undefined,
       chatNotes: initialChatNote,
@@ -145,13 +152,15 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setSuccessMsg(null);
       // reset form
       setOrderId('');
+      setCustomer('');
+      setAmazonAddress('');
+      setAmazonProduct('');
       setCourier('');
       setDeliveryMethod('Normal');
       setAwb('');
       setWeight('');
       setSku('');
       setItemCount('1');
-      setCustomer('');
       setContactPerson('');
       setContactPhone('');
       setOrderReceivedDate('');
@@ -278,8 +287,80 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
             </p>
           </div>
 
-          {/* PACKAGE & SHIPMENT DETAILS */}
-          <div className="bg-stone-50/80 border border-stone-200/80 rounded-xl p-4 space-y-3.5">
+          {orderSource === 'amazon' ? (
+            /* Simplified Amazon Order Form - 4 Key Fields */
+            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-amber-200/60">
+                <PackagePlus className="w-4 h-4 text-amber-700" />
+                <span className="text-xs font-extrabold text-amber-900 font-mono uppercase tracking-wider">
+                  Amazon Order Details (4 Required Fields)
+                </span>
+              </div>
+
+              {/* Customer Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Customer Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={customer}
+                  onChange={(e) => setCustomer(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm font-bold rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white text-slate-900"
+                />
+              </div>
+
+              {/* Customer Full Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Customer Full Address (1 Column) <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="e.g. Flat 402, Sunshine Apartments, MG Road, Bangalore, Karnataka - 560001"
+                  value={amazonAddress}
+                  onChange={(e) => setAmazonAddress(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm font-medium rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white text-slate-900"
+                />
+              </div>
+
+              {/* Desired Product Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Desired Product Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Custom Acrylic Nameplate (Gold Finish)"
+                  value={amazonProduct}
+                  onChange={(e) => setAmazonProduct(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm font-bold rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-600 bg-white text-slate-900"
+                />
+              </div>
+
+              {/* Production TV Deck Toggle */}
+              <div className="pt-2">
+                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-amber-200 cursor-pointer font-bold text-slate-900 text-xs shadow-sm">
+                  <input
+                    type="checkbox"
+                    checked={sendToProductionDeck}
+                    onChange={(e) => setSendToProductionDeck(e.target.checked)}
+                    className="w-5 h-5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-black text-amber-950 uppercase tracking-wide">Display on Production TV Deck Schedule</span>
+                    <span className="text-[10px] font-bold text-amber-800/70">Enable this to track workshop sub-assembly and live dashboard monitoring</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          ) : (
+            /* PACKAGE & SHIPMENT DETAILS */
+            <div className="bg-stone-50/80 border border-stone-200/80 rounded-xl p-4 space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-stone-200/60">
               <div className="flex items-center gap-2">
                 <Box className="w-4 h-4 text-[#832f5e]" />
@@ -587,6 +668,7 @@ export const AddOrderModal: React.FC<AddOrderModalProps> = ({
               </label>
             </div>
           </div>
+          )}
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100 sticky bottom-0 bg-white z-10 py-2">
