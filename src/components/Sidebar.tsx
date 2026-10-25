@@ -66,6 +66,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'deck', label: 'Production TV Deck', icon: Tv },
       { id: 'search', label: 'Orders & Archives', icon: Search },
     ];
+  } else if (currentStaff.role === 'ORDER_MANAGEMENT') {
+    navItems = [
+      { id: 'search', label: 'Orders & Add', icon: Search },
+      { id: 'station', label: 'Packing Station', icon: Video, badge: pendingCount > 0 ? `${pendingCount}` : undefined },
+      { id: 'history', label: 'History', icon: History },
+    ];
   } else {
     // CRE and ADMIN have full access, preserving every existing feature
     navItems = [

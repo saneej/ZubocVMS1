@@ -851,57 +851,66 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
               ) : (
                 paginatedOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <Link 
-                          to={`/order/${encodeURIComponent(order.orderId)}`}
-                          className="font-mono font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
-                        >
-                          <span>{order.orderId}</span>
-                          <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </Link>
-                        {order.isProductionDeckOrder && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#832f5e]/10 text-[#832f5e] border border-[#832f5e]/20 font-mono shrink-0">
-                            TV DECK
-                          </span>
-                        )}
-                        {order.isDesignRequired && (() => {
-                          const s = order.workflowStatus || 'DESIGN_PENDING';
-                          const isCreReview = ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(s);
-                          const isRevision = s === 'DESIGN_REVISION_REQUESTED';
-                          const isProdPending = s === 'PRODUCTION_PENDING';
-                          const isProdActive = s === 'PRODUCTION_IN_PROGRESS';
-                          const isProdDone = s === 'PRODUCTION_COMPLETED';
-
-                          let badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
-                          let label = s.replace(/_/g, ' ');
-
-                          if (isCreReview) {
-                            badgeClass = 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse font-black';
-                            label = 'AWAITING CRE REVIEW';
-                          } else if (isRevision) {
-                            badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                            label = 'REVISION REQUESTED';
-                          } else if (isProdPending) {
-                            badgeClass = 'bg-blue-50 text-blue-800 border-blue-200 font-bold';
-                            label = 'CRE APPROVED • PROD QUEUED';
-                          } else if (isProdActive) {
-                            badgeClass = 'bg-indigo-50 text-indigo-800 border-indigo-200 font-bold';
-                            label = 'IN PRODUCTION';
-                          } else if (isProdDone) {
-                            badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold';
-                            label = 'PRODUCTION READY';
-                          }
-
-                          return (
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] border font-mono shrink-0 flex items-center gap-1 ${badgeClass}`}>
-                              <Palette className="w-2.5 h-2.5" />
-                              <span>{label}</span>
+                    <td className="py-4 px-4 align-top w-[280px]">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link 
+                            to={`/order/${encodeURIComponent(order.orderId)}`}
+                            className="font-mono font-bold text-slate-900 text-xs hover:text-blue-600 hover:underline flex items-center gap-1 group"
+                          >
+                            <span>{order.orderId}</span>
+                            <Eye className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </Link>
+                          {order.isProductionDeckOrder && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#832f5e]/10 text-[#832f5e] border border-[#832f5e]/20 font-mono shrink-0">
+                              TV DECK
                             </span>
-                          );
-                        })()}
+                          )}
+                          {order.isDesignRequired && (() => {
+                            const s = order.workflowStatus || 'DESIGN_PENDING';
+                            const isCreReview = ['DESIGN_SUBMITTED', 'CRE_REVIEW_PENDING', 'SUBMITTED_TO_CRE'].includes(s);
+                            const isRevision = s === 'DESIGN_REVISION_REQUESTED';
+                            const isProdPending = s === 'PRODUCTION_PENDING';
+                            const isProdActive = s === 'PRODUCTION_IN_PROGRESS';
+                            const isProdDone = s === 'PRODUCTION_COMPLETED';
+
+                            let badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
+                            let label = s.replace(/_/g, ' ');
+
+                            if (isCreReview) {
+                              badgeClass = 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse font-black';
+                              label = 'AWAITING CRE REVIEW';
+                            } else if (isRevision) {
+                              badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                              label = 'REVISION REQUESTED';
+                            } else if (isProdPending) {
+                              badgeClass = 'bg-blue-50 text-blue-800 border-blue-200 font-bold';
+                              label = 'CRE APPROVED • PROD QUEUED';
+                            } else if (isProdActive) {
+                              badgeClass = 'bg-indigo-50 text-indigo-800 border-indigo-200 font-bold';
+                              label = 'IN PRODUCTION';
+                            } else if (isProdDone) {
+                              badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold';
+                              label = 'PRODUCTION READY';
+                            }
+
+                            return (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] border font-mono shrink-0 flex items-center gap-1 ${badgeClass}`}>
+                                <Palette className="w-2.5 h-2.5" />
+                                <span>{label}</span>
+                              </span>
+                            );
+                          })()}
+                        </div>
+
+                        {order.awbNumber ? (
+                          <div className="font-mono text-[11px] text-blue-600 font-medium">AWB: {order.awbNumber}</div>
+                        ) : (
+                          <div className="text-slate-400 text-[10px] font-mono">No AWB</div>
+                        )}
+
                         {onStartPacking && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                             {/* Check if evidence exists in TG/system - check for non-empty values */}
                             {((order.telegramMessageLink && order.telegramMessageLink.trim() !== '') || 
                               (order.videoUrl && order.videoUrl.trim() !== '') || 
@@ -937,11 +946,6 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
                           </div>
                         )}
                       </div>
-                      {order.awbNumber ? (
-                        <div className="font-mono text-[11px] text-blue-600 font-medium">AWB: {order.awbNumber}</div>
-                      ) : (
-                        <span className="text-slate-400 text-[10px]">No AWB</span>
-                      )}
                     </td>
 
                     <td className="p-3 font-mono text-xs">

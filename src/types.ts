@@ -194,7 +194,7 @@ export interface AppSettings {
   tvScrollSpeed?: number;
 }
 
-export type StaffRole = 'ADMIN' | 'CRE' | 'DESIGNER' | 'PRODUCTION' | 'SUPERVISOR' | 'PACKER';
+export type StaffRole = 'ADMIN' | 'CRE' | 'DESIGNER' | 'PRODUCTION' | 'SUPERVISOR' | 'ORDER_MANAGEMENT';
 
 export interface StaffMember {
   id: string;
