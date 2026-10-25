@@ -33,7 +33,6 @@ import { OrderRecord, StaffMember, DepartmentWorkflow, OrderAttachment, DesignRe
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
 import { RequestRevisionModal } from './RequestRevisionModal';
-import { INITIAL_FALLBACK_ORDERS } from '../utils/initialOrders';
 
 interface DesignerDashboardProps {
   currentStaff: StaffMember;
@@ -54,10 +53,10 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return INITIAL_FALLBACK_ORDERS;
+    return [];
   });
   const [designersList, setDesignersList] = useState<StaffMember[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(ordersWithWorkflow.length === 0);
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   

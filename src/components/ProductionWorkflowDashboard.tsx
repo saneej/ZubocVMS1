@@ -26,7 +26,6 @@ import { StaffMember, DepartmentWorkflow, OrderAttachment } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
 import { RequestRevisionModal } from './RequestRevisionModal';
-import { INITIAL_FALLBACK_ORDERS } from '../utils/initialOrders';
 
 interface ProductionWorkflowDashboardProps {
   currentStaff: StaffMember;
@@ -48,9 +47,9 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return INITIAL_FALLBACK_ORDERS;
+    return [];
   });
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(ordersWithWorkflow.length === 0);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Selected order for manufacturing drawer
