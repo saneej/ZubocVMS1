@@ -553,6 +553,28 @@ export const SearchRetrieval: React.FC<SearchRetrievalProps> = ({
         }}
       />
       
+      {/* Friendly Minimal Guide Banner */}
+      <div className="bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border border-purple-500/20 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold shadow-md shadow-purple-600/30 shrink-0">
+            <Sparkles className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900 font-sans">Welcome to Zuboc VMS Order Dashboard</h2>
+            <p className="text-xs text-slate-600 font-medium">Manage Website & Amazon orders effortlessly, record packing proofs in 1 click, and track workflows in real time.</p>
+          </div>
+        </div>
+        {onOpenAddOrder && (
+          <button
+            onClick={onOpenAddOrder}
+            className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black shadow-md shadow-purple-600/25 transition-all cursor-pointer shrink-0 active:scale-95"
+          >
+            <PackagePlus className="w-4 h-4" />
+            <span>+ Add New Order</span>
+          </button>
+        )}
+      </div>
+
       {/* Search & Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
         
