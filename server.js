@@ -11,7 +11,105 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
 // src/utils/initialOrders.ts
-var INITIAL_FALLBACK_ORDERS = [];
+var INITIAL_FALLBACK_ORDERS = [
+  {
+    orderId: "ORD-1001",
+    order_source: "website",
+    orderSource: "website",
+    order_number_num: 1001,
+    staffId: "Admin",
+    stationId: "Packing-01",
+    recordingStartedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    durationSeconds: 12,
+    recordingStatus: "COMPLETED",
+    uploadStatus: "SUCCESS",
+    awbNumber: "AWB987654321",
+    courier: "Delhivery",
+    deliveryMethod: "Express",
+    weight: "0.45 kg",
+    productSku: "LUX-BOX-GOLD-01",
+    customerName: "Rahul Sharma (Mumbai)",
+    contactPerson: "Rahul",
+    contactPhone: "+91 98765 43210",
+    orderReceivedDate: (/* @__PURE__ */ new Date()).toISOString(),
+    dispatchDate: (/* @__PURE__ */ new Date()).toISOString(),
+    orderAmount: "2499.00",
+    shippingAmount: "150.00",
+    orderTotal: "2649.00",
+    itemCount: 2,
+    fulfillmentStatus: "Pending",
+    notes: "Custom gold foil stamping on velvet box lid.",
+    remarks: "Checked and verified by QC",
+    isDesignRequired: true,
+    workflowStatus: "DESIGN_PENDING",
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  },
+  {
+    orderId: "ORD-1002",
+    order_source: "website",
+    orderSource: "website",
+    order_number_num: 1002,
+    staffId: "Admin",
+    stationId: "Packing-01",
+    recordingStartedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    durationSeconds: 18,
+    recordingStatus: "COMPLETED",
+    uploadStatus: "SUCCESS",
+    awbNumber: "AWB123456789",
+    courier: "Blue Dart",
+    deliveryMethod: "Normal",
+    weight: "1.20 kg",
+    productSku: "INV-ROYAL-VINTAGE",
+    customerName: "Priya Patel (Bangalore)",
+    contactPerson: "Priya",
+    contactPhone: "+91 91234 56789",
+    orderReceivedDate: (/* @__PURE__ */ new Date()).toISOString(),
+    dispatchDate: (/* @__PURE__ */ new Date()).toISOString(),
+    orderAmount: "4500.00",
+    shippingAmount: "200.00",
+    orderTotal: "4700.00",
+    itemCount: 5,
+    fulfillmentStatus: "Packed",
+    notes: "Wax seal stamp with custom crest monogram.",
+    remarks: "Passed QA inspection",
+    isDesignRequired: true,
+    workflowStatus: "PRODUCTION_PENDING",
+    createdAt: new Date(Date.now() - 36e5).toISOString(),
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  },
+  {
+    orderId: "AMZ-402-9832104",
+    order_source: "amazon",
+    orderSource: "amazon",
+    order_number_num: 4029832,
+    staffId: "System",
+    stationId: "Order-Department",
+    recordingStartedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    durationSeconds: 0,
+    recordingStatus: "PENDING",
+    uploadStatus: "PENDING",
+    awbNumber: "AMZ-TRK-88210",
+    courier: "Amazon Shipping",
+    deliveryMethod: "Normal",
+    weight: "0.80 kg",
+    productSku: "AMZ-STATIONERY-PACK",
+    customerName: "Amit Kumar (Delhi)",
+    contactPerson: "Amit",
+    contactPhone: "+91 99887 76655",
+    orderReceivedDate: (/* @__PURE__ */ new Date()).toISOString(),
+    orderAmount: "1299.00",
+    shippingAmount: "0.00",
+    orderTotal: "1299.00",
+    itemCount: 1,
+    fulfillmentStatus: "Pending",
+    notes: "Standard Amazon fulfillment order.",
+    isDesignRequired: false,
+    workflowStatus: "CRE_CREATED",
+    createdAt: new Date(Date.now() - 72e5).toISOString(),
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  }
+];
 
 // server.ts
 import { exec } from "child_process";
@@ -637,9 +735,21 @@ async function syncFromSupabase() {
         for (const o of ords) {
           if (o.orderId) freshOrdersMap[o.orderId] = o;
         }
-        ordersStore = freshOrdersMap;
+        if (Object.keys(freshOrdersMap).length > 0) {
+          ordersStore = freshOrdersMap;
+          console.log(`Synced ${ords.length} orders from Supabase.`);
+        } else {
+          console.log("Supabase orders table is empty. Seeding initial fallback orders...");
+          for (const fallbackOrd of INITIAL_FALLBACK_ORDERS) {
+            if (fallbackOrd && fallbackOrd.orderId) {
+              ordersStore[fallbackOrd.orderId] = fallbackOrd;
+              client.from("orders").upsert(cleanForSupabase(fallbackOrd), { onConflict: "orderId" }).then(() => {
+              }).catch(() => {
+              });
+            }
+          }
+        }
         saveLocalBackup();
-        console.log(`Synced ${ords.length} orders from Supabase.`);
       }
     }
     if (workflowsRes.status === "fulfilled") {
@@ -2671,6 +2781,11 @@ apiRouter.get("/orders", async (req, res) => {
       hasPerformedInitialSync = true;
     } catch (e) {
       console.warn("Initial sync warning on GET /orders:", e?.message);
+    }
+  }
+  if (Object.keys(ordersStore).length === 0) {
+    for (const ord of INITIAL_FALLBACK_ORDERS) {
+      if (ord && ord.orderId) ordersStore[ord.orderId] = ord;
     }
   }
   const orders = Object.values(ordersStore).map((o) => {
