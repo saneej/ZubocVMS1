@@ -26,6 +26,7 @@ import { StaffMember, DepartmentWorkflow, OrderAttachment } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
 import { RequestRevisionModal } from './RequestRevisionModal';
+import { INITIAL_FALLBACK_ORDERS } from '../utils/initialOrders';
 
 interface ProductionWorkflowDashboardProps {
   currentStaff: StaffMember;
@@ -39,8 +40,17 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
   onNavigateToCRE
 }) => {
   const [activeTab, setActiveTab] = useState<'PENDING' | 'IN_PROGRESS' | 'COMPLETED'>('PENDING');
-  const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('zuboc_production_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_FALLBACK_ORDERS;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Selected order for manufacturing drawer
@@ -53,11 +63,11 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchWorkflowOrders = async () => {
-    setIsLoading(true);
     try {
       const data = await safeFetchJson('/api/workflow/orders');
       if (Array.isArray(data)) {
         setOrdersWithWorkflow(data);
+        try { localStorage.setItem('zuboc_production_orders_cache', JSON.stringify(data)); } catch {}
       }
     } catch (err: any) {
       console.error('Error fetching production orders:', err);
@@ -68,8 +78,22 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
 
   useEffect(() => {
     fetchWorkflowOrders();
-    const interval = setInterval(fetchWorkflowOrders, 8000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchWorkflowOrders, 45000);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('zuboc_flow_sync');
+      bc.onmessage = (msg) => {
+        if (msg.data?.type === 'SYNC_REFRESH') {
+          fetchWorkflowOrders();
+        }
+      };
+    } catch {}
+
+    return () => {
+      clearInterval(interval);
+      if (bc) bc.close();
+    };
   }, []);
 
   // Filter queues

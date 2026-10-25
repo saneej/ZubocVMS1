@@ -33,6 +33,7 @@ import { OrderRecord, StaffMember, DepartmentWorkflow, OrderAttachment, DesignRe
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
 import { RequestRevisionModal } from './RequestRevisionModal';
+import { INITIAL_FALLBACK_ORDERS } from '../utils/initialOrders';
 
 interface DesignerDashboardProps {
   currentStaff: StaffMember;
@@ -45,9 +46,18 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 }) => {
   const isCREOrAdmin = currentStaff.role === 'ADMIN' || currentStaff.role === 'CRE';
   const [activeTab, setActiveTab] = useState<'UNASSIGNED' | 'MY_ORDERS' | 'CRE_REVIEW' | 'SUBMITTED' | 'ALL_DESIGN_PROJECTS'>('UNASSIGNED');
-  const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>([]);
+  const [ordersWithWorkflow, setOrdersWithWorkflow] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('zuboc_designer_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_FALLBACK_ORDERS;
+  });
   const [designersList, setDesignersList] = useState<StaffMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   
@@ -63,12 +73,20 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
   // Modal for CRE requesting revision from Designer
   const [revisionModalTarget, setRevisionModalTarget] = useState<any | null>(null);
 
+  const broadcastSync = () => {
+    try {
+      const bc = new BroadcastChannel('zuboc_flow_sync');
+      bc.postMessage({ type: 'SYNC_REFRESH' });
+      bc.close();
+    } catch {}
+  };
+
   const fetchWorkflowOrders = async () => {
-    setIsLoading(true);
     try {
       const data = await safeFetchJson('/api/workflow/orders');
       if (Array.isArray(data)) {
         setOrdersWithWorkflow(data);
+        try { localStorage.setItem('zuboc_designer_orders_cache', JSON.stringify(data)); } catch {}
       }
     } catch (err: any) {
       console.error('Error fetching designer orders:', err);
@@ -79,8 +97,22 @@ export const DesignerDashboard: React.FC<DesignerDashboardProps> = ({
 
   useEffect(() => {
     fetchWorkflowOrders();
-    const interval = setInterval(fetchWorkflowOrders, 8000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchWorkflowOrders, 45000);
+    
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('zuboc_flow_sync');
+      bc.onmessage = (msg) => {
+        if (msg.data?.type === 'SYNC_REFRESH') {
+          fetchWorkflowOrders();
+        }
+      };
+    } catch {}
+
+    return () => {
+      clearInterval(interval);
+      if (bc) bc.close();
+    };
   }, []);
 
   useEffect(() => {

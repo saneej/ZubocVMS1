@@ -1397,37 +1397,16 @@ apiRouter.get("/workflow/orders", async (req, res) => {
   try {
     const { role, status, designerId, unassignedOnly } = req.query;
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    const client = getSupabaseClient();
-    if (client) {
-      try {
-        if (!hasPerformedInitialSync || Object.keys(ordersStore).length === 0) {
-          await syncFromSupabase();
-        } else {
-          const LIGHTWEIGHT_COLUMNS = "orderId, staffId, stationId, recordingStartedAt, recordingCompletedAt, durationSeconds, recordingStatus, uploadStatus, evidenceType, videoUrl, photoUrls, awbNumber, courier, deliveryMethod, weight, productSku, customerName, contactPerson, contactPhone, fulfillFrom, orderReceivedDate, dispatchDate, riderNumber, deliveredDate, orderAmount, shippingAmount, orderTotal, itemCount, fulfillmentStatus, notes, remarks, clientName, product, formFillingDate, preparedBy, checkedBy, customisations, subAssemblyProgress, timeline, promisedDeliveryDate, paymentGate, productionStage, stageDueDates, productionNotes, isProductionDeckOrder, createdAt, updatedAt, order_source, orderSource, order_number_num, email, financialStatus, subtotal, shipping, taxes, total, discountCode, discountAmount, shippingMethod, shippingName, shippingStreet, shippingAddress1, shippingAddress2, shippingCompany, shippingCity, shippingZip, shippingProvince, shippingCountry, shippingPhone, lineItems";
-          const [workflowsRes, ordersRes] = await Promise.allSettled([
-            withTimeout(client.from("department_order_workflow").select("*"), 5e3),
-            withTimeout(client.from("orders").select(LIGHTWEIGHT_COLUMNS).order("createdAt", { ascending: false }), 5e3)
-          ]);
-          if (workflowsRes.status === "fulfilled") {
-            const { data: wfs, error: wfErr } = workflowsRes.value;
-            if (!wfErr && Array.isArray(wfs)) {
-              for (const w of wfs) {
-                if (w.orderId) workflowsStore[w.orderId] = { ...workflowsStore[w.orderId] || {}, ...w };
-              }
-            }
-          }
-          if (ordersRes.status === "fulfilled") {
-            const { data: ords, error: ordErr } = ordersRes.value;
-            if (!ordErr && Array.isArray(ords)) {
-              for (const o of ords) {
-                if (o.orderId) ordersStore[o.orderId] = { ...ordersStore[o.orderId] || {}, ...o };
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Supabase sync warning on /workflow/orders:", e?.message);
+    if (Object.keys(ordersStore).length === 0) {
+      for (const ord of INITIAL_FALLBACK_ORDERS) {
+        if (ord && ord.orderId) ordersStore[ord.orderId] = ord;
       }
+    }
+    const client = getSupabaseClient();
+    if (client && !hasPerformedInitialSync) {
+      syncFromSupabase().catch(() => {
+      });
+      hasPerformedInitialSync = true;
     }
     const findWorkflow = (orderId) => {
       if (!orderId) return void 0;
