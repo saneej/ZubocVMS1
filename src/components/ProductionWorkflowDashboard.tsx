@@ -25,6 +25,7 @@ import {
 import { StaffMember, DepartmentWorkflow, OrderAttachment } from '../types';
 import { safeFetchJson } from '../utils/api';
 import { formatIST } from '../utils/time';
+import { supabase } from '../supabase';
 import { RequestRevisionModal } from './RequestRevisionModal';
 import { INITIAL_FALLBACK_ORDERS } from '../utils/initialOrders';
 
@@ -65,15 +66,31 @@ export const ProductionWorkflowDashboard: React.FC<ProductionWorkflowDashboardPr
   const fetchWorkflowOrders = async () => {
     try {
       const data = await safeFetchJson('/api/workflow/orders');
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setOrdersWithWorkflow(data);
         try { localStorage.setItem('zuboc_production_orders_cache', JSON.stringify(data)); } catch {}
+        return;
       }
     } catch (err: any) {
-      console.error('Error fetching production orders:', err);
-    } finally {
-      setIsLoading(false);
+      console.warn('Error fetching production orders via API, using direct Supabase fallback:', err);
     }
+
+    try {
+      const { data: supaOrders } = await supabase.from('orders').select('*').order('createdAt', { ascending: false });
+      if (Array.isArray(supaOrders) && supaOrders.length > 0) {
+        const enriched = supaOrders.map(o => ({
+          ...o,
+          workflow: {
+            orderId: o.orderId,
+            isDesignRequired: o.isDesignRequired || o.workflowStatus === 'DESIGN_PENDING',
+            workflowStatus: o.workflowStatus || 'PRODUCTION_PENDING',
+            priority: 'NORMAL'
+          }
+        }));
+        setOrdersWithWorkflow(enriched);
+        try { localStorage.setItem('zuboc_production_orders_cache', JSON.stringify(enriched)); } catch {}
+      }
+    } catch {}
   };
 
   useEffect(() => {
