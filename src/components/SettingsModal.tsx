@@ -50,7 +50,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onStaffChanged
 }) => {
   const isAdmin = currentStaff.role === 'ADMIN';
-  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'cache'>(isAdmin ? 'telegram' : 'profile');
+  const [activeTab, setActiveTab] = useState<'telegram' | 'profile' | 'staffs' | 'cache' | 'migration'>(isAdmin ? 'telegram' : 'profile');
 
   // Cache clearing state
   const [isClearingCache, setIsClearingCache] = useState(false);
@@ -144,6 +144,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [resettingStaffId, setResettingStaffId] = useState<string | null>(null);
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+
+  // Supabase Migration State
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => localStorage.getItem('zuboc_custom_supabase_url') || '');
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => localStorage.getItem('zuboc_custom_supabase_anon_key') || '');
+  const [supabaseTestStatus, setSupabaseTestStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const handleSaveSupabaseConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsTestingSupabase(true);
+    setSupabaseTestStatus(null);
+    try {
+      if (supabaseUrlInput.trim()) {
+        localStorage.setItem('zuboc_custom_supabase_url', supabaseUrlInput.trim());
+      } else {
+        localStorage.removeItem('zuboc_custom_supabase_url');
+      }
+      if (supabaseKeyInput.trim()) {
+        localStorage.setItem('zuboc_custom_supabase_anon_key', supabaseKeyInput.trim());
+      } else {
+        localStorage.removeItem('zuboc_custom_supabase_anon_key');
+      }
+
+      const res = await safeFetchJson('/api/supabase/status');
+      if (res && res.connected) {
+        setSupabaseTestStatus({ success: true, message: `Connected successfully to new Supabase project! (${res.sampleCount || 0} orders found)` });
+      } else {
+        setSupabaseTestStatus({ success: false, message: res?.error || 'Connected, but tables might be missing. Ensure you ran the SQL migration script.' });
+      }
+    } catch (err: any) {
+      setSupabaseTestStatus({ success: false, message: err?.message || 'Failed to connect to Supabase' });
+    } finally {
+      setIsTestingSupabase(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const res = await safeFetchJson('/api/admin/export-all-data');
+      if (res && res.success && res.data) {
+        const jsonStr = JSON.stringify(res.data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `zuboc_flow_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        throw new Error('Export failed');
+      }
+    } catch (err: any) {
+      alert(`Export failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    setImportStatus(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const dataPayload = parsed.data || parsed;
+      const res = await safeFetchJson('/api/admin/import-all-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: dataPayload })
+      });
+      if (res && res.success) {
+        setImportStatus('Data imported and synced successfully! Reloading in 1.5 seconds...');
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        throw new Error(res?.error || 'Import failed');
+      }
+    } catch (err: any) {
+      setImportStatus(`Import error: ${err?.message || 'Invalid JSON file'}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -470,6 +560,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
               <span>CLEAR CACHE</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('migration')}
+              className={`px-4 py-2.5 font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+                activeTab === 'migration'
+                  ? 'border-blue-600 text-blue-600 bg-white rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 text-blue-600" />
+              <span>SUPABASE & MIGRATION</span>
             </button>
           )}
         </div>
@@ -938,6 +1043,153 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <RotateCcw className={`w-4 h-4 ${isClearingCache ? 'animate-spin' : ''}`} />
                   <span>{isClearingCache ? 'CLEARING ALL CACHES...' : 'PURGE ALL CACHES & RELOAD'}</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: Supabase & Migration */}
+          {activeTab === 'migration' && (
+            <div className="space-y-5 font-mono">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-900 space-y-1">
+                <div className="font-bold flex items-center gap-2 text-xs">
+                  <Database className="w-4 h-4 text-blue-600" />
+                  <span>Supabase Account Switcher &amp; Data Migration</span>
+                </div>
+                <div className="text-[11px] text-blue-800 leading-relaxed">
+                  Switch your application to a new Supabase project, export all orders and staff data as a JSON backup, and import data into your new Supabase account.
+                </div>
+              </div>
+
+              {/* 1. Supabase Account Configuration Form */}
+              <form onSubmit={handleSaveSupabaseConfig} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="font-bold text-slate-900 text-xs uppercase flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Configure New Supabase Account</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase">Supabase Project URL</label>
+                  <input
+                    type="url"
+                    value={supabaseUrlInput}
+                    onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                    placeholder="https://your-project.supabase.co"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-xs focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase">Supabase Anon / Public Key</label>
+                  <input
+                    type="password"
+                    value={supabaseKeyInput}
+                    onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                    placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 text-xs focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                {supabaseTestStatus && (
+                  <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                    supabaseTestStatus.success ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+                  }`}>
+                    {supabaseTestStatus.success ? <Check className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
+                    <span>{supabaseTestStatus.message}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isTestingSupabase}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs cursor-pointer shadow-2xs flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isTestingSupabase ? 'TESTING & SAVING...' : 'SAVE & TEST CONNECTION'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* 2. Data Export & Import Panel */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Export Card */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="font-bold text-slate-900 text-xs uppercase flex items-center gap-1.5">
+                      <Download className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Export All Data</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      Download a complete JSON backup file containing all orders, workflows, staff access codes, and settings.
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExportData}
+                    disabled={isExporting}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-2xs text-xs uppercase tracking-wider"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{isExporting ? 'EXPORTING...' : '📥 EXPORT JSON BACKUP'}</span>
+                  </button>
+                </div>
+
+                {/* Import Card */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="font-bold text-slate-900 text-xs uppercase flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Import Data (Restore)</span>
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      Upload your JSON backup file to instantly populate the new Supabase database and local storage.
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center gap-2 cursor-pointer shadow-2xs text-xs uppercase tracking-wider">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{isImporting ? 'IMPORTING...' : '📤 IMPORT JSON BACKUP'}</span>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={importStatus && isImporting ? undefined : handleImportFileChange}
+                        disabled={isImporting}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {importStatus && (
+                    <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-900 text-[11px] rounded-lg">
+                      {importStatus}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. SQL Schema & Functions Reference */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                <div className="font-bold text-amber-900 text-xs uppercase flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-amber-600" />
+                  <span>Required SQL Setup for New Supabase Project</span>
+                </div>
+                <div className="text-[11px] text-amber-800 leading-relaxed">
+                  Run the complete SQL migration script (available in <code>database_migration_cre_designer_production.sql</code>) in your new Supabase project&#39;s SQL Editor to set up all tables (<code>orders</code>, <code>staffs</code>, <code>department_order_workflow</code>, <code>design_revisions</code>, <code>workflow_audit_logs</code>), constraints, and RPC functions (<code>accept_design_order</code>, <code>submit_design_to_cre</code>, <code>cre_approve_design</code>).
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`-- Run database_migration_cre_designer_production.sql in your new Supabase SQL Editor.`);
+                      alert('Instructions copied! Open database_migration_cre_designer_production.sql in your repository for the complete SQL script.');
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] cursor-pointer shadow-2xs"
+                  >
+                    📋 Copy SQL Instructions
+                  </button>
+                </div>
               </div>
             </div>
           )}

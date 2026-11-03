@@ -6,10 +6,23 @@ export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://bdfgsc
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkZmdzY2ppdXFjY29pZGtlYXFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDc0ODgsImV4cCI6MjEwNzk4MzQ4OH0.CP8Cb8ZYRdvtV4Cs4PEe6XnA9S3rrv3O6LLbnTh2T2U';
 
 let _supabaseClientInstance: any = null;
+let _cachedUrl = '';
+let _cachedKey = '';
 
 export function getClientSupabase() {
-  if (_supabaseClientInstance) return _supabaseClientInstance;
-  _supabaseClientInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  const customUrl = typeof window !== 'undefined' ? localStorage.getItem('zuboc_custom_supabase_url') : null;
+  const customKey = typeof window !== 'undefined' ? localStorage.getItem('zuboc_custom_supabase_anon_key') : null;
+  
+  const url = (customUrl && customUrl.trim()) || SUPABASE_URL;
+  const key = (customKey && customKey.trim()) || SUPABASE_ANON_KEY;
+
+  if (_supabaseClientInstance && _cachedUrl === url && _cachedKey === key) {
+    return _supabaseClientInstance;
+  }
+
+  _cachedUrl = url;
+  _cachedKey = key;
+  _supabaseClientInstance = createClient(url, key, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

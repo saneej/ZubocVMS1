@@ -1250,6 +1250,76 @@ apiRouter.get('/supabase/status', async (req, res) => {
   }
 });
 
+// Export all app data
+apiRouter.get('/admin/export-all-data', (req, res) => {
+  res.json({
+    success: true,
+    exportedAt: new Date().toISOString(),
+    version: APP_VERSION,
+    data: {
+      orders: ordersStore,
+      staffs: staffsStore,
+      settings,
+      workflows: workflowsStore,
+      revisions: designRevisionsStore,
+      attachments: orderAttachmentsStore,
+      auditLogs: workflowAuditLogsStore
+    }
+  });
+});
+
+// Import all app data
+apiRouter.post('/admin/import-all-data', async (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!data || typeof data !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid import data payload' });
+    }
+
+    if (data.orders && typeof data.orders === 'object') {
+      ordersStore = { ...data.orders };
+      const client = getSupabaseClient();
+      if (client) {
+        for (const ord of Object.values(data.orders)) {
+          try {
+            await client.from('orders').upsert(cleanForSupabase(ord), { onConflict: 'orderId' });
+          } catch {}
+        }
+      }
+    }
+
+    if (data.staffs && typeof data.staffs === 'object') {
+      staffsStore = { ...data.staffs };
+      const client = getSupabaseClient();
+      if (client) {
+        for (const stf of Object.values(data.staffs)) {
+          try {
+            await client.from('staffs').upsert(cleanForSupabase(stf), { onConflict: 'id' });
+          } catch {}
+        }
+      }
+    }
+
+    if (data.settings && typeof data.settings === 'object') {
+      settings = { ...settings, ...data.settings };
+    }
+
+    if (data.workflows && typeof data.workflows === 'object') {
+      workflowsStore = { ...data.workflows };
+    }
+
+    if (data.auditLogs && Array.isArray(data.auditLogs)) {
+      workflowAuditLogsStore = [...data.auditLogs];
+    }
+
+    saveLocalBackup();
+
+    res.json({ success: true, message: 'Data imported and synced successfully!' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Import failed' });
+  }
+});
+
 // Cloudflare R2 Status & Test Endpoints
 apiRouter.get('/cloudflare/status', async (req, res) => {
   const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT || process.env.R2_ENDPOINT || '';
